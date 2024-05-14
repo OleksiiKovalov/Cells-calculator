@@ -15,7 +15,7 @@ class CellCounter():
 
     Output value is the number of cells detected.
     """
-    def __init__(self, path='best_m.pt'):
+    def __init__(self, path='model/best_m.pt'):
         self.model = YOLO(path)
 
     def countCells(self, img_path):
@@ -29,7 +29,7 @@ class CellCounter():
         The output param is optimized count of cells.
         """
 
-        cache_dir = '.cache'
+        cache_dir = 'model/cache'
         os.makedirs(cache_dir, exist_ok=True)
 
         img = cv2.imread(img_path)
@@ -75,9 +75,9 @@ class CellCounter():
         cv2.imwrite(os.path.join(cache_dir, cache_img_paths[6]), img1121)
         cv2.imwrite(os.path.join(cache_dir, cache_img_paths[7]), img1222)
 
-        results = self.model([img_path, 'img11.png', 'img12.png',
-                              'img21.png', 'img22.png', 'img1112.png',
-                              'img2122.png', 'img1121.png', 'img1222.png'])  # return a list of Results objects
+        results = self.model([img_path, cache_dir+'/img11.png', cache_dir+'/img12.png',
+                              cache_dir+'/img21.png', cache_dir+'/img22.png', cache_dir+'/img1112.png',
+                              cache_dir+'/img2122.png', cache_dir+'/img1121.png', cache_dir+'/img1222.png'])  # return a list of Results objects
 
         res_values = {
             'img': 0,

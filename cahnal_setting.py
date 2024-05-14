@@ -66,7 +66,7 @@ class DialogWindow(QMainWindow):
             
             #combo_box.setContentsMargins(0, 0, 0, 0)
             combo_box.addItems([f'Channel {i+1}'for i in range(self.num_channels)])
-            combo_box.setCurrentText(self.parametrs[option])
+            combo_box.setCurrentText(f"Channel {self.parametrs[option]+1}")
             
             self.combo_box_dict[option] = combo_box
             label_combo_layout = QHBoxLayout()
@@ -109,7 +109,7 @@ class DialogWindow(QMainWindow):
         #check_parametrs(self.combo_box_dict)
         
         for option,combo_box in self.combo_box_dict.items():
-            self.parametrs[option] = combo_box.currentText()
+            self.parametrs[option] = int (combo_box.currentText()[len("Chennal "):]) -1
 
         #if okay
         self.close()

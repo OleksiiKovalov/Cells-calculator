@@ -6,19 +6,21 @@ import numpy as np
 import tifffile
 from cahnal_setting import DialogWindow
 from calculate_functions import metod1, metod2, metod3
+from model.Model import Model as model1
 from table import calculate_table
 import os
 class MainWindow(QMainWindow):
     
-    parametrs = {'Option 1': 'Channel 1',
-                 'Option 2': 'Channel 2',
-                 'Option 3': 'Channel 3'
+    parametrs = {'Cell' : 0,
+                 'Nuclei': 1
                  
                  }
+    
     metods = {
-        'metod1': metod1,
-        'metod2': metod2,
-        'metod3': metod3
+        'Model 1': model1().calculate,
+        'Model 2': metod2,
+        'Model 3': metod3
+       
     }
     lsm_path = None
     lsm_filesList = None
@@ -84,7 +86,7 @@ class MainWindow(QMainWindow):
                 self.df.to_csv(file_name, index=False)
     def init_rightLayout(self):
         self.combo_box = QComboBox()
-        label = QLabel("Choose metod:")
+        label = QLabel("Choose model:")
         self.right_scene = QGraphicsScene()
       
         self.right_view = QGraphicsView(self.right_scene)
@@ -172,7 +174,7 @@ class MainWindow(QMainWindow):
             
         #self.right_view.setFixedSize(451, 661)
         if metod != "All_metod":
-            result = self.metods[metod](lsm_path = self.lsm_path, parametrs = self.parametrs)
+            result = self.metods[metod](img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
             if not result:
                 return 0
             label_aliveCells = QGraphicsTextItem(f'Alive cells: {result["alive"]*100}%')
@@ -193,12 +195,12 @@ class MainWindow(QMainWindow):
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             table.setRowCount(len(self.metods))
             table.setColumnCount(2)
-            table.setHorizontalHeaderLabels(['Metod', 'Alive/Dead Cells %'])
+            table.setHorizontalHeaderLabels(['Model', 'Alive/Dead Cells %'])
             row = 0
             for metod_name, metod in self.metods.items():
                 if metod_name == "All_metod":
                     continue
-                result = metod(self.lsm_path, self.parametrs)
+                result = metod(img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
                 if result:
                     row_toAdd = f"{result['alive']*100}%/{result['dead']*100}%"
                 else:

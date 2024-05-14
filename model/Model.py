@@ -3,8 +3,8 @@ import numpy as np
 import cv2
 import tiffile
 
-from CellCounter import CellCounter
-from NucleiCounter import NucleiCounter
+from model.CellCounter import CellCounter
+from model.NucleiCounter import NucleiCounter
 
 class Model():
     """
@@ -24,15 +24,26 @@ class Model():
     - 'Cells': the number of cells detected;
     - '%': the target percentage value obtained.
     """
-    def __init__(self, path='best_m.pt', threshold=100, eps=5, min_samples=10):
+    def __init__(self, path='model/best_m.pt', threshold=100, eps=5, min_samples=10):
         self.nuclei_counter = NucleiCounter(threshold=threshold, eps=eps, min_samples=min_samples)
         self.cell_counter = CellCounter(path=path)
 
-    def read_img(self, img_path):
+    def read_img(self, img_path, cell_channel=0, nuclei_channel=1):
         """Reads lsm image and returns as array."""
         with tiffile.TiffFile(img_path) as tif:
             image = tif.pages[0].asarray()
-        return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_BGR2RGB)
+        if np.transpose(image, (1, 2, 0)).shape[-1] == 1:
+            return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_GRAY2BGR)
+        elif np.transpose(image, (1, 2, 0)).shape[-1] == 2:
+            img = np.transpose(image, (1, 2, 0))
+            stacked_array = np.dstack((img, np.zeros((512,512)).astype('uint8')))
+            return cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
+        elif np.transpose(image, (1, 2, 0)).shape[-1] == 3:
+            return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_RGB2BGR)
+        else:
+            img = np.transpose(image, (1, 2, 0))
+            stacked_array = np.dstack((img[cell_channel], img[nuclei_channel], np.zeros((512,512)).astype('uint8')))
+            return cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """
@@ -63,4 +74,3 @@ class Model():
         percentage = (1 - nuclei_count/cell_count) * 100
 
         return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
-    
