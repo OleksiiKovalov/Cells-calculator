@@ -60,14 +60,17 @@ class DialogWindow(QMainWindow):
         self.combo_box_dict = None
         try:
             self.add_images()
+            
         except:
             #mb warning window?
             self.num_channels = 5
             self.scene.clear()
-            
-
-
         options = list(self.parametrs.keys())
+        for option in options:
+            
+            self.num_channels = max (self.num_channels, self.parametrs[option]+1 )
+
+        
         self.combo_box_dict = self.parametrs.copy()
         for option in options:
             label = QLabel(option)
