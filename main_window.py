@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
         self.setFixedSize(screen_geometry.width(), desktop.availableGeometry().height()-self.menuBar().height())
 
         
-        self.setWindowTitle("Main Window")
+        self.setWindowTitle("Cells Calculator")
         #self.setMinimumSize
         
         self.initUI()
@@ -174,39 +174,65 @@ class MainWindow(QMainWindow):
             
         #self.right_view.setFixedSize(451, 661)
         if metod != "All_metod":
-            result = self.metods[metod](img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
+            try:
+                result = self.metods[metod](img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
+            except:
+                #TODO: warning
+                result = None
             if not result:
                 return 0
-            label_aliveCells = QGraphicsTextItem(f'Alive cells: {result["alive"]*100}%')
-            label_aliveCells.setFont(QFont('Arial',24))
-            label_aliveCells.setPos(0, 0)
-            label_deadCells = QGraphicsTextItem(f'Dead cells: {result["dead"]*100}%')
-            label_deadCells.setFont(QFont('Arial',24))
-            label_deadCells.setPos(0, 100)
-            self.right_scene.clear()
-            self.right_scene.addItem(label_aliveCells)
+            label_cells = QGraphicsTextItem(f'Cells: {result["Cells"]}')
+            label_cells.setFont(QFont('Arial',24))
+            label_cells.setPos(0, 0)
+            label_nuclei = QGraphicsTextItem(f'Nuclei: {result["Nuclei"]}')
+            label_nuclei.setFont(QFont('Arial',24))
+            label_nuclei.setPos(0, 100)
+            label_alive = QGraphicsTextItem(f'Alive: {result["%"]}%')
+            label_alive.setFont(QFont('Arial',24))
+            label_alive.setPos(0, 200)
             
-            self.right_scene.addItem(label_deadCells)
+            self.right_scene.clear()
+            self.right_scene.addItem(label_cells)
+
+            self.right_scene.addItem(label_nuclei)
+
+            self.right_scene.addItem(label_alive)
         else:
             table = QTableWidget()
             view_width = self.right_view.viewport().width()
             view_height = self.right_view.viewport().height()
             table.verticalHeader().setVisible(False)
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            columns = ['Cells', 'Nuclei', 'Alive']
             table.setRowCount(len(self.metods))
-            table.setColumnCount(2)
-            table.setHorizontalHeaderLabels(['Model', 'Alive/Dead Cells %'])
+            table.setColumnCount(4)
+
+            table.setHorizontalHeaderLabels(['Model'] + columns)
             row = 0
             for metod_name, metod in self.metods.items():
+                colum_number = 0
+                table.setItem(row, colum_number, QTableWidgetItem(metod_name))
+                colum_number +=1
                 if metod_name == "All_metod":
                     continue
-                result = metod(img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
+                try:
+                    result = metod(img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
+                except:
+                    #TODO: hz
+                    result = None
                 if result:
-                    row_toAdd = f"{result['alive']*100}%/{result['dead']*100}%"
+                    row_toAdd = []
+                    for colum in columns:
+                        if colum == "Alive":
+                            row_toAdd = f"{result['%']}%"
+                        else:
+                            row_toAdd = f"{result[colum]}"
+                        table.setItem(row, colum_number,QTableWidgetItem(row_toAdd) )
+                        colum_number+=1
                 else:
                     row_toAdd = "-"
-                table.setItem(row, 0, QTableWidgetItem(metod_name))
-                table.setItem(row, 1,QTableWidgetItem(row_toAdd) )
+                
+                
                 row+=1
            
             # Устанавливаем размеры таблицы
@@ -243,10 +269,12 @@ class MainWindow(QMainWindow):
                 
                 
                 
-                
+                self.setWindowTitle(f"Cells Calculator - {os.path.basename(self.folder_path)}/")   
             else:
                 #TODO add warning dialog
                 print("No LSM files found in the selected folder.")
+                #self.setWindowTitle(f"Cells Calculator")
+            
     def create_table(self):
         if not self.lsm_filesList:
             return
@@ -353,7 +381,7 @@ class MainWindow(QMainWindow):
         # Устанавливаем позицию пиксмапа
         pixmap_item.setPos(x_pos, y_pos)
             #self.main_view.fitInView(pixmap_item)#, Qt.KeepAspectRatio)
-            
+        self.setWindowTitle(f"Cells Calculator - {os.path.basename(lsm_path)}")
           
             
     def open_dialogWindow(self):

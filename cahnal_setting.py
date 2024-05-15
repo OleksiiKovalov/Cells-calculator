@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import QMessageBox,QGraphicsPixmapItem,QApplication, QMainW
 from PyQt5.QtGui import QPixmap, QImage, QFont
 from PyQt5.QtCore import Qt
 import numpy as np
+import os
 import tifffile
 class DialogWindow(QMainWindow):
     def __init__(self,  parametrs : dict, lsm_path : str, parent=None,call_back = None  ):
@@ -39,7 +40,7 @@ class DialogWindow(QMainWindow):
         self.setFixedSize(self.parent_width * 0.75, self.parent_height * 0.75)
         #self.setFixedSize(parent_width * 0.75, parent_height * 0.75)  #self.setFixedSize
         #self.resize(parent_width * 0.75, parent_height * 0.75)
-        self.setWindowTitle('Диалоговое окно')
+        self.setWindowTitle(f'Settings - {os.path.basename( self.lsm_path)}')
         #self.center()
         self.makeScen()
         
@@ -53,10 +54,19 @@ class DialogWindow(QMainWindow):
         self.view = QGraphicsView(self.scene)
         #self.view.setFixedWidth(int(self.width()*0.75))
         self.view.setFixedWidth(int(self.parent_width*0.75*0.75))
-        self.view.setFixedHeight(int(self.parent_height*0.75))
+        self.view.setFixedHeight(int(self.parent_height*0.70))
         #self.view.setFixedSize(int(self.width()*0.75),int(self.height()*0.75))
         right_layout = QVBoxLayout()
-        self.add_images()
+        self.combo_box_dict = None
+        try:
+            self.add_images()
+        except:
+            #mb warning window?
+            self.num_channels = 5
+            self.scene.clear()
+            
+
+
         options = list(self.parametrs.keys())
         self.combo_box_dict = self.parametrs.copy()
         for option in options:
@@ -68,6 +78,7 @@ class DialogWindow(QMainWindow):
             combo_box.addItems([f'Channel {i+1}'for i in range(self.num_channels)])
             combo_box.setCurrentText(f"Channel {self.parametrs[option]+1}")
             
+            # TODO : add to add_image()
             self.combo_box_dict[option] = combo_box
             label_combo_layout = QHBoxLayout()
             #label_combo_layout.setContentsMargins(0, 0, 0, 0)
@@ -118,15 +129,24 @@ class DialogWindow(QMainWindow):
         if self.number == len(self.lsm_list):
             self.number = 0
         self.lsm_path = self.lsm_list[self.number]
-        
-        self.add_images()
+        try:
+            self.add_images()
+        except:
+            #TODO: mb warning
+            self.scene.clear()
+        self.setWindowTitle(f'Settings - {os.path.basename( self.lsm_path)}')
         
     def add_images(self):
         self.scene.clear()
         with tifffile.TiffFile(self.lsm_path) as tif:
             lsm = tif.pages[0].asarray()
         self.num_channels = lsm.shape[0] #* 100
-        
+        if self.combo_box_dict:
+            options = list(self.parametrs.keys())
+            for option in options:
+                current_amount = self.combo_box_dict[option].count()
+                if len(self.combo_box_dict[option])< self.num_channels:
+                    self.combo_box_dict[option].addItems([f'Channel {i}'for i in range(current_amount+1,self.num_channels+1)])
         # Добавление QPixmap и текста в сцену
         image_width = int(self.parent_width * 0.75 * 0.75 / 2)  # Ширина изображения на экране
         image_height = int(self.parent_height * 0.75 / 2)  # Высота изображения на экране

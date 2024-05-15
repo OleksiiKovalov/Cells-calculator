@@ -73,4 +73,4 @@ class Model():
 
         percentage = (1 - nuclei_count/cell_count) * 100
 
-        return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
+        return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage,1)}
