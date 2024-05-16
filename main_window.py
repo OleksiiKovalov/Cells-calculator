@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
 
     def initUI(self):
         #self.setGeometry(100, 100, 800, 600)
-        
+        self.df = None
         # Create a menu action to open LSM file
         self.open_lsm_action = QAction("Open LSM File", self)
         self.open_lsm_action.triggered.connect(self.open_lsm)
@@ -71,19 +71,28 @@ class MainWindow(QMainWindow):
         settings_menu.addAction(self.settings_action)
         self.init_mainScen()
     def init_mainView(self):
-        # TODO : add 2 button 
+  
         self.main_view.setFixedWidth(int(self.width() * 0.75))
         #self.main_view.setFixedHeight(int(self.height()*0.95))
         #self.main_view.setMaximumHeight(int(self.height()))
         
     def save_as(self):
-        ptions = QFileDialog.Options()
-        file_name, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
-        if file_name:
-            if file_name.endswith('.xlsx'):
-                self.df.to_excel(file_name, index=False)
-            elif file_name.endswith('.csv'):
-                self.df.to_csv(file_name, index=False)
+        if  self.df is None:
+            self.show_warning_dialog("Nothing to Save")
+            self.save_as_action.setEnabled(False)
+            return
+        try:
+            ptions = QFileDialog.Options()
+            file_name, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+            if file_name:
+                if file_name.endswith('.xlsx'):
+                    self.df.to_excel(file_name, index=False)
+                elif file_name.endswith('.csv'):
+                    self.df.to_csv(file_name, index=False)
+        except:
+            self.show_warning_dialog("Error during saving table")
+            self.save_as_action.setEnabled(False)
+            return
     def init_rightLayout(self):
         self.combo_box = QComboBox()
         label = QLabel("Choose model:")
@@ -152,11 +161,11 @@ class MainWindow(QMainWindow):
         
         
         
-    def show_warning_dialog(self):
+    def show_warning_dialog(self, text):
     # Создаем диалоговое окно предупреждения
         msgBox = QMessageBox()
         msgBox.setIcon(QMessageBox.Warning)
-        msgBox.setText("Warning\n\nChoose method and file.")
+        msgBox.setText(text)
         #msgBox.setInformativeText("Choose method and file.")
         msgBox.setWindowTitle("Warning")
         msgBox.adjustSize()
@@ -165,10 +174,10 @@ class MainWindow(QMainWindow):
     def calculate_button(self):
         metod = self.combo_box.currentText()
         if metod == "" or self.lsm_path is None:
-            self.show_warning_dialog()
+            self.show_warning_dialog("Warning\n\nChoose method and file.")
             print("choose metod and fille")
             return 0
-            #TODO : сделать обработку если не  выбран метод
+           
         
         
             
@@ -177,9 +186,11 @@ class MainWindow(QMainWindow):
             try:
                 result = self.metods[metod](img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
             except:
-                #TODO: warning
+               
+                self.show_warning_dialog("Error during calculation \n\nChoose another model or change channels settings")
                 result = None
             if not result:
+              
                 return 0
             label_cells = QGraphicsTextItem(f'Cells: {result["Cells"]}')
             label_cells.setFont(QFont('Arial',24))
@@ -218,7 +229,7 @@ class MainWindow(QMainWindow):
                 try:
                     result = metod(img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
                 except:
-                    #TODO: hz
+                    
                     result = None
                 if result:
                     row_toAdd = []
@@ -271,66 +282,83 @@ class MainWindow(QMainWindow):
                 
                 self.setWindowTitle(f"Cells Calculator - {os.path.basename(self.folder_path)}/")   
             else:
-                #TODO add warning dialog
+                self.folder_path = None
+                self.show_warning_dialog("No LSM files found in the selected folder")
                 print("No LSM files found in the selected folder.")
                 #self.setWindowTitle(f"Cells Calculator")
             
     def create_table(self):
+       
         if not self.lsm_filesList:
             return
         self.main_scen.clear()
+        try:
+            table = QTableWidget()
+            #self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+           
+            try:
+                df = calculate_table(metod_dict=self.metods,files_name=self.lsm_filesList,parametrs=self.parametrs)
+            except:
+                self.settings_action.setEnabled(False)
+                self.save_as_action.setEnabled(False)
+                self.lsm_filesList = None
+                self.show_warning_dialog("Error during calculation.")
+                return
+
+            self.df = df
+            view_width = self.main_view.viewport().width()
+            view_height = self.main_view.viewport().height()
+            cell_width = table.horizontalHeader().defaultSectionSize()
+            cell_height = table.verticalHeader().defaultSectionSize()
+            #rows_to_add = int(view_height / cell_height) - len(df.index()) - 1
+            #columns_to_add = int(view_width / cell_width) - len(df.columns())
+
+        # Устанавливаем количество строк и столбцов в таблице
         
-        table = QTableWidget()
-        #self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        df = calculate_table(metod_dict=self.metods,files_name=self.lsm_filesList,parametrs=self.parametrs)
-        self.df = df
-        view_width = self.main_view.viewport().width()
-        view_height = self.main_view.viewport().height()
-        cell_width = table.horizontalHeader().defaultSectionSize()
-        cell_height = table.verticalHeader().defaultSectionSize()
-        #rows_to_add = int(view_height / cell_height) - len(df.index()) - 1
-        #columns_to_add = int(view_width / cell_width) - len(df.columns())
+            #table.setRowCount(df.index() + rows_to_add)
+            #table.setColumnCount(columns + columns_to_add)
+            table.verticalHeader().setVisible(False)
+            table.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
-    # Устанавливаем количество строк и столбцов в таблице
-    
-        #table.setRowCount(df.index() + rows_to_add)
-        #table.setColumnCount(columns + columns_to_add)
-        table.verticalHeader().setVisible(False)
-        table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            #for row in range(rows):
+            #    for col in range(columns):
+            #        item = QTableWidgetItem()
+            #        table.setItem(row, col, item)
+            #
+            table.setRowCount(df.shape[0])
+            table.setColumnCount(df.shape[1])
 
-        #for row in range(rows):
-        #    for col in range(columns):
-        #        item = QTableWidgetItem()
-        #        table.setItem(row, col, item)
-        #
-        table.setRowCount(df.shape[0])
-        table.setColumnCount(df.shape[1])
+            # Устанавливаем заголовки столбцов
+            table.setHorizontalHeaderLabels(df.columns)
 
-        # Устанавливаем заголовки столбцов
-        table.setHorizontalHeaderLabels(df.columns)
+            # Добавляем данные из DataFrame в QTableWidget
+            for i in range(df.shape[0]):
+                for j in range(df.shape[1]):
+                    item = QTableWidgetItem(str(df.iloc[i, j]))
+                    table.setItem(i, j, item)
+            # Устанавливаем размеры таблицы
+            table.setMinimumSize(view_width, view_height)
+            #table.setMaximumSize(view_width, view_height)
+            table.resizeRowsToContents()
+            table.resizeColumnsToContents()
+            
 
-        # Добавляем данные из DataFrame в QTableWidget
-        for i in range(df.shape[0]):
-            for j in range(df.shape[1]):
-                item = QTableWidgetItem(str(df.iloc[i, j]))
-                table.setItem(i, j, item)
-        # Устанавливаем размеры таблицы
-        table.setMinimumSize(view_width, view_height)
-        #table.setMaximumSize(view_width, view_height)
-        table.resizeRowsToContents()
-        table.resizeColumnsToContents()
+            #proxy.setWidget(self.table)
+
+            # Добавляем QGraphicsProxyWidget в main_scen
         
-
-        #proxy.setWidget(self.table)
-
-        # Добавляем QGraphicsProxyWidget в main_scen
+            self.main_scen.addWidget(table)
+            print(self.main_scen.height())
+            print(self.main_view.viewport().height())
+            # Устанавливаем политику изменения размеров для QGraphicsProxyWidget
+            #self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        except:
+            self.settings_action.setEnabled(False)
+            self.save_as_action.setEnabled(False)
+            self.lsm_filesList = None
+            self.df = None
+            self.show_warning_dialog("Error during creating table")
     
-        self.main_scen.addWidget(table)
-        print(self.main_scen.height())
-        print(self.main_view.viewport().height())
-        # Устанавливаем политику изменения размеров для QGraphicsProxyWidget
-        #self.table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
     def open_lsm(self):
         
         #запомнить путь последней папки  вместо ""
@@ -345,67 +373,94 @@ class MainWindow(QMainWindow):
         self.save_as_action.setEnabled(False)
         self.right_button.setEnabled(True)
         self.lsm_filesList = None
+        try:
+            with tifffile.TiffFile(self.lsm_path) as tif:
+                lsm_file = tif.pages[0].asarray()
+            if lsm_file.shape[0] < max([value+1 for key, value in self.parametrs.items()]):
+                self.parametrs = {'Cell' : 0,
+                                        'Nuclei': 1
+                                    }
+            if lsm_file.shape[0] <=1:
+                self.show_warning_dialog("File is wrong\n\nAmount of Channel less than 2")
+                return
+            image = QImage(lsm_file[1], lsm_file.shape[1],  lsm_file.shape[2] , QImage.Format_Grayscale8)
 
-        with tifffile.TiffFile(self.lsm_path) as tif:
-            lsm_file = tif.pages[0].asarray()
-        image = QImage(lsm_file[1], lsm_file.shape[1],  lsm_file.shape[2] , QImage.Format_Grayscale8)
-
-        # Создаем QPixmap из QImage
-        pixmap = QPixmap.fromImage(image)
-        
-        # Определяем размеры видового окна
-        view_width = self.main_view.viewport().width()
-        view_height = self.main_view.viewport().height()
-        
-        # Определяем соотношение сторон изображения
-        pixmap_aspect_ratio = pixmap.width() / pixmap.height()
-        
-        # Определяем размеры пиксмапа, чтобы он занимал хотя бы одну часть экрана
-        if view_width / view_height > pixmap_aspect_ratio:
-            pixmap_width = view_height * pixmap_aspect_ratio
-            pixmap_height = view_height
-        else:
-            pixmap_width = view_width
-            pixmap_height = view_width / pixmap_aspect_ratio
-        
-        # Изменяем размеры пиксмапа
-        pixmap = pixmap.scaled(pixmap_width, pixmap_height, aspectRatioMode=Qt.KeepAspectRatio)
-        
-        # Создаем пиксмап изображения с измененными размерами
-        pixmap_item = self.main_scen.addPixmap(pixmap)
-        
-        # Вычисляем позицию пиксмапа, чтобы он был по центру видового окна
-        x_pos = (view_width - pixmap.width()) / 2
-        y_pos = (view_height - pixmap.height()) / 2
-        
-        # Устанавливаем позицию пиксмапа
-        pixmap_item.setPos(x_pos, y_pos)
-            #self.main_view.fitInView(pixmap_item)#, Qt.KeepAspectRatio)
-        self.setWindowTitle(f"Cells Calculator - {os.path.basename(lsm_path)}")
-          
+            # Создаем QPixmap из QImage
+            pixmap = QPixmap.fromImage(image)
+            
+            # Определяем размеры видового окна
+            view_width = self.main_view.viewport().width()
+            view_height = self.main_view.viewport().height()
+            
+            # Определяем соотношение сторон изображения
+            pixmap_aspect_ratio = pixmap.width() / pixmap.height()
+            
+            # Определяем размеры пиксмапа, чтобы он занимал хотя бы одну часть экрана
+            if view_width / view_height > pixmap_aspect_ratio:
+                pixmap_width = view_height * pixmap_aspect_ratio
+                pixmap_height = view_height
+            else:
+                pixmap_width = view_width
+                pixmap_height = view_width / pixmap_aspect_ratio
+            
+            # Изменяем размеры пиксмапа
+            pixmap = pixmap.scaled(pixmap_width, pixmap_height, aspectRatioMode=Qt.KeepAspectRatio)
+            
+            # Создаем пиксмап изображения с измененными размерами
+            pixmap_item = self.main_scen.addPixmap(pixmap)
+            
+            # Вычисляем позицию пиксмапа, чтобы он был по центру видового окна
+            x_pos = (view_width - pixmap.width()) / 2
+            y_pos = (view_height - pixmap.height()) / 2
+            
+            # Устанавливаем позицию пиксмапа
+            pixmap_item.setPos(x_pos, y_pos)
+                #self.main_view.fitInView(pixmap_item)#, Qt.KeepAspectRatio)
+            self.setWindowTitle(f"Cells Calculator - {os.path.basename(lsm_path)}")
+        except  Exception as e:
+            print(e)
+            self.show_warning_dialog("Error during opening file.")
+            self.lsm_path = None
+            self.main_scen.clear()
+            self.settings_action.setEnabled(False)
+            self.save_as_action.setEnabled(False)
+            self.right_button.setEnabled(False)
+            self.lsm_filesList = None
+            return 0
             
     def open_dialogWindow(self):
         #запомнить путь последней папки  вместо ""
         #self.lsm_path, _ = QFileDialog.getOpenFileName(self, "Open .LSM File", "", "LSM Files (*.lsm)")
-        if self.lsm_filesList:
-            lsm_path = self.lsm_filesList
-        else:
-            lsm_path = self.lsm_path
-        if lsm_path:
-            dialog = DialogWindow(parent=self, lsm_path=lsm_path, parametrs = self.parametrs, call_back = self.create_table)
-            dialog.setWindowModality(Qt.ApplicationModal)
-            #dialog.setFixedSize(1080, 720)
-            #dialog.move(100,100)
-            dialog.show()
-            dialog.center()
+        try:
+            if self.lsm_filesList:
+                lsm_path = self.lsm_filesList
+                call_back = self.create_table
+            else:
+                call_back = None
+                lsm_path = self.lsm_path
+            if lsm_path:
+                dialog = DialogWindow(parent=self, lsm_path=lsm_path, parametrs = self.parametrs, call_back = call_back)
+                dialog.setWindowModality(Qt.ApplicationModal)
+                #dialog.setFixedSize(1080, 720)
+                #dialog.move(100,100)
+                dialog.show()
+                dialog.center()
+        except:
+            self.show_warning_dialog("Error during opening channels settings")
+       
             
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    print(QApplication.desktop().availableGeometry())
-    window = MainWindow()
-    window.showMaximized()
-    print(window.right_view.size())
-    #window.open_lsm_action.trigger()
-
-    sys.exit(app.exec_())
+    try:
+        
+        print(QApplication.desktop().availableGeometry())
+        window = MainWindow()
+        window.showMaximized()
+        print(window.right_view.size())
+        #window.open_lsm_action.trigger()
+        
+        sys.exit(app.exec_())
+    except Exception as e:
+        QMessageBox.critical(None, "Critical Error", str(e), QMessageBox.Ok)
+        sys.exit(1)

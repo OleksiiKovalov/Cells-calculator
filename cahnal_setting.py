@@ -5,10 +5,33 @@ from PyQt5.QtCore import Qt
 import numpy as np
 import os
 import tifffile
+
+def has_duplicates(lst):
+        seen = set()
+        for item in lst:
+            if item in seen:
+                return True
+            seen.add(item)
+        return False
 class DialogWindow(QMainWindow):
+    def show_warning_dialog(self, text):
+    # Создаем диалоговое окно предупреждения
+        msgBox = QMessageBox()
+        msgBox.setIcon(QMessageBox.Warning)
+        msgBox.setText(text)
+        #msgBox.setInformativeText("Choose method and file.")
+        msgBox.setWindowTitle("Warning")
+        msgBox.adjustSize()
+        msgBox.exec_()
+        if self.first_warning and self.call_back:
+            print(self.call_back)
+            self.first_warning = 0
+            self.show_warning_dialog("If you have problem to choose Channel press Cancel\n\n It will calculate with standart parameters")
     def __init__(self,  parametrs : dict, lsm_path : str, parent=None,call_back = None  ):
         
         super().__init__(parent)
+        self.warning_count = 0
+        self.first_warning = 1
 
         self.call_back = call_back
         self.setStyleSheet('''
@@ -30,9 +53,9 @@ class DialogWindow(QMainWindow):
         self.initUI()
     def closeEvent(self, event):
         #добавить логику для call_back функции
-        if self.call_back:
-            self.call_back()
+        
         pass
+
     def initUI(self):
         
         self.parent_width = self.parent().width()
@@ -62,7 +85,12 @@ class DialogWindow(QMainWindow):
             self.add_images()
             
         except:
-            #mb warning window?
+            if self.warning_count == 0:
+                self.show_warning_dialog("Error during layout images\n\nUse Next button")
+                self.warning_count = 1
+            if not self.call_back and self.warning_count == 0 :
+                self.show_warning_dialog("Error during layout images")
+                self.warning_count = 1
             self.num_channels = 5
             self.scene.clear()
         options = list(self.parametrs.keys())
@@ -81,7 +109,7 @@ class DialogWindow(QMainWindow):
             combo_box.addItems([f'Channel {i+1}'for i in range(self.num_channels)])
             combo_box.setCurrentText(f"Channel {self.parametrs[option]+1}")
             
-            # TODO : add to add_image()
+           
             self.combo_box_dict[option] = combo_box
             label_combo_layout = QHBoxLayout()
             #label_combo_layout.setContentsMargins(0, 0, 0, 0)
@@ -93,7 +121,7 @@ class DialogWindow(QMainWindow):
         buttons_layout = QHBoxLayout()
 
         cancel_button = QPushButton("Cancel")
-        cancel_button.clicked.connect(self.close)
+        cancel_button.clicked.connect(self.cancel_action)
 
         choose_button = QPushButton("Choose")
         choose_button.clicked.connect(self.choose_function)
@@ -119,13 +147,24 @@ class DialogWindow(QMainWindow):
         main_layout.addLayout(right_layout)
        #main_layout.addWidget(spacer)
         central_widget.setLayout(main_layout)
+    def cancel_action(self):
+        if self.call_back:
+            self.call_back()
+        self.close()
     def choose_function(self):
         #check_parametrs(self.combo_box_dict)
-        
+        options_list = []
         for option,combo_box in self.combo_box_dict.items():
-            self.parametrs[option] = int (combo_box.currentText()[len("Chennal "):]) -1
+            options_list.append(int (combo_box.currentText()[len("Channel "):]) -1)
+        if has_duplicates(options_list):
+            self.show_warning_dialog("Channels can not be dublicated")
+            return
+        for option,combo_box in self.combo_box_dict.items():
+            self.parametrs[option] = int (combo_box.currentText()[len("Channel "):]) -1
 
         #if okay
+        if self.call_back:
+            self.call_back()
         self.close()
     def next_action(self):
         self.number += 1
@@ -135,7 +174,11 @@ class DialogWindow(QMainWindow):
         try:
             self.add_images()
         except:
-            #TODO: mb warning
+            if self.warning_count == 0:
+                self.warning_count = 1
+                self.show_warning_dialog("Error during layout images\n\nUse Next button")
+          
+            
             self.scene.clear()
         self.setWindowTitle(f'Settings - {os.path.basename( self.lsm_path)}')
         
