@@ -24,7 +24,7 @@ class Model():
     - 'Cells': the number of cells detected;
     - '%': the target percentage value obtained.
     """
-    def __init__(self, path='model/best_m.pt', threshold=100, eps=5, min_samples=10):
+    def __init__(self, path=os.path.join('model', 'best_m.onnx'), threshold=100, eps=5, min_samples=10):
         self.nuclei_counter = NucleiCounter(threshold=threshold, eps=eps, min_samples=min_samples)
         self.cell_counter = CellCounter(path=path)
 

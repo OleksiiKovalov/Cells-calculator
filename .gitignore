@@ -1,2 +1,12 @@
 /__pycache__
+/.ipynb_checkpoints
+/model/best_m_openvino_model
 /lsm_files
+*.lsm
+*.TIF
+*.png
+*.jpg
+*.JPG
+*.ipynb
+*.npy
+*.exe
