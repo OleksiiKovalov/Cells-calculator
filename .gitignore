@@ -10,3 +10,4 @@
 *.ipynb
 *.npy
 *.exe
+/model/__pycache__

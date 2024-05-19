@@ -10,7 +10,7 @@ from model.Model import Model as model1
 from table import calculate_table
 import os
 class MainWindow(QMainWindow):
-    
+
     parametrs = {'Cell' : 0,
                  'Nuclei': 1
                  
@@ -18,8 +18,8 @@ class MainWindow(QMainWindow):
     
     metods = {
         'Model 1': model1().calculate,
-        'Model 2': metod2,
-        'Model 3': metod3
+        #'Model 2': metod2,
+        #'Model 3': metod3
        
     }
     lsm_path = None
@@ -111,7 +111,7 @@ class MainWindow(QMainWindow):
         self.combo_box.addItems(['All_metod'])
         self.combo_box.addItems([key for key in self.metods])
         self.combo_box.currentTextChanged.connect(self.selection_changed)
-        self.combo_box.setCurrentIndex(-1)
+        self.combo_box.setCurrentIndex(1)
         label.setFont(QFont("Arial", 32))
         self.right_button.setFont(QFont("Arial", 32))
         self.right_button.clicked.connect(self.calculate_button)
