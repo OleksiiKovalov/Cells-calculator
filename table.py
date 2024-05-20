@@ -20,6 +20,7 @@ def calculate_table(metod_dict: dict, files_name: list, parametrs: dict  ):
 
         for metod_name, metod in metod_dict.items():
             try:
+                print(parametrs['Cell'],parametrs['Nuclei'])
                 result = metod(img_path = file_path, cell_channel=parametrs['Cell'], nuclei_channel=parametrs['Nuclei'])
             except:
                 result = None
@@ -35,6 +36,6 @@ def calculate_table(metod_dict: dict, files_name: list, parametrs: dict  ):
                 for i in column_list:
 
                     row_toAdd[f"{metod_name}/{i}"] = "-"
-
-        table = table.append(row_toAdd, ignore_index = True)
+            row_to_add = pd.DataFrame([row_toAdd])
+            table = pd.concat([table, row_to_add], ignore_index=True)
     return table

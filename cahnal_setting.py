@@ -198,7 +198,7 @@ class DialogWindow(QMainWindow):
         image_height = int(self.parent_height * 0.75 / 2)  # Высота изображения на экране
         
         for i in range(self.num_channels):
-            pixmap = QPixmap.fromImage(QImage(lsm[i%lsm.shape[0]], lsm.shape[1], lsm.shape[2], QImage.Format_Grayscale8))
+            pixmap = QPixmap.fromImage(QImage(lsm[i], lsm.shape[1], lsm.shape[2], QImage.Format_Grayscale8))
             pixmap_item = QGraphicsPixmapItem(pixmap)
             current_image_height = (i // 2) * (image_height + 40)
             pixmap_item.setPos((i % 2) * image_width, current_image_height )

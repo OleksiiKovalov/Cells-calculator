@@ -89,7 +89,8 @@ class MainWindow(QMainWindow):
                     self.df.to_excel(file_name, index=False)
                 elif file_name.endswith('.csv'):
                     self.df.to_csv(file_name, index=False)
-        except:
+        except Exception as e:
+            print(e)
             self.show_warning_dialog("Error during saving table")
             self.save_as_action.setEnabled(False)
             return
@@ -184,6 +185,7 @@ class MainWindow(QMainWindow):
         #self.right_view.setFixedSize(451, 661)
         if metod != "All_metod":
             try:
+                print(self.parametrs['Cell'],self.parametrs['Nuclei'])
                 result = self.metods[metod](img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
             except:
                
@@ -298,7 +300,8 @@ class MainWindow(QMainWindow):
            
             try:
                 df = calculate_table(metod_dict=self.metods,files_name=self.lsm_filesList,parametrs=self.parametrs)
-            except:
+            except Exception as e:
+                print(e)
                 self.settings_action.setEnabled(False)
                 self.save_as_action.setEnabled(False)
                 self.lsm_filesList = None
@@ -358,7 +361,39 @@ class MainWindow(QMainWindow):
             self.lsm_filesList = None
             self.df = None
             self.show_warning_dialog("Error during creating table")
-    
+    def add_image(self, lsm_file):
+        image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],  lsm_file.shape[2] , QImage.Format_Grayscale8)
+
+        # Создаем QPixmap из QImage
+        pixmap = QPixmap.fromImage(image)
+        
+        # Определяем размеры видового окна
+        view_width = self.main_view.viewport().width()
+        view_height = self.main_view.viewport().height()
+        
+        # Определяем соотношение сторон изображения
+        pixmap_aspect_ratio = pixmap.width() / pixmap.height()
+        
+        # Определяем размеры пиксмапа, чтобы он занимал хотя бы одну часть экрана
+        if view_width / view_height > pixmap_aspect_ratio:
+            pixmap_width = view_height * pixmap_aspect_ratio
+            pixmap_height = view_height
+        else:
+            pixmap_width = view_width
+            pixmap_height = view_width / pixmap_aspect_ratio
+        
+        # Изменяем размеры пиксмапа
+        pixmap = pixmap.scaled(pixmap_width, pixmap_height, aspectRatioMode=Qt.KeepAspectRatio)
+        
+        # Создаем пиксмап изображения с измененными размерами
+        pixmap_item = self.main_scen.addPixmap(pixmap)
+        
+        # Вычисляем позицию пиксмапа, чтобы он был по центру видового окна
+        x_pos = (view_width - pixmap.width()) / 2
+        y_pos = (view_height - pixmap.height()) / 2
+        
+        # Устанавливаем позицию пиксмапа
+        pixmap_item.setPos(x_pos, y_pos)
     def open_lsm(self):
         
         #запомнить путь последней папки  вместо ""
@@ -383,39 +418,9 @@ class MainWindow(QMainWindow):
             if lsm_file.shape[0] <=1:
                 self.show_warning_dialog("File is wrong\n\nAmount of Channel less than 2")
                 return
-            image = QImage(lsm_file[1], lsm_file.shape[1],  lsm_file.shape[2] , QImage.Format_Grayscale8)
-
-            # Создаем QPixmap из QImage
-            pixmap = QPixmap.fromImage(image)
             
-            # Определяем размеры видового окна
-            view_width = self.main_view.viewport().width()
-            view_height = self.main_view.viewport().height()
-            
-            # Определяем соотношение сторон изображения
-            pixmap_aspect_ratio = pixmap.width() / pixmap.height()
-            
-            # Определяем размеры пиксмапа, чтобы он занимал хотя бы одну часть экрана
-            if view_width / view_height > pixmap_aspect_ratio:
-                pixmap_width = view_height * pixmap_aspect_ratio
-                pixmap_height = view_height
-            else:
-                pixmap_width = view_width
-                pixmap_height = view_width / pixmap_aspect_ratio
-            
-            # Изменяем размеры пиксмапа
-            pixmap = pixmap.scaled(pixmap_width, pixmap_height, aspectRatioMode=Qt.KeepAspectRatio)
-            
-            # Создаем пиксмап изображения с измененными размерами
-            pixmap_item = self.main_scen.addPixmap(pixmap)
-            
-            # Вычисляем позицию пиксмапа, чтобы он был по центру видового окна
-            x_pos = (view_width - pixmap.width()) / 2
-            y_pos = (view_height - pixmap.height()) / 2
-            
-            # Устанавливаем позицию пиксмапа
-            pixmap_item.setPos(x_pos, y_pos)
                 #self.main_view.fitInView(pixmap_item)#, Qt.KeepAspectRatio)
+            self.add_image(lsm_file)
             self.setWindowTitle(f"Cells Calculator - {os.path.basename(lsm_path)}")
         except  Exception as e:
             print(e)
@@ -427,7 +432,16 @@ class MainWindow(QMainWindow):
             self.right_button.setEnabled(False)
             self.lsm_filesList = None
             return 0
-            
+    def change_image(self):
+        
+        try:
+            with tifffile.TiffFile(self.lsm_path) as tif:
+                lsm_file = tif.pages[0].asarray()
+            self.main_scen.clear()
+            self.add_image(lsm_file)
+        except Exception as e:
+            print(e)
+            self.show_warning_dialog("Error during opening image.")
     def open_dialogWindow(self):
         #запомнить путь последней папки  вместо ""
         #self.lsm_path, _ = QFileDialog.getOpenFileName(self, "Open .LSM File", "", "LSM Files (*.lsm)")
@@ -436,7 +450,7 @@ class MainWindow(QMainWindow):
                 lsm_path = self.lsm_filesList
                 call_back = self.create_table
             else:
-                call_back = None
+                call_back = self.change_image
                 lsm_path = self.lsm_path
             if lsm_path:
                 dialog = DialogWindow(parent=self, lsm_path=lsm_path, parametrs = self.parametrs, call_back = call_back)
