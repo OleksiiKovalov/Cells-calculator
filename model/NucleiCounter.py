@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import cv2
 from sklearn.cluster import DBSCAN
 
 class NucleiCounter():
@@ -16,10 +17,20 @@ class NucleiCounter():
 
     Output value is the number of marked nuclei detected.
     """
-    def __init__(self, threshold=100, eps=5, min_samples=10):
+    def __init__(self, threshold=100, eps=2, min_samples=5):
         self.threshold = threshold
         self.eps = eps
         self.min_samples = min_samples
+
+    def preprocess(self, channel, kernel_size=4, threshold=30):
+        """Eliminates noise and structures binary component."""
+        _, img = cv2.threshold(channel, np.median(channel[channel > threshold]), 255, cv2.THRESH_BINARY)
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+        opened_img = cv2.dilate(img, kernel)
+        eroded_img = cv2.erode(opened_img, kernel)
+        opened_img = cv2.dilate(eroded_img, kernel)
+        eroded_img = cv2.erode(opened_img, kernel)
+        return eroded_img
 
     def channel2points(self, channel):
         """Converts given binary channel to a set of points in 2D space."""
@@ -38,5 +49,5 @@ class NucleiCounter():
 
     def countNuclei(self, img_channel):
         """Unites the functions above and calculates marked cell nuclei on a given image channel."""
-        return self.groupNuclei(self.channel2points(img_channel))
+        return self.groupNuclei(self.channel2points(self.preprocess(img_channel)))
     

@@ -33,17 +33,17 @@ class Model():
         with tiffile.TiffFile(img_path) as tif:
             image = tif.pages[0].asarray()
         if np.transpose(image, (1, 2, 0)).shape[-1] == 1:
-            return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_GRAY2BGR)
+            return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_GRAY2RGB)
         elif np.transpose(image, (1, 2, 0)).shape[-1] == 2:
             img = np.transpose(image, (1, 2, 0))
             stacked_array = np.dstack((img, np.zeros((512,512)).astype('uint8')))
-            return cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
+            return stacked_array #cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
         elif np.transpose(image, (1, 2, 0)).shape[-1] == 3:
-            return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_RGB2BGR)
+            return np.transpose(image, (1, 2, 0)) #cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_RGB2BGR)
         else:
             img = np.transpose(image, (1, 2, 0))
             stacked_array = np.dstack((img[cell_channel], img[nuclei_channel], np.zeros((512,512)).astype('uint8')))
-            return cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
+            return stacked_array #cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """
