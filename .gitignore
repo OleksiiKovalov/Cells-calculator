@@ -10,4 +10,6 @@
 *.ipynb
 *.npy
 *.exe
+*.csv
+*xlsx
 /model/__pycache__
