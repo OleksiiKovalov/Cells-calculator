@@ -45,7 +45,7 @@ class MainWindow(QMainWindow):
         self.df = None
         # Create a menu action to open LSM file
         self.open_lsm_action = QAction("Open LSM File", self)
-        self.open_lsm_action.triggered.connect(self.open_lsm)
+        self.open_lsm_action.triggered.connect(self.open_file)
 
         self.open_folder_action = QAction("Open Folder", self)
         self.open_folder_action.triggered.connect(self.open_folder)
@@ -197,10 +197,16 @@ class MainWindow(QMainWindow):
             label_cells = QGraphicsTextItem(f'Cells: {result["Cells"]}')
             label_cells.setFont(QFont('Arial',24))
             label_cells.setPos(0, 0)
-            label_nuclei = QGraphicsTextItem(f'Nuclei: {result["Nuclei"]}')
+            if result["Nuclei"] == -100:
+                label_nuclei = QGraphicsTextItem(f'Nuclei: -')
+            else:
+                label_nuclei = QGraphicsTextItem(f'Nuclei: {result["Nuclei"]}')
             label_nuclei.setFont(QFont('Arial',24))
             label_nuclei.setPos(0, 100)
-            label_alive = QGraphicsTextItem(f'Alive: {result["%"]}%')
+            if result["%"] == -100:
+                label_alive = QGraphicsTextItem(f'Alive: -')
+            else:
+                label_alive = QGraphicsTextItem(f'Alive: {result["%"]}%')
             label_alive.setFont(QFont('Arial',24))
             label_alive.setPos(0, 200)
             
@@ -234,12 +240,19 @@ class MainWindow(QMainWindow):
                     
                     result = None
                 if result:
-                    row_toAdd = []
+                    row_toAdd = "-"
                     for colum in columns:
+                        
                         if colum == "Alive":
-                            row_toAdd = f"{result['%']}%"
+                            if result ["%"] == -100:
+                                row_toAdd ="-"
+                            else:
+                                row_toAdd = f"{result['%']}%"
                         else:
-                            row_toAdd = f"{result[colum]}"
+                            if result [colum] == -100:
+                                row_toAdd ="-"
+                            else:
+                                row_toAdd = f"{result[colum]}"
                         table.setItem(row, colum_number,QTableWidgetItem(row_toAdd) )
                         colum_number+=1
                 else:
@@ -268,7 +281,7 @@ class MainWindow(QMainWindow):
     def open_folder(self):
         self.folder_path = QFileDialog.getExistingDirectory(self, "Open Folder", "")
         if self.folder_path:
-            self.lsm_filesList = [os.path.join(self.folder_path, file) for file in os.listdir(self.folder_path) if file.endswith('.lsm')]
+            self.lsm_filesList = [os.path.join(self.folder_path, file) for file in os.listdir(self.folder_path) if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
 
             if self.lsm_filesList:
                 self.main_scen.clear()
@@ -285,8 +298,8 @@ class MainWindow(QMainWindow):
                 self.setWindowTitle(f"Cells Calculator - {os.path.basename(self.folder_path)}/")   
             else:
                 self.folder_path = None
-                self.show_warning_dialog("No LSM files found in the selected folder")
-                print("No LSM files found in the selected folder.")
+                self.show_warning_dialog("No Image files found in the selected folder")
+                print("No Image files found in the selected folder.")
                 #self.setWindowTitle(f"Cells Calculator")
             
     def create_table(self):
@@ -362,7 +375,10 @@ class MainWindow(QMainWindow):
             self.df = None
             self.show_warning_dialog("Error during creating table")
     def add_image(self, lsm_file):
-        image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],  lsm_file.shape[2] , QImage.Format_Grayscale8)
+        if isinstance(lsm_file, str):
+            image = QImage(lsm_file)
+        else:
+            image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],  lsm_file.shape[2] , QImage.Format_Grayscale8)
 
         # Создаем QPixmap из QImage
         pixmap = QPixmap.fromImage(image)
@@ -394,14 +410,35 @@ class MainWindow(QMainWindow):
         
         # Устанавливаем позицию пиксмапа
         pixmap_item.setPos(x_pos, y_pos)
-    def open_lsm(self):
-        
-        #запомнить путь последней папки  вместо ""
-        lsm_path, _ = QFileDialog.getOpenFileName(self, "Open .LSM File", "", "LSM Files (*.lsm)")
-        
-        
+    def open_file(self):
+        lsm_path, _ = QFileDialog.getOpenFileName(self, "Open Image File", "", "Image Files (*.png *.jpg *.bmp *.lsm *.TIF)")
         if not lsm_path:
             return 0
+        if lsm_path.endswith(".lsm"):
+            self.open_lsm(lsm_path)
+        else:
+            self.lsm_path = lsm_path
+            self.main_scen.clear()
+            self.settings_action.setEnabled(False)
+            self.save_as_action.setEnabled(False)
+            self.right_button.setEnabled(True)
+            self.lsm_filesList = None
+            try:
+                self.add_image(self.lsm_path)
+                self.setWindowTitle(f"Cells Calculator - {os.path.basename(lsm_path)}")
+            except Exception as e:
+                print(e)
+                self.show_warning_dialog("Error during opening file.")
+                self.setWindowTitle(f"Cells Calculator")
+                self.lsm_path = None
+                self.main_scen.clear()
+                self.settings_action.setEnabled(False)
+                self.save_as_action.setEnabled(False)
+                self.right_button.setEnabled(False)
+                self.lsm_filesList = None
+                return 0
+    def open_lsm(self, lsm_path):
+        
         self.lsm_path = lsm_path
         self.main_scen.clear()
         self.settings_action.setEnabled(True)
@@ -425,6 +462,7 @@ class MainWindow(QMainWindow):
         except  Exception as e:
             print(e)
             self.show_warning_dialog("Error during opening file.")
+            self.setWindowTitle(f"Cells Calculator")
             self.lsm_path = None
             self.main_scen.clear()
             self.settings_action.setEnabled(False)

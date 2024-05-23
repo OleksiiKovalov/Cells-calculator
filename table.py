@@ -31,6 +31,8 @@ def calculate_table(metod_dict: dict, files_name: list, parametrs: dict  ):
                         value = str(round(value,1))
                         value+="%"
                         key = "Alive"
+                    if value == "-100%" or value == -100:
+                        value = "-"
                     row_toAdd[f"{metod_name}/{key}"] = f"{value}"
             else:
                 for i in column_list:
