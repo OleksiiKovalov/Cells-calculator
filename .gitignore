@@ -2,6 +2,7 @@
 /.ipynb_checkpoints
 /model/best_m_openvino_model
 /lsm_files
+/.cache
 *.lsm
 *.TIF
 *.png

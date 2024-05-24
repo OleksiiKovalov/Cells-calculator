@@ -7,8 +7,11 @@ import tifffile
 from cahnal_setting import DialogWindow
 from calculate_functions import metod1, metod2, metod3
 from model.Model import Model as model1
+from model.utils import draw_bounding_box
 from table import calculate_table
 import os
+import pickle
+import shutil
 class MainWindow(QMainWindow):
 
     parametrs = {'Cell' : 0,
@@ -28,6 +31,13 @@ class MainWindow(QMainWindow):
     def __init__(self):
         
         super().__init__()
+
+        # added cache directory creation
+        try:
+            shutil.rmtree('.cache', ignore_errors=True)  # Ignore errors if directory is empty
+        except OSError as e:
+            pass
+        os.makedirs('.cache', exist_ok=True)
         
         desktop = QApplication.desktop()
         screen_geometry = desktop.availableGeometry()
@@ -44,7 +54,7 @@ class MainWindow(QMainWindow):
         #self.setGeometry(100, 100, 800, 600)
         self.df = None
         # Create a menu action to open LSM file
-        self.open_lsm_action = QAction("Open LSM File", self)
+        self.open_lsm_action = QAction("Open Image", self)
         self.open_lsm_action.triggered.connect(self.open_file)
 
         self.open_folder_action = QAction("Open Folder", self)
@@ -171,6 +181,23 @@ class MainWindow(QMainWindow):
         msgBox.setWindowTitle("Warning")
         msgBox.adjustSize()
         msgBox.exec_()
+
+    def visualize(self, img_path='cell_tmp_img.png'):
+        with open(os.path.join('.cache', 'detections.pickle'), 'rb') as f:
+            detections = pickle.load(f)
+        for detection in detections:
+            box = detection['box']
+            scale = detection['scale']
+            draw_bounding_box(
+                img_path,
+                detection['class_name'],
+                detection['confidence'],
+                round(box[0] * scale),
+                round(box[1] * scale),
+                round((box[0] + box[2]) * scale),
+                round((box[1] + box[3]) * scale),
+                draw_mode = 0
+            )
     
     def calculate_button(self):
         metod = self.combo_box.currentText()
@@ -188,9 +215,11 @@ class MainWindow(QMainWindow):
                 print(self.parametrs['Cell'],self.parametrs['Nuclei'])
                 result = self.metods[metod](img_path = self.lsm_path, cell_channel=self.parametrs['Cell'], nuclei_channel=self.parametrs['Nuclei'])
             except:
-               
-                self.show_warning_dialog("Error during calculation \n\nChoose another model or change channels settings")
-                result = None
+                try:
+                    result = self.metods[metod](img_path = self.lsm_path)
+                except:
+                    self.show_warning_dialog("Error during calculation \n\nChoose another model or change channels settings")
+                    result = None
             if not result:
               
                 return 0

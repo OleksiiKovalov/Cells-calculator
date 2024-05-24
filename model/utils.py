@@ -4,6 +4,8 @@ import tiffile
 import numpy as np
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
+CLASSES = ['Cell']
+colors = [(3,177,252)]
 
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
@@ -24,7 +26,8 @@ def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
 
 def read_standard_img(img_path):
     """Reads image in grayscale jpg/png/tif/bmp which contains cells only."""
-    return cv2.cvtColor(cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2GRAY,
+    img = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
+    return cv2.cvtColor(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY,
                                      cv2.COLOR_GRAY2RGB))
 
 def is_image_valid(img_path: str):
@@ -83,3 +86,29 @@ def calculate_standard(cell_counter, img_path):
     """
     cell_count = cell_counter.countCells(img_path)
     return {'Nuclei': -100, 'Cells': cell_count, '%': -100}
+
+def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
+    """
+    Draws bounding boxes on the input image based on the provided arguments.
+
+    Args:
+        img (numpy.ndarray): The input image to draw the bounding box on.
+        # img_path (str): The path to input image to draw the bounding box on.
+        class_id (int): Class ID of the detected object.
+        confidence (float): Confidence score of the detected object.
+        x (int): X-coordinate of the top-left corner of the bounding box.
+        y (int): Y-coordinate of the top-left corner of the bounding box.
+        x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
+        y_plus_h (int): Y-coordinate of the bottom-right corner of the bounding box.
+    """
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # label = f"{CLASSES[class_id]} ({confidence:.2f})"
+    color = colors[0]
+    if img.shape[0] < 800:
+        thickness = 1
+    else:
+        thickness = 2
+    if draw_mode == 0:
+        cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
+    else:
+        img = cv2.circle(img, (x, y), 2, color, -1)
