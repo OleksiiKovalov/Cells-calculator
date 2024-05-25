@@ -41,7 +41,7 @@ Below is a list of main model quality metrics. The metrics have been measured on
 
 #### Cell counter
 
-|  | Precision | Recall | F1 score | MAPE | MAPE$_{manual}$ |
+|  | Precision | Recall | F1 score | MAPE | MAPE manual |
 |---|---|---|---|---|---|
 | Subset 1 | 0.957 | 0.899 | 0.926 | 0.146 | - |
 | Subset 2 | 0.905 | 0.918 | 0.910 | 0.095 | - |
