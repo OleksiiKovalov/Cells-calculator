@@ -1,32 +1,16 @@
+"""
+In this module the CellCounter class is defined which is used
+to calculate cells on a given contrast microimage.
+"""
+
 import os
 import shutil
-# import json
-import pickle
 import cv2
 import numpy as np
 from model.utils import draw_bounding_box
 
 CLASSES = ['Cell']
 colors = np.random.uniform(0, 255, size=(len(CLASSES), 3))
-
-def visualize(img_path='.cache/cell_tmp_img.png', draw_mode=0):
-    with open(os.path.join('.cache', 'detections.pickle'), 'rb') as f:
-        detections = pickle.load(f)
-    img = cv2.imread(img_path)
-    for detection in detections:
-        box = detection['box']
-        scale = detection['scale']
-        draw_bounding_box(
-            img,
-            detection['class_name'],
-            detection['confidence'],
-            round(box[0] * scale),
-            round(box[1] * scale),
-            round((box[0] + box[2]) * scale),
-            round((box[1] + box[3]) * scale),
-            draw_mode = draw_mode
-        )
-    cv2.imwrite('.cache/cell_tmp_img_with_detections.png', img)
 
 class CellCounter():
     """
@@ -46,18 +30,17 @@ class CellCounter():
 
     def count(self, model, input_image):
         """
-        Main function to load ONNX model, perform inference, draw bounding boxes, and display the output image.
+        Main function to load ONNX model, perform inference, draw bounding boxes,
+        and display the output image.
 
         Args:
             onnx_model (str): Path to the ONNX model.
             input_image (str): Path to the input image.
 
         Returns:
-            list: List of dictionaries containing detection information such as class_id, class_name, confidence, etc.
+            list: List of dictionaries containing detection information such as class_id,
+            class_name, confidence, etc.
         """
-        # Load the ONNX model
-    #     model: cv2.dnn.Net = cv2.dnn.readNetFromONNX(onnx_model)
-
         # Read the input image
         original_image: np.ndarray = cv2.imread(input_image)
         [height, width, _] = original_image.shape
@@ -102,7 +85,6 @@ class CellCounter():
                 class_ids.append(maxClassIndex)
 
         # Apply NMS (Non-maximum suppression)
-    #     result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.45, 0.5)
         result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)  # score, nms thresholds
 
         detections = []
@@ -118,26 +100,17 @@ class CellCounter():
                 "box": box,
                 "scale": scale,
             }
-            # print(type(detection['class_id']))
-            # print(type(detection['class_name']))
-            # print(type(detection['confidence']))
-            # print(type(detection['box']))
-            # print(type(detection['scale']))
             detections.append(detection)
-            # draw_bounding_box(
-            #     original_image,
-            #     class_ids[index],
-            #     scores[index],
-            #     round(box[0] * scale),
-            #     round(box[1] * scale),
-            #     round((box[0] + box[2]) * scale),
-            #     round((box[1] + box[3]) * scale),
-            # )
-
-        # Display the image with bounding boxes
-        # cv2.imshow("image", original_image)
-        # cv2.waitKey(0)
-        # cv2.destroyAllWindows()
+            draw_bounding_box(
+                original_image,
+                class_ids[index],
+                scores[index],
+                round(box[0] * scale),
+                round(box[1] * scale),
+                round((box[0] + box[2]) * scale),
+                round((box[1] + box[3]) * scale),
+            )
+        cv2.imwrite('.cache/cell_tmp_img_with_detections.png', original_image)
 
         return detections
 
@@ -154,9 +127,5 @@ class CellCounter():
         dst = os.path.join('.cache', 'cell_tmp_img.png')
         shutil.copy2(img_path, dst)
         detections = self.count(self.model, dst)
-        # Convert the dictionary to a JSON string
-        with open(os.path.join('.cache', 'detections.pickle'), 'wb') as f:
-            pickle.dump(detections, f)
-        visualize(dst)
         return len(detections)
         

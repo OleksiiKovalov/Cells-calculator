@@ -1,11 +1,14 @@
+"""
+In this module the general Model class is defined which is used to calculate:
+- cells only, if given microimage in JPG / PNG / TIF / BMP format;
+- cells, nuclei and %, if given microimage in LSM format.
+"""
+
 import os
-import numpy as np
-import cv2
-import tiffile
 
 from model.CellCounter import CellCounter
 from model.NucleiCounter import NucleiCounter
-from model.utils import read_img, is_image_valid, calculate_lsm, calculate_standard
+from model.utils import is_image_valid, calculate_lsm, calculate_standard
 
 class Model():
     """

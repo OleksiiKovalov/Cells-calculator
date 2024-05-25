@@ -1,3 +1,8 @@
+"""
+In this module the NucleiCounter class is defined which is used
+to calculate stained nuclei presented in LSM images.
+"""
+
 import numpy as np
 import pandas as pd
 import cv2
@@ -24,7 +29,8 @@ class NucleiCounter():
 
     def preprocess(self, channel, kernel_size=4, threshold=30):
         """Eliminates noise and structures binary component."""
-        _, img = cv2.threshold(channel, np.median(channel[channel > threshold]), 255, cv2.THRESH_BINARY)
+        _, img = cv2.threshold(channel,
+                               np.median(channel[channel > threshold]), 255, cv2.THRESH_BINARY)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
         opened_img = cv2.dilate(img, kernel)
         eroded_img = cv2.erode(opened_img, kernel)

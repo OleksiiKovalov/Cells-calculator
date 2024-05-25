@@ -1,3 +1,5 @@
+"""Some useful functions used by the model or its submodels."""
+
 import os
 import cv2
 import tiffile
@@ -16,13 +18,14 @@ def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     elif np.transpose(image, (1, 2, 0)).shape[-1] == 2:
         img = np.transpose(image, (1, 2, 0))
         stacked_array = np.dstack((img, np.zeros((512,512)).astype('uint8')))
-        return stacked_array #cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
+        return stacked_array
     elif np.transpose(image, (1, 2, 0)).shape[-1] == 3:
-        return np.transpose(image, (1, 2, 0)) #cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_RGB2BGR)
+        return np.transpose(image, (1, 2, 0))
     else:
         img = np.transpose(image, (1, 2, 0))
-        stacked_array = np.dstack((img[cell_channel], img[nuclei_channel], np.zeros((512,512)).astype('uint8')))
-        return stacked_array #cv2.cvtColor(stacked_array, cv2.COLOR_RGB2BGR)
+        stacked_array = np.dstack((img[cell_channel], img[nuclei_channel],
+                                   np.zeros((512,512)).astype('uint8')))
+        return stacked_array
 
 def read_standard_img(img_path):
     """Reads image in grayscale jpg/png/tif/bmp which contains cells only."""
@@ -43,7 +46,7 @@ def read_img(img_path, cell_channel=0, nuclei_channel=1):
         return read_lsm_img(img_path, cell_channel, nuclei_channel)
     elif is_image_valid(img_path):
         return read_standard_img(img_path)
-    
+
 def calculate_lsm(cell_counter, nuclei_counter,
                   img_path, cell_channel=0, nuclei_channel=1):
     """
