@@ -30,6 +30,7 @@ class DialogWindow(QMainWindow):
     def __init__(self,  parametrs : dict, lsm_path : str, parent=None,call_back = None  ):
         
         super().__init__(parent)
+        self.parent_ = parent
         self.warning_count = 0
         self.first_warning = 1
 
@@ -148,11 +149,13 @@ class DialogWindow(QMainWindow):
        #main_layout.addWidget(spacer)
         central_widget.setLayout(main_layout)
     def cancel_action(self):
+        
         if self.call_back:
             self.call_back()
         self.close()
     def choose_function(self):
         #check_parametrs(self.combo_box_dict)
+        self.parent_.draw_bounding = 0
         options_list = []
         for option,combo_box in self.combo_box_dict.items():
             options_list.append(int (combo_box.currentText()[len("Channel "):]) -1)

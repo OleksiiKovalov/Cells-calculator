@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QAbstractItemView,QSizePolicy,QGraphicsProxyWidget, QGraphicsRectItem,QHeaderView, QMessageBox,QTableWidget, QTableWidgetItem, QPushButton,QGraphicsView, QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, QLabel, QHBoxLayout
+from PyQt5.QtWidgets import QAbstractItemView,QCheckBox,QGraphicsPixmapItem,QSizePolicy,QGraphicsProxyWidget, QGraphicsRectItem,QHeaderView, QMessageBox,QTableWidget, QTableWidgetItem, QPushButton,QGraphicsView, QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, QLabel, QHBoxLayout
 from PyQt5.QtGui import QPixmap, QImage, QFont,QColor, QPen
 from PyQt5.QtCore import Qt
 import numpy as np
@@ -7,7 +7,7 @@ import tifffile
 from cahnal_setting import DialogWindow
 from calculate_functions import metod1, metod2, metod3
 from model.Model import Model as model1
-from model.utils import draw_bounding_box
+#from model.utils import draw_bounding_box
 from table import calculate_table
 import os
 import pickle
@@ -28,6 +28,8 @@ class MainWindow(QMainWindow):
     lsm_path = None
     lsm_filesList = None
     folder_path = None
+    show_boundry = 0
+    draw_bounding = 0
     def __init__(self):
         
         super().__init__()
@@ -104,6 +106,10 @@ class MainWindow(QMainWindow):
             self.show_warning_dialog("Error during saving table")
             self.save_as_action.setEnabled(False)
             return
+    def on_state_changed(self, state):
+        self.show_boundry = state
+        self.draw_bounding_box()
+
     def init_rightLayout(self):
         self.combo_box = QComboBox()
         label = QLabel("Choose model:")
@@ -123,7 +129,25 @@ class MainWindow(QMainWindow):
         self.combo_box.addItems([key for key in self.metods])
         self.combo_box.currentTextChanged.connect(self.selection_changed)
         self.combo_box.setCurrentIndex(1)
+        #checkBox_layout = QHBoxLayout()
+        #checkBox_label = QLabel("Boundry_box")
         label.setFont(QFont("Arial", 32))
+        #checkBox_label.setFont(QFont("Arial", 24))
+        self.checkbox = QCheckBox( "Show Detected Cells",self)
+        self.checkbox.stateChanged.connect(self.on_state_changed)
+        self.checkbox.setFont(QFont("Arial", 24))
+        self.checkbox.setStyleSheet('''
+            QCheckBox::indicator {
+                width: 24px;
+                height: 24px;
+            }
+        ''')
+        #checkBox_layout.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        
+        
+
+        #checkBox_layout.addWidget(checkBox_label)
+        #checkBox_layout.addWidget(self.checkbox)
         self.right_button.setFont(QFont("Arial", 32))
         self.right_button.clicked.connect(self.calculate_button)
         
@@ -136,6 +160,9 @@ class MainWindow(QMainWindow):
         self.right_layout.addSpacing(20)
       
         self.right_layout.addWidget(self.right_view)
+        self.right_layout.addSpacing(20)
+        #self.right_layout.addLayout(checkBox_layout) 
+        self.right_layout.addWidget(self.checkbox)   
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.right_button)
         self.right_layout.addSpacing(20)
@@ -182,22 +209,22 @@ class MainWindow(QMainWindow):
         msgBox.adjustSize()
         msgBox.exec_()
 
-    def visualize(self, img_path='cell_tmp_img.png'):
-        with open(os.path.join('.cache', 'detections.pickle'), 'rb') as f:
-            detections = pickle.load(f)
-        for detection in detections:
-            box = detection['box']
-            scale = detection['scale']
-            draw_bounding_box(
-                img_path,
-                detection['class_name'],
-                detection['confidence'],
-                round(box[0] * scale),
-                round(box[1] * scale),
-                round((box[0] + box[2]) * scale),
-                round((box[1] + box[3]) * scale),
-                draw_mode = 0
-            )
+    #def visualize(self, img_path='cell_tmp_img.png'):
+    #    with open(os.path.join('.cache', 'detections.pickle'), 'rb') as f:
+    #        detections = pickle.load(f)
+    #    for detection in detections:
+    #        box = detection['box']
+    #        scale = detection['scale']
+    #        draw_bounding_box(
+    #            img_path,
+    #            detection['class_name'],
+    #            detection['confidence'],
+    #            round(box[0] * scale),
+    #            round(box[1] * scale),
+    #            round((box[0] + box[2]) * scale),
+    #            round((box[1] + box[3]) * scale),
+    #            draw_mode = 0
+    #        )
     
     def calculate_button(self):
         metod = self.combo_box.currentText()
@@ -220,6 +247,7 @@ class MainWindow(QMainWindow):
                 except:
                     self.show_warning_dialog("Error during calculation \n\nChoose another model or change channels settings")
                     result = None
+                    self.draw_bounding = 0
             if not result:
               
                 return 0
@@ -245,6 +273,8 @@ class MainWindow(QMainWindow):
             self.right_scene.addItem(label_nuclei)
 
             self.right_scene.addItem(label_alive)
+            self.draw_bounding = 1
+            self.draw_bounding_box()
         else:
             table = QTableWidget()
             view_width = self.right_view.viewport().width()
@@ -299,11 +329,25 @@ class MainWindow(QMainWindow):
             table.resizeColumnsToContents()
             self.right_scene.clear()
             self.right_scene.addWidget(table)
+            self.draw_bounding = 1
+            self.draw_bounding_box()
         #self.right_view.fitInView(self.right_scene.sceneRect())#, Qt.KeepAspectRatio)
         #self.right_view.adjustSize()
        
         
-        
+    def draw_bounding_box(self):
+        if self.draw_bounding == 0:
+            return
+        self.main_scen.clear()
+        try:
+            if self.show_boundry:
+                self.add_image(".cache\cell_tmp_img_with_detections.png")
+            else:
+                self.add_image(".cache\cell_tmp_img.png")
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            self.show_warning_dialog("Error during opening image.")
     def selection_changed(self, text):
         print(text)
         
@@ -315,6 +359,7 @@ class MainWindow(QMainWindow):
             if self.lsm_filesList:
                 self.main_scen.clear()
                 self.lsm_path = None
+                self.draw_bounding = 0
                 self.settings_action.setEnabled(True)
                 self.save_as_action.setEnabled(True)
                 self.right_button.setEnabled(False)
@@ -406,6 +451,8 @@ class MainWindow(QMainWindow):
     def add_image(self, lsm_file):
         if isinstance(lsm_file, str):
             image = QImage(lsm_file)
+            
+           
         else:
             image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],  lsm_file.shape[2] , QImage.Format_Grayscale8)
 
@@ -512,6 +559,7 @@ class MainWindow(QMainWindow):
     def open_dialogWindow(self):
         #запомнить путь последней папки  вместо ""
         #self.lsm_path, _ = QFileDialog.getOpenFileName(self, "Open .LSM File", "", "LSM Files (*.lsm)")
+        
         try:
             if self.lsm_filesList:
                 lsm_path = self.lsm_filesList
