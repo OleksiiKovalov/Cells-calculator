@@ -2,10 +2,10 @@
 
 ## Brief description
 
-**Cell Calculator** is an innovative application developed by project team "B" for processing mouse fibroblast cells of L929 cell line. It enables processing contrast microscopic images in *.lsm* format. Its basic functionality involves:
+**Cell Calculator** is an innovative application developed by project team "B" for processing mouse fibroblast cells of L929 cell line. It enables processing contrast microscopic images in *.lsm* format, as well as images in standard formats, such as *jpeg*, *png* etc. Its basic functionality involves:
 * counting the total number of cells presented on a given image;
-* counting the number of stained nuclei presented on a given image;
-* calculating the resulting percentage of alive cells presented on a given image.
+* counting the number of stained nuclei presented on a given image (for *lsm* images only);
+* calculating the resulting percentage of alive cells presented on a given image (for *lsm* images only).
 To perform calculations, the application uses a unique model developed from scratch for this exactly project.
 
 ## Model design
@@ -18,27 +18,56 @@ The model obtains the results from each submodel, and then returns them as a dic
 The submodel for nuclei counting is based on classical computer vision algorithms used for image pre-processing and DBSCAN clustering algorithm used for differetiating between separated stained nuclei and counting them based on their spatial relations. The hyperparameter values for DBSCAN algorithm have been chosen by fine-tuning them on several images. The resulting nuclei counter can perform counting in approximately 3 seconds.
 
 ### Cell counter design
-The submodel for cell counting is a YOLOV8 size-m object detection deep neural network which calculates cells by simply detecting them. It has been trained from scratch for 18 epochs on an object-detection dataset(more information is provided in **Data** section below). On the test object detection dataset the model showed Precision = 0.837 and Recall = 0.52. Thus, the model is clearly capable of detecting actual cells, but it cannot detect ALL the cells on the image. The explanation for this problem is simple: YOLOV8 models have an architectural limitation for the maximum number of objects that can be detected per image - in our case, that is 300 objects per image. To eliminate this issue we used the "regression on tales" approach - that is, we did predictions on separated parts of a single image and then combined them in the end. This technique allowed us to increase the limit up to 1,200 cells per image, which is already enough for the target images. Since YOLO models are designed to do real-time inference, regression on tales still works relatively fast, taking up to 10 seconds per image for inference.
+The submodel for cell counting is a YOLOv8-m object detection deep neural network which calculates cells by simply detecting them. It has been trained from scratch for 22 epochs on a third-party dataset(more information is provided in **Data** section below) in Google Colab cloud environment with default T4 GPU using Adam optimizer with default parameters and early stopping as a stopping criterion.
+
+## Data
+
+Original dataset which had been given to us was a set of unstandardized databases containing contrast images of L929 cells with some stained nuclei. Along with that, in response to our request we had been also given a set of images of cells only so that we could better analyze our model for cell counting.
+
+Having performed EDA, it was clear that our data has several serious problems:
+- Large data diversity (visually images differed significantly);
+- Lack of data (fewer than 300 images available after filtering);
+- No labels (no ground truth had been given to us - only the images).
+
+As a result, it was decided to search for third-party datasets of cell microimages which would have visual appearance similar to ours. The dataset we found was LIVECell dataset, containing over 5,000 images (3,000+ training images), which was enough for us to train a deep model.
+
+The test dataset for evaluating our model consists of 54 carefully chosen target images divided in 3 subsets so that images of different images could be analyzed in more details.
 
 ### Model quality metrics
-Below is a list of main model quality metrics. Unless specified, the metrics were obtained from the test subset of target data.
+Below is a list of main model quality metrics. The metrics have been measured on the target test dataset.
 
 #### Nuclei counter
-* MAE = 2.5;
-* Inference time: 3 sec.
+* MAE = 2.5.
 
 #### Cell counter
-* Precision = 0.837*;
-* Recall = 0.52*;
-* MAPE = 0.12;
-* Inference time: 10 sec.
 
-**Metrics obtained on an object detection test subset.*
+|  | Precision | Recall | F1 score | MAPE | MAPE$_{manual}$ |
+|---|---|---|---|---|
+| Subset 1 | 0.957 | 0.899 | 0.926 | 0.146 | - |
+| Subset 2 | 0.905 | 0.918 | 0.910 | 0.095 | - |
+| Subset 3 | 0.989 | 0.923 | 0.954 | 0.102 | - |
+| Micro Avg | 0.968 | 0.912 | 0.938 | 0.120 | 0.100 |
+| Macro Avg | 0.950 | 0.913 | 0.930 | 0.114 | 0.080 |
 
 #### General model
 * MAE (for target percentage): 0.018;
-* Inference time: 13.5 sec.
+* Inference time in the app: 4.5 sec.
 
-## Data
+## Run the code
+
+Should you want to run the raw application code, follow the guidelines below:
+1. Clone the repository using the prompt below:
+```bash
+git clone https://github.com/kikuroki/Cells-calculator.git
+```
+2. Enter the folder in which the repo is cloned and set up your environment. To do that, you need to have Python 3.7 or above pre-installed. Install the required dependency packages by running:
+```bash
+pip install -r requirements.txt
+```
+3. To start the application, execute the ```main_window.py``` file - for example, by running:
+```bash
+python main_window.py
+```
+4. Enjoy the application running!
 
 <!-- TODO -->
