@@ -7,10 +7,8 @@ import tifffile
 from cahnal_setting import DialogWindow
 from calculate_functions import metod1, metod2, metod3
 from model.Model import Model as model1
-#from model.utils import draw_bounding_box
 from table import calculate_table
 import os
-import pickle
 import shutil
 class MainWindow(QMainWindow):
 
@@ -194,11 +192,7 @@ class MainWindow(QMainWindow):
         self.main_layout.addLayout(self.right_layout)
         self.central_widget.setLayout(self.main_layout)
         self.main_scen.setSceneRect(0, 0, self.main_view.width()-10, self.main_view.height())
-        
-       
-        
-        
-        
+
     def show_warning_dialog(self, text):
     # Создаем диалоговое окно предупреждения
         msgBox = QMessageBox()
@@ -208,23 +202,6 @@ class MainWindow(QMainWindow):
         msgBox.setWindowTitle("Warning")
         msgBox.adjustSize()
         msgBox.exec_()
-
-    #def visualize(self, img_path='cell_tmp_img.png'):
-    #    with open(os.path.join('.cache', 'detections.pickle'), 'rb') as f:
-    #        detections = pickle.load(f)
-    #    for detection in detections:
-    #        box = detection['box']
-    #        scale = detection['scale']
-    #        draw_bounding_box(
-    #            img_path,
-    #            detection['class_name'],
-    #            detection['confidence'],
-    #            round(box[0] * scale),
-    #            round(box[1] * scale),
-    #            round((box[0] + box[2]) * scale),
-    #            round((box[1] + box[3]) * scale),
-    #            draw_mode = 0
-    #        )
     
     def calculate_button(self):
         metod = self.combo_box.currentText()

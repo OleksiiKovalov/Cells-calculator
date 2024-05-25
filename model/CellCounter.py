@@ -55,7 +55,6 @@ class CellCounter():
 
         # Preprocess the image and prepare blob for model
         blob = cv2.dnn.blobFromImage(image, scalefactor=1 / 255, size=(512, 512), swapRB=True)
-        print('shape', blob.shape)
         model.setInput(blob)
 
         # Perform inference
