@@ -121,9 +121,9 @@ class DialogWindow(QMainWindow):
         self.setWindowTitle(f'Settings - {os.path.basename(self.lsm_path)}')
         
         # Create the scene
-        self.makeScen()
+        self.makeScene()
             
-    def makeScen(self):
+    def makeScene(self):
         """
         Create the scene and layout for the dialog window.
         

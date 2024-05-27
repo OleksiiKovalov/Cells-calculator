@@ -32,7 +32,7 @@ class MainWindow(QMainWindow):
     }
 
     # Dictionary containing available models and their corresponding methods
-    metods = {
+    models = {
         'Model 1': model1().calculate
     }
 
@@ -118,7 +118,7 @@ class MainWindow(QMainWindow):
         settings_menu.addAction(self.settings_action)
 
         # Initialize the main scene
-        self.init_mainScen()
+        self.init_mainScene()
 
 
     def init_mainView(self):
@@ -231,8 +231,8 @@ class MainWindow(QMainWindow):
         self.combo_box.setFont(QFont("Arial", 24))
         
         # Add 'All_method' option and method names to the combo box
-        self.combo_box.addItems(['All_metod'])
-        self.combo_box.addItems([key for key in self.metods])
+        self.combo_box.addItems(['All_models'])
+        self.combo_box.addItems([key for key in self.models])
         
         # Set current index to 1
         self.combo_box.setCurrentIndex(1)
@@ -276,7 +276,7 @@ class MainWindow(QMainWindow):
         self.right_layout.addSpacing(20)
 
      
-    def init_mainScen(self):
+    def init_mainScene(self):
         """
         Initialize the main scene and its layout.
 
@@ -297,8 +297,8 @@ class MainWindow(QMainWindow):
         self.main_layout = QHBoxLayout()
 
         # Initialize the main scene and its view
-        self.main_scen = QGraphicsScene()
-        self.main_view = QGraphicsView(self.main_scen)
+        self.main_scene = QGraphicsScene()
+        self.main_view = QGraphicsView(self.main_scene)
         self.main_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.init_mainView()
 
@@ -314,7 +314,7 @@ class MainWindow(QMainWindow):
         self.central_widget.setLayout(self.main_layout)
         
         # Set the scene rectangle to match the size of the main view
-        self.main_scen.setSceneRect(
+        self.main_scene.setSceneRect(
             0, 0, self.main_view.width()-10, self.main_view.height())
 
 
@@ -360,7 +360,7 @@ class MainWindow(QMainWindow):
             - Add the results to the right scene.
             - Set flag to draw bounding boxes.
             - Draw bounding boxes.
-        - If "All_metod" is selected:
+        - If "All_models" is selected:
             - Create a table widget.
             - Configure table properties.
             - Iterate over methods.
@@ -373,26 +373,25 @@ class MainWindow(QMainWindow):
             - Draw bounding boxes.
         """
         # Get the selected method from the combo box
-        metod = self.combo_box.currentText()
+        model = self.combo_box.currentText()
         
         # Check if a method and file are selected
-        if metod == "" or self.lsm_path is None:
+        if model == "" or self.lsm_path is None:
             # If not, show a warning dialog and return
-            self.show_warning_dialog("Warning\n\nChoose method and file.")
-            print("choose metod and fille")
+            self.show_warning_dialog("Warning\n\nChoose model and file.")
             return 0
 
         # If a specific method is selected
-        if metod != "All_metod":
+        if model != "All_models":
             try:
                 # Attempt to calculate the result using the selected method
-                result = self.metods[metod](
+                result = self.models[model](
                     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                         nuclei_channel=self.parametrs['Nuclei'])
             except:
                 try:
                     # If an error occurs, try without channel information
-                    result = self.metods[metod](img_path=self.lsm_path)
+                    result = self.models[model](img_path=self.lsm_path)
                 except:
                     # If still not successful, show an error dialog
                     self.show_warning_dialog(
@@ -438,7 +437,7 @@ class MainWindow(QMainWindow):
             self.draw_bounding_box()
         
         else:
-            # If "All_metod" is selected
+            # If "All_models" is selected
             
             # Create a table widget
             table = QTableWidget()
@@ -449,24 +448,24 @@ class MainWindow(QMainWindow):
             table.verticalHeader().setVisible(False)
             table.setEditTriggers(QAbstractItemView.NoEditTriggers)
             columns = ['Cells', 'Nuclei', 'Alive']
-            table.setRowCount(len(self.metods))
+            table.setRowCount(len(self.models))
             table.setColumnCount(4)
             table.setHorizontalHeaderLabels(['Model'] + columns)
             
             row = 0
             # Iterate over methods
-            for metod_name, metod in self.metods.items():
+            for model_name, model in self.models.items():
                 colum_number = 0
-                table.setItem(row, colum_number, QTableWidgetItem(metod_name))
+                table.setItem(row, colum_number, QTableWidgetItem(model_name))
                 colum_number += 1
                 
-                # If method is "All_metod", continue to the next iteration
-                if metod_name == "All_metod":
+                # If method is "All_models", continue to the next iteration
+                if model_name == "All_models":
                     continue
                 
                 try:
                     # Attempt to calculate the result using the method
-                    result = metod(
+                    result = model(
                         img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                             nuclei_channel=self.parametrs['Nuclei'])
                 except:
@@ -529,7 +528,7 @@ class MainWindow(QMainWindow):
             return
         
         # Clear the main scene
-        self.main_scen.clear()
+        self.main_scene.clear()
         
         try:
             # Check if the show boundary flag is set
@@ -571,7 +570,7 @@ class MainWindow(QMainWindow):
             # If image files are found
             if self.lsm_filesList:
                 # Clear the main scene
-                self.main_scen.clear()
+                self.main_scene.clear()
                 
                 # Reset certain variables
                 self.lsm_path = None
@@ -609,7 +608,7 @@ class MainWindow(QMainWindow):
             return
         
         # Clears the main scene
-        self.main_scen.clear()
+        self.main_scene.clear()
         
         try:
             # Attempts to create a table widget
@@ -618,7 +617,7 @@ class MainWindow(QMainWindow):
             try:
                 # Attempts to calculate table data using given methods, files, and parameters
                 df = calculate_table(
-                    metod_dict=self.metods, files_name=self.lsm_filesList, parametrs=self.parametrs)
+                    model_dict=self.models, files_name=self.lsm_filesList, parametrs=self.parametrs)
             except Exception as e:
                 # If an exception occurs during calculation disables certain actions,
                 # resets file list and data frame, and shows a warning dialog
@@ -656,7 +655,7 @@ class MainWindow(QMainWindow):
             table.resizeColumnsToContents()
             
             # Adds the table to the main scene
-            self.main_scen.addWidget(table)
+            self.main_scene.addWidget(table)
             
         except:
             # If an exception occurs during the process, disables certain actions,
@@ -713,7 +712,7 @@ class MainWindow(QMainWindow):
                             aspectRatioMode=Qt.KeepAspectRatio)
 
         # Add the scaled pixmap to the main scene
-        pixmap_item = self.main_scen.addPixmap(pixmap)
+        pixmap_item = self.main_scene.addPixmap(pixmap)
 
         # Calculate the position to center the image within the view
         x_pos = (view_width - pixmap.width()) / 2
@@ -753,7 +752,7 @@ class MainWindow(QMainWindow):
             self.lsm_path = lsm_path
             
             # Clear the main scene
-            self.main_scen.clear()
+            self.main_scene.clear()
             
             # Disable certain actions
             self.settings_action.setEnabled(False)
@@ -774,7 +773,7 @@ class MainWindow(QMainWindow):
                 self.show_warning_dialog("Error during opening file.")
                 self.setWindowTitle(f"Cells Calculator")
                 self.lsm_path = None
-                self.main_scen.clear()
+                self.main_scene.clear()
                 self.settings_action.setEnabled(False)
                 self.save_as_action.setEnabled(False)
                 self.right_button.setEnabled(False)
@@ -794,7 +793,7 @@ class MainWindow(QMainWindow):
         self.lsm_path = lsm_path
         
         # Clear the main scene
-        self.main_scen.clear()
+        self.main_scene.clear()
         
         # Enable certain actions
         self.settings_action.setEnabled(True)
@@ -833,7 +832,7 @@ class MainWindow(QMainWindow):
             self.show_warning_dialog("Error during opening file.")
             self.setWindowTitle(f"Cells Calculator")
             self.lsm_path = None
-            self.main_scen.clear()
+            self.main_scene.clear()
             self.settings_action.setEnabled(False)
             self.save_as_action.setEnabled(False)
             self.right_button.setEnabled(False)
@@ -860,7 +859,7 @@ class MainWindow(QMainWindow):
                 lsm_file = tif.pages[0].asarray()
             
             # Clear the main scene
-            self.main_scen.clear()
+            self.main_scene.clear()
             
             # Add the new image to the scene
             self.add_image(lsm_file)
