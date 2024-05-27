@@ -1,1 +1,17 @@
 /__pycache__
+/.ipynb_checkpoints
+/model/best_m_openvino_model
+/lsm_files
+/.cache
+*.lsm
+*.TIF
+*.png
+*.jpg
+*.JPG
+*.ipynb
+*.npy
+*.exe
+*.csv
+*xlsx
+/model/__pycache__
+/UI/__pycache__
