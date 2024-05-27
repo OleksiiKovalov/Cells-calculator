@@ -6,12 +6,12 @@ import os
 
 
 
-def calculate_table(metod_dict: dict, files_name: list, parametrs: dict):
+def calculate_table(model_dict: dict, files_name: list, parametrs: dict):
     """
     Calculate a table based on methods applied to image files.
 
     Args:
-    metod_dict (dict): Dictionary containing method names as keys and corresponding functions as values.
+    model_dict (dict): Dictionary containing method names as keys and corresponding functions as values.
     files_name (list): List of file names or a single file name.
     parametrs (dict): Dictionary containing parameters for the methods.
 
@@ -25,9 +25,9 @@ def calculate_table(metod_dict: dict, files_name: list, parametrs: dict):
     # Define column names for the table
     column_list = ["Nuclei", "Cells", "Alive"]
     columns = ['File name']
-    for metod_name in metod_dict:
+    for model_name in model_dict:
         for value in column_list:
-            columns.append(f"{metod_name}/{value}")
+            columns.append(f"{model_name}/{value}")
 
     # Create an empty DataFrame with the defined columns
     table = pd.DataFrame(columns=columns)
@@ -38,10 +38,10 @@ def calculate_table(metod_dict: dict, files_name: list, parametrs: dict):
         row_toAdd = {"File name": os.path.basename(file_path)}
 
         # Iterate through each method
-        for metod_name, metod in metod_dict.items():
+        for model_name, model in model_dict.items():
             try:
                 # Attempt to apply the method to the image file
-                result = metod(img_path=file_path, cell_channel=parametrs['Cell'],\
+                result = model(img_path=file_path, cell_channel=parametrs['Cell'],\
                     nuclei_channel=parametrs['Nuclei'])
             except:
                 result = None
@@ -55,11 +55,11 @@ def calculate_table(metod_dict: dict, files_name: list, parametrs: dict):
                         key = "Alive"
                     if value == "-100%" or value == -100:
                         value = "-"
-                    row_toAdd[f"{metod_name}/{key}"] = f"{value}"
+                    row_toAdd[f"{model_name}/{key}"] = f"{value}"
             else:
                 # If no result is returned, mark the row with "-"
                 for i in column_list:
-                    row_toAdd[f"{metod_name}/{i}"] = "-"
+                    row_toAdd[f"{model_name}/{i}"] = "-"
             
             # Convert the row dictionary to a DataFrame and concatenate it with the main table
             row_to_add = pd.DataFrame([row_toAdd])
