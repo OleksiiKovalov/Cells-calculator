@@ -22,6 +22,18 @@ Should you want to try the CellsCalulator application, follow the guidelines bel
 
 Remember: it is forbidden to rename or change location of ANY elements within the **CellsCalculator** directory, as it may badly influence the application behaviour, up to its full crash with unpredictable errors on the way. Please, note that the application does require the *model* folder with *best_m.onnx* file in it in order to calculate cells and work correctly in general.
 
+## Discover what our product is capable of
+
+**CellCalculator** is a huge innovation indeed - just look at what an awesome way it handles the job of calculating both cells and stained nuclei on given images, achieving nearly state-of-the-art performance on images of proper quality:
+![[cells_detected]](images/Screenshot_8_2.png)
+*Example of how detected cells can be marked with bounding boxes.*
+![[cells_detected]](images/Screenshot_9_2.png)
+*However, as more cells appear on an image, it may become complicated to see anything in-between tightly coupled bounding-boxes, that is why the checkbox on the right was designed to turn this option off.*
+![[multiple_processing]](images/Screenshot_18.png)
+*Have a folder of images? Process it all at once - no need for image-wise processing! Note, that an error may occure in case of non-lsm images, in which case follow the instructions on your screen.*
+![[more_multiple_processing]](images/Screenshot_19.png)
+*With large folders this option really becomes handy - but keep in mind that unstable lsm format may involve mixed-up image channels, so keep the track of negative percentage and correct it manually afterwards!*
+
 ## Model design
 The model can be divided into 2 separated submodels:
 * Nuclei counter - counts the number of stained nuclei;
