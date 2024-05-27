@@ -13,9 +13,9 @@ from PyQt5.QtGui import QPixmap, QImage, QFont, QColor, QPen
 from PyQt5.QtCore import Qt
 import numpy as np
 import tifffile
-from cahnal_setting import DialogWindow
+from UI.cahnal_setting import DialogWindow
 from model.Model import Model as model1
-from table import calculate_table
+from UI.table import calculate_table
 import os
 import shutil
 
