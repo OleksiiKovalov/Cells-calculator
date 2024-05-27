@@ -12,8 +12,10 @@ To perform calculations, the application uses a unique model developed from scra
 
 Should you want to try the CellsCalulator application, follow the guidelines below:
 1. On project's GitHub main page, search for **Releases** section in the right menu;
+![[Releases]](images/Screenshot_8.jpg)
 2. Click on the latest release available;
 3. In the opened release window, go to **Assets** section at the bottom and click on **CellsCalculator.zip** file archive;
+![[Assets]](images/Screenshot_9.jpg)
 4. Wait until the archive is completely loaded and then unpack it;
 5. Enter the automatically created **CellsCalculator** folder and run the **main.exe** file.
 6. Enjoy the application!
@@ -25,16 +27,22 @@ The model can be divided into 2 separated submodels:
 * Nuclei counter - counts the number of stained nuclei;
 * Cell counter - counts the total number of cells.
 The model obtains the results from each submodel, and then returns them as a dictionary which includes counts for nuclei, cells, and the resulting percentage.
+![model](images/general_model.png)
 
 ### Nuclei counter design
 The submodel for nuclei counting is based on classical computer vision algorithms used for image pre-processing and DBSCAN clustering algorithm used for differetiating between separated stained nuclei and counting them based on their spatial relations. Additionaly, some statistical-based methods are used for final filtering of the clusters obtained. The hyperparameter values for DBSCAN algorithm have been chosen by fine-tuning them on several images.
+![[Nuclei_pipeline]](images/Screenshot_5.png)
 
 ### Cell counter design
-The submodel for cell counting is a YOLOv8-m object detection deep neural network which calculates cells by simply detecting them. It has been trained from scratch for 22 epochs on a third-party dataset(more information is provided in **Data** section below) in Google Colab cloud environment with default T4 GPU using Adam optimizer with default parameters and early stopping as a stopping criterion.
+The submodel for cell counting is a YOLOv8-m object detection deep neural network which calculates cells by simply detecting them.
+![[YOLO]](images/YOLO_architecture.jpg)
+It has been trained from scratch for 22 epochs on a third-party dataset(more information is provided in **Data** section below) in Google Colab cloud environment with default T4 GPU using Adam optimizer with default parameters and early stopping as a stopping criterion.
+![[Nuclei_pipeline]](images/Screenshot_6.png)
 
 ## Data
 
 Original dataset which had been given to us was a set of unstandardized databases containing contrast images of L929 cells with some stained nuclei. Along with that, in response to our request we had been also given a set of images of cells only so that we could better analyze our model for cell counting.
+![[L929_images]](images/target_data.png)
 
 Having performed EDA, it was clear that our data has several serious problems:
 - Large data diversity (visually images differed significantly);
@@ -42,8 +50,10 @@ Having performed EDA, it was clear that our data has several serious problems:
 - No labels (no ground truth had been given to us - only the images).
 
 As a result, it was decided to search for third-party datasets of cell microimages which would have visual appearance similar to ours. The dataset we found was LIVECell dataset, containing over 5,000 images (3,000+ training images), which was enough for us to train a deep model.
+![[L929_images]](images/livecell_data.png)
 
 The test dataset for evaluating our cell calculating model consists of 96 carefully chosen target images divided into 5 subsets so that images of different images could be analyzed in more details.
+![[L929_images]](images/Test_dataset_balance.png)
 
 The test dataset for evaluating the stained nuclei counter model consists of 23 images, on which we could clearly differentiate between actual nuclei and noisy regions when creating ground truth labels.
 

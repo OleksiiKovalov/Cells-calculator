@@ -5,8 +5,6 @@
 /.cache
 *.lsm
 *.TIF
-*.png
-*.jpg
 *.JPG
 *.ipynb
 *.npy
