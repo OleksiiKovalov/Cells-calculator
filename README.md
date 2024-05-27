@@ -24,7 +24,7 @@ Remember: it is forbidden to rename or change location of ANY elements within th
 
 ## Discover what our product is capable of
 
-**CellCalculator** is a huge innovation indeed - just look at what an awesome way it handles the job of calculating both cells and stained nuclei on given images, achieving nearly state-of-the-art performance on images of proper quality:
+**CellCalculator** is a huge innovation indeed - just look at in what an awesome way it handles the job of calculating both cells and stained nuclei on given images, achieving nearly state-of-the-art performance on images of proper quality:
 ![[cells_detected]](images/Screenshot_8_2.png)
 *Example of how detected cells can be marked with bounding boxes.*
 ![[cells_detected]](images/Screenshot_9_2.png)
