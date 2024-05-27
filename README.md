@@ -12,10 +12,10 @@ To perform calculations, the application uses a unique model developed from scra
 
 Should you want to try the CellsCalulator application, follow the guidelines below:
 1. On project's GitHub main page, search for **Releases** section in the right menu;
-![[Releases]](images/Screenshot_8.jpg)
+![[Releases]](images/Screenshot_8.png)
 2. Click on the latest release available;
 3. In the opened release window, go to **Assets** section at the bottom and click on **CellsCalculator.zip** file archive;
-![[Assets]](images/Screenshot_9.jpg)
+![[Assets]](images/Screenshot_9.png)
 4. Wait until the archive is completely loaded and then unpack it;
 5. Enter the automatically created **CellsCalculator** folder and run the **main.exe** file.
 6. Enjoy the application!
@@ -35,7 +35,7 @@ The submodel for nuclei counting is based on classical computer vision algorithm
 
 ### Cell counter design
 The submodel for cell counting is a YOLOv8-m object detection deep neural network which calculates cells by simply detecting them.
-![[YOLO]](images/YOLO_architecture.jpg)
+![[YOLO]](images/YOLO_architecture.png)
 It has been trained from scratch for 22 epochs on a third-party dataset(more information is provided in **Data** section below) in Google Colab cloud environment with default T4 GPU using Adam optimizer with default parameters and early stopping as a stopping criterion.
 ![[Nuclei_pipeline]](images/Screenshot_6.png)
 
