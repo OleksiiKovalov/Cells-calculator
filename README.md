@@ -89,8 +89,8 @@ Below is a list of main model quality metrics. The metrics have been measured on
 | Subset 3 | 0.905 | 0.918 | 0.910 | 0.095 | - | 5 | 1200 |
 | Subset 4 | 0.898 | 0.989 | 0.938 | 0.156 | - | 30 | 8588 |
 | Subset 5 | 0.927 | 0.888 | 0.899 | 0.129 | - | 25 | 9193 |
-| Micro Avg / Sum | 0.930 | 0.934 | 0.929 | 0.110 | 0.080 | 95 | 9193 |
-| Macro Avg / Sum | 0.929 | 0.935 | 0.927 | 0.128 | 0.100 | 95 | 9193 |
+| Micro Avg / Sum | 0.930 | 0.934 | 0.929 | 0.110 | 0.080 | 95 | 33606 |
+| Macro Avg / Sum | 0.929 | 0.935 | 0.927 | 0.128 | 0.100 | 95 | 33606 |
 
 ## Run the code
 
