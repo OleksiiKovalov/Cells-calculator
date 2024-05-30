@@ -69,8 +69,7 @@ As a result, it was decided to search for third-party datasets of cell microimag
 The test dataset for evaluating our cell calculating model consists of 96 carefully chosen target images divided into 5 subsets so that images of different images could be analyzed in more details.
 ![[L929_images]](images/Test_dataset_balance.png)
 
-The test dataset for evaluating the stained nuclei counter model consists of 23 images, on which we could clearly differentiate between actual nuclei and noisy regions when creating ground truth labels. Below is a sample from the test set:
-![[StainedNucleiSample]](images/B1_2.png)
+The test dataset for evaluating the stained nuclei counter model consists of 23 images, on which we could clearly differentiate between actual nuclei and noisy regions when creating ground truth labels.
 
 It should be noted that many pictures have been filtered out due to different reasons, mostly - small cell scale or because of us being unable to infer any ground truth information ourselves due to the low quality of the data.
 
