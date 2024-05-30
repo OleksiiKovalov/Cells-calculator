@@ -75,21 +75,21 @@ It should be noted that many pictures have been filtered out due to different re
 Below is a list of main model quality metrics. The metrics have been measured on the target test datasets separately for model components for cell calculation and stained nuclei calculation.
 
 #### Nuclei counter
-| MAPE | MAE | RMSE |
-|---|---|---|
-| 0.059 | 1.0 | 1.629 |
+| MAPE | MAE | RMSE | Images | Nuclei |
+|---|---|---|---|---|
+| 0.059 | 1.0 | 1.629 | 23 | 325 |
 
 #### Cell counter
 
-|  | Precision | Recall | F1 score | MAPE | MAPE manual |
-|---|---|---|---|---|---|
-| Subset 1 | 0.961 | 0.962 | 0.961 | 0.042 | - |
-| Subset 2 | 0.959 | 0.913 | 0.934 | 0.129 | - |
-| Subset 3 | 0.905 | 0.918 | 0.910 | 0.095 | - |
-| Subset 4 | 0.898 | 0.989 | 0.938 | 0.156 | - |
-| Subset 5 | 0.927 | 0.888 | 0.899 | 0.129 | - |
-| Micro Avg | 0.930 | 0.934 | 0.929 | 0.110 | 0.080 |
-| Macro Avg | 0.929 | 0.935 | 0.927 | 0.128 | 0.100 |
+|  | Precision | Recall | F1 score | MAPE | MAPE manual | Images | Cells |
+|---|---|---|---|---|---|---|---|
+| Subset 1 | 0.961 | 0.962 | 0.961 | 0.042 | - | 8 | 7006 |
+| Subset 2 | 0.959 | 0.913 | 0.934 | 0.129 | - | 27 | 7619 |
+| Subset 3 | 0.905 | 0.918 | 0.910 | 0.095 | - | 5 | 1200 |
+| Subset 4 | 0.898 | 0.989 | 0.938 | 0.156 | - | 30 | 8588 |
+| Subset 5 | 0.927 | 0.888 | 0.899 | 0.129 | - | 25 | 9193 |
+| Micro Avg / sum | 0.930 | 0.934 | 0.929 | 0.110 | 0.080 | 95 | 9193 |
+| Macro Avg / sum | 0.929 | 0.935 | 0.927 | 0.128 | 0.100 | 95 | - |
 
 ## Run the code
 
