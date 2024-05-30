@@ -50,7 +50,7 @@ The submodel for cell counting is a YOLOv8-m object detection deep neural networ
 ![[YOLO]](images/YOLO_architecture.png)
 It has been trained from scratch for 22 epochs on a third-party dataset(more information is provided in **Data** section below) in Google Colab cloud environment with default T4 GPU using Adam optimizer with default parameters and early stopping as a stopping criterion.
 ![[Nuclei_pipeline]](images/Screenshot_6.png)
-If you want to take a look at how the model was trained, please visit our Colab notebook for more information: [![Open In Colab](https://colab.research.google.com/drive/1cpntc3IXbIoR_0kkj4pkOzkzGqZbzueq?usp=sharing)]
+If you want to take a look at how the model was trained, please visit our Colab notebook for more information: [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1cpntc3IXbIoR_0kkj4pkOzkzGqZbzueq?usp=sharing)
 
 ## Data
 
