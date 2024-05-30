@@ -50,6 +50,7 @@ The submodel for cell counting is a YOLOv8-m object detection deep neural networ
 ![[YOLO]](images/YOLO_architecture.png)
 It has been trained from scratch for 22 epochs on a third-party dataset(more information is provided in **Data** section below) in Google Colab cloud environment with default T4 GPU using Adam optimizer with default parameters and early stopping as a stopping criterion.
 ![[Nuclei_pipeline]](images/Screenshot_6.png)
+If you want to take a look at how the model was trained, please visit our Colab notebook for more information: [![Open In Colab](https://colab.research.google.com/drive/1cpntc3IXbIoR_0kkj4pkOzkzGqZbzueq?usp=sharing)]
 
 ## Data
 
@@ -88,8 +89,8 @@ Below is a list of main model quality metrics. The metrics have been measured on
 | Subset 3 | 0.905 | 0.918 | 0.910 | 0.095 | - | 5 | 1200 |
 | Subset 4 | 0.898 | 0.989 | 0.938 | 0.156 | - | 30 | 8588 |
 | Subset 5 | 0.927 | 0.888 | 0.899 | 0.129 | - | 25 | 9193 |
-| Micro Avg / sum | 0.930 | 0.934 | 0.929 | 0.110 | 0.080 | 95 | 9193 |
-| Macro Avg / sum | 0.929 | 0.935 | 0.927 | 0.128 | 0.100 | 95 | - |
+| Micro Avg / Sum | 0.930 | 0.934 | 0.929 | 0.110 | 0.080 | 95 | 9193 |
+| Macro Avg / Sum | 0.929 | 0.935 | 0.927 | 0.128 | 0.100 | 95 | 9193 |
 
 ## Run the code
 
