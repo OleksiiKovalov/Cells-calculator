@@ -66,7 +66,7 @@ Having performed EDA, it was clear that our data has several serious problems:
 As a result, it was decided to search for third-party datasets of cell microimages which would have visual appearance similar to ours. The dataset we found was LIVECell dataset, containing over 5,000 images (3,000+ training images), which was enough for us to train a deep model.
 ![[L929_images]](images/livecell_data.png)
 
-The test dataset for evaluating our cell calculating model consists of 96 carefully chosen target images divided into 5 subsets so that images of different images could be analyzed in more details.
+The test dataset for evaluating our cell calculating model consists of 95 carefully chosen target images divided into 5 subsets so that images of different images could be analyzed in more details.
 ![[L929_images]](images/Test_dataset_balance.png)
 
 The test dataset for evaluating the stained nuclei counter model consists of 23 images, on which we could clearly differentiate between actual nuclei and noisy regions when creating ground truth labels.
