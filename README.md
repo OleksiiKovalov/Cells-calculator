@@ -73,15 +73,15 @@ The test dataset for evaluating the stained nuclei counter model consists of 23 
 
 It should be noted that many pictures have been filtered out due to different reasons, mostly - small cell scale or because of us being unable to infer any ground truth information ourselves due to the low quality of the data.
 
-### Model quality metrics
+## Model quality metrics
 Below is a list of main model quality metrics. The metrics have been measured on the target test datasets separately for model components for cell calculation and stained nuclei calculation by manually calculating the initial figures (TP, FP, FN, number of predicted instances).
 
-#### Nuclei counter
+### Nuclei counter
 | MAPE | MAE | RMSE | Images | Nuclei |
 |---|---|---|---|---|
 | 0.059 | 1.0 | 1.629 | 23 | 325 |
 
-#### Cell counter
+### Cell counter
 
 |  | Precision | Recall | F1 score | MAPE | MAPE manual | Images | Cells |
 |---|---|---|---|---|---|---|---|
