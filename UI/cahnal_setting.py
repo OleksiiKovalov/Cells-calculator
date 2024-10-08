@@ -14,6 +14,8 @@ import numpy as np
 import os
 import tifffile
 
+import traceback
+
 def has_duplicates(lst):
     """
     Check if a list contains duplicate elements.
@@ -115,7 +117,7 @@ class DialogWindow(QMainWindow):
         self.parent_height = self.parent().height()
         
         # Set fixed size for the dialog window
-        self.setFixedSize(self.parent_width * 0.75, self.parent_height * 0.75)
+        self.setFixedSize(int(self.parent_width * 0.75), int(self.parent_height * 0.75))
         
         # Set window title with basename of the LSM path
         self.setWindowTitle(f'Settings - {os.path.basename(self.lsm_path)}')
@@ -153,6 +155,7 @@ class DialogWindow(QMainWindow):
         try:
             self.add_images()
         except:
+            traceback.print_exc()
             # Handle error during layout image
             if self.warning_count == 0:
                 self.show_warning_dialog("Error during layout images\n\nUse Next button")
@@ -263,6 +266,7 @@ class DialogWindow(QMainWindow):
         try:
             self.add_images()
         except:
+            traceback.print_exc()
             if self.warning_count == 0:
                 self.warning_count = 1
                 self.show_warning_dialog("Error during layout images\n\nUse Next button")

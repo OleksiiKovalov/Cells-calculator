@@ -2,13 +2,14 @@
 This module defines the MainWindow class for the Cells Calculator application.
 The application is designed to open, process, and analyze cell images.
 """
+print('111s ')
 import sys
 from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
     QSizePolicy, QGraphicsProxyWidget, QGraphicsRectItem, QHeaderView, \
         QMessageBox, QTableWidget, QTableWidgetItem, QPushButton, QGraphicsView,\
             QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, \
                 QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, \
-                    QLabel, QHBoxLayout
+                    QLabel, QHBoxLayout, QSlider
 from PyQt5.QtGui import QPixmap, QImage, QFont, QColor, QPen
 from PyQt5.QtCore import Qt
 import numpy as np
@@ -19,6 +20,10 @@ from UI.table import calculate_table
 import os
 import shutil
 
+import pyqtgraph as pg
+from UI.Slider import Slider
+
+import traceback
 
 class MainWindow(QMainWindow):
     """
@@ -26,6 +31,10 @@ class MainWindow(QMainWindow):
     This class handles the initialization of the UI, loading and processing images, 
     and interacting with various models to perform cell calculations.
     """
+    
+    object_size = { 'min' : 0,
+                   'max' : 10
+    }
     # Default parameters for cell and nuclei channels
     parametrs = {'Cell': 0,
                  'Nuclei': 1
@@ -163,6 +172,7 @@ class MainWindow(QMainWindow):
                 elif file_name.endswith('.csv'):
                     self.df.to_csv(file_name, index=False)
         except Exception as e:
+            traceback.print_exc()
             # If an error occurs during saving, show a warning dialog
             self.show_warning_dialog("Error during saving table")
             
@@ -262,13 +272,27 @@ class MainWindow(QMainWindow):
         
         # Connect button click event to calculate_button function
         self.right_button.clicked.connect(self.calculate_button)
-
+        
         # Add widgets to the right layout with spacing
         self.right_layout.addWidget(label)
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.combo_box)
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.right_view)
+        self.right_layout.addSpacing(20)
+        range_lable = QLabel("Object Size:")
+        font = QFont()
+        font.setPointSize(16) 
+        range_lable.setFont(font)
+        self.right_layout.addWidget(range_lable)
+        #self.right_layout.addSpacing(1)
+        self.min_range_slider = Slider(self.object_size, 'min')
+        self.max_range_slider = Slider(self.object_size, 'max')
+        
+        self.right_layout.addWidget(self.min_range_slider)
+        self.right_layout.addWidget(self.max_range_slider)
+
+
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.checkbox)
         self.right_layout.addSpacing(20)
@@ -389,10 +413,12 @@ class MainWindow(QMainWindow):
                     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                         nuclei_channel=self.parametrs['Nuclei'])
             except:
+                traceback.print_exc()
                 try:
                     # If an error occurs, try without channel information
                     result = self.models[model](img_path=self.lsm_path)
                 except:
+                    traceback.print_exc()
                     # If still not successful, show an error dialog
                     self.show_warning_dialog(
                         "Error during calculation \n\nChoose another model or change channels settings")
@@ -540,7 +566,7 @@ class MainWindow(QMainWindow):
                 self.add_image(".cache\cell_tmp_img.png")
         except Exception as e:
             # If an error occurs, print the traceback, show a warning dialog
-            import traceback
+          
             traceback.print_exc()
             self.show_warning_dialog("Error during opening image.")
 
@@ -619,6 +645,7 @@ class MainWindow(QMainWindow):
                 df = calculate_table(
                     model_dict=self.models, files_name=self.lsm_filesList, parametrs=self.parametrs)
             except Exception as e:
+                traceback.print_exc()
                 # If an exception occurs during calculation disables certain actions,
                 # resets file list and data frame, and shows a warning dialog
                 self.settings_action.setEnabled(False)
@@ -658,6 +685,7 @@ class MainWindow(QMainWindow):
             self.main_scene.addWidget(table)
             
         except:
+            traceback.print_exc()
             # If an exception occurs during the process, disables certain actions,
             # resets file list and data frame, and shows a warning dialog
             self.settings_action.setEnabled(False)
@@ -706,7 +734,8 @@ class MainWindow(QMainWindow):
         else:
             pixmap_width = view_width
             pixmap_height = view_width / pixmap_aspect_ratio
-
+        pixmap_height = int(pixmap_height)
+        pixmap_width = int(pixmap_width)
         # Scale the pixmap
         pixmap = pixmap.scaled(pixmap_width, pixmap_height,
                             aspectRatioMode=Qt.KeepAspectRatio)
@@ -768,6 +797,7 @@ class MainWindow(QMainWindow):
                 self.setWindowTitle(
                     f"Cells Calculator - {os.path.basename(lsm_path)}")
             except Exception as e:
+                traceback.print_exc()
                 # If an error occurs, show a warning dialog,
                 # reset variables, and clear the main scene
                 self.show_warning_dialog("Error during opening file.")
@@ -827,6 +857,7 @@ class MainWindow(QMainWindow):
             self.setWindowTitle(
                 f"Cells Calculator - {os.path.basename(lsm_path)}")
         except Exception as e:
+            traceback.print_exc()
             # If an error occurs, show a warning dialog,
             # reset variables, and clear the main scene
             self.show_warning_dialog("Error during opening file.")
@@ -864,6 +895,7 @@ class MainWindow(QMainWindow):
             # Add the new image to the scene
             self.add_image(lsm_file)
         except Exception as e:
+            traceback.print_exc()
             # If an error occurs, show a warning dialog
             self.show_warning_dialog("Error during opening image.")
 
@@ -907,6 +939,7 @@ class MainWindow(QMainWindow):
                 # Center the dialog window on the screen
                 dialog.center()
         except:
+            traceback.print_exc()
             # If an error occurs, show a warning dialog
             self.show_warning_dialog("Error during opening channels settings")
 
