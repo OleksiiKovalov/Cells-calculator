@@ -7,7 +7,9 @@ import os
 import shutil
 import cv2
 import numpy as np
-from model.utils import draw_bounding_box
+import pandas as pd
+
+from model.utils import draw_bounding_box, filter_detections
 
 CLASSES = ['Cell']
 colors = np.random.uniform(0, 255, size=(len(CLASSES), 3))
@@ -85,6 +87,7 @@ class CellCounter():
 
         # Apply NMS (Non-maximum suppression)
         result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)  # score, nms thresholds
+        # boxes_to_filter = np.array(boxes)[result_boxes,:]
 
         detections = []
 
@@ -96,18 +99,30 @@ class CellCounter():
                 "class_id": class_ids[index],
                 "class_name": CLASSES[class_ids[index]],
                 "confidence": scores[index],
-                "box": box,
+                "box": np.array(box),
                 "scale": scale,
             }
             detections.append(detection)
+        # perform square-based filtering of bboxes
+        detections = pd.DataFrame(detections)
+        # TODO: in this codeline, calculate max and min squares of obtained bboxes and automatically
+        # set them as lower and upper bounds for the filtering sliders if the sliders currently
+        # have default values (0 and 10) set up. Otherwise do not re-set up them.
+        # TODO: in this codeline, add initialization of min_size and max_size params where their
+        # values are read from the boundary sliders. Scale them to be in 0.0-1.0 range, as required
+        # by the filter_detections() function.
+        # TODO: pass the min/max_size params to filter_detections() call below.
+        # TODO: when opening a new image or folder of images, reset boundary sliders to their default values (min=0%, max=10%).
+        filtered_detections = filter_detections(detections)
+        for i in range(filtered_detections.shape[0]):
             draw_bounding_box(
                 original_image,
-                class_ids[index],
-                scores[index],
-                round(box[0] * scale),
-                round(box[1] * scale),
-                round((box[0] + box[2]) * scale),
-                round((box[1] + box[3]) * scale),
+                filtered_detections.iloc[i,0],
+                filtered_detections.iloc[i,2],
+                round(filtered_detections.iloc[i,3][0] * scale),
+                round(filtered_detections.iloc[i,3][1] * scale),
+                round((filtered_detections.iloc[i,-2][0] + filtered_detections.iloc[i,-2][2]) * filtered_detections.iloc[i,-1]),
+                round((filtered_detections.iloc[i,-2][1] + filtered_detections.iloc[i,-2][3]) * filtered_detections.iloc[i,-1]),
             )
         cv2.imwrite('.cache/cell_tmp_img_with_detections.png', original_image)
 

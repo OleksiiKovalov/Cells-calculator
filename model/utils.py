@@ -4,6 +4,7 @@ import os
 import cv2
 import tiffile
 import numpy as np
+import pandas as pd
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
@@ -97,8 +98,8 @@ def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_
     Args:
         img (numpy.ndarray): The input image to draw the bounding box on.
         # img_path (str): The path to input image to draw the bounding box on.
-        class_id (int): Class ID of the detected object.
-        confidence (float): Confidence score of the detected object.
+        # class_id (int): Class ID of the detected object.
+        # confidence (float): Confidence score of the detected object.
         x (int): X-coordinate of the top-left corner of the bounding box.
         y (int): Y-coordinate of the top-left corner of the bounding box.
         x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
@@ -115,3 +116,28 @@ def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_
         cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
     else:
         img = cv2.circle(img, (x, y), 2, color, -1)
+
+def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512,512)) -> pd.DataFrame:
+    """
+    Filters bounding boxes based on their area.
+    Bboxes of size < min_size or > max_size are removed.
+    Area is measured in % of image size (between 0.0 and 1.0).
+    This filtering function is implemented in October, 2024, to reduce the amount of garbage detected as cells.
+
+    Input args:
+    - detections: pd.DataFrame of detections, including bboxes in [x1, y1, w, h] format, where x1, y1 - lower-left corner coordinates;
+    - min_size: float representing the minimal possible size of bbox;
+    - max_size: float representing the maximal possible size of bbox;
+    - img_size: tuple of size 2 representing width and height of image.
+
+    Returns np.array of filtered bboxes.
+    """
+    assert(min_size <= max_size)
+    if detections.empty:
+        return detections
+    img_sq = img_size[0] * img_size[1]
+    print(type(detections['box']))
+    print(detections['box'].head())
+    filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
+
+    return filtered_detections
