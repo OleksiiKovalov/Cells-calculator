@@ -27,8 +27,9 @@ class CellCounter():
 
     Output value is the number of cells detected.
     """
-    def __init__(self, path):
+    def __init__(self, path, object_size):
         self.model: cv2.dnn.Net = cv2.dnn.readNetFromONNX(path)
+        self.object_size = object_size
 
     def count(self, model, input_image):
         """
@@ -38,6 +39,7 @@ class CellCounter():
         Args:
             onnx_model (str): Path to the ONNX model.
             input_image (str): Path to the input image.
+            object_size (dict): !!!!!!!!
 
         Returns:
             list: List of dictionaries containing detection information such as class_id,
@@ -113,7 +115,8 @@ class CellCounter():
         # by the filter_detections() function.
         # TODO: pass the min/max_size params to filter_detections() call below.
         # TODO: when opening a new image or folder of images, reset boundary sliders to their default values (min=0%, max=10%).
-        filtered_detections = filter_detections(detections)
+        print(self.object_size)
+        filtered_detections = filter_detections(detections, min_size = self.object_size['min_size'], max_size= self.object_size['max_size'])
         for i in range(filtered_detections.shape[0]):
             draw_bounding_box(
                 original_image,

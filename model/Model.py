@@ -29,10 +29,10 @@ class Model():
     - '%': the target percentage value obtained.
     """
     def __init__(self, path=os.path.join('model', 'best_m.onnx'),
-                 threshold=100, eps=5, min_samples=10):
+                 threshold=100, eps=5, min_samples=10, object_size = { 'min_size' : 0, 'max_size' : 10}):
         self.nuclei_counter = NucleiCounter(threshold=threshold,
                                             eps=eps, min_samples=min_samples)
-        self.cell_counter = CellCounter(path=path)
+        self.cell_counter = CellCounter(path=path, object_size = object_size)
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """

@@ -2,7 +2,6 @@
 This module defines the MainWindow class for the Cells Calculator application.
 The application is designed to open, process, and analyze cell images.
 """
-print('111s ')
 import sys
 from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
     QSizePolicy, QGraphicsProxyWidget, QGraphicsRectItem, QHeaderView, \
@@ -32,9 +31,11 @@ class MainWindow(QMainWindow):
     and interacting with various models to perform cell calculations.
     """
     
-    object_size = { 'min' : 0,
-                   'max' : 10
+    object_size = { 'min_size' : 0.000,
+                   'max_size' : 10.000,
+                   'round_parametr' : 10**3
     }
+   
     # Default parameters for cell and nuclei channels
     parametrs = {'Cell': 0,
                  'Nuclei': 1
@@ -42,7 +43,7 @@ class MainWindow(QMainWindow):
 
     # Dictionary containing available models and their corresponding methods
     models = {
-        'Model 1': model1().calculate
+        'Model 1': model1(object_size = object_size).calculate
     }
 
     # Initialize variables to None or default values
@@ -286,8 +287,8 @@ class MainWindow(QMainWindow):
         range_lable.setFont(font)
         self.right_layout.addWidget(range_lable)
         #self.right_layout.addSpacing(1)
-        self.min_range_slider = Slider(self.object_size, 'min')
-        self.max_range_slider = Slider(self.object_size, 'max')
+        self.min_range_slider = Slider(self.object_size, 'min_size')
+        self.max_range_slider = Slider(self.object_size, 'max_size')
         
         self.right_layout.addWidget(self.min_range_slider)
         self.right_layout.addWidget(self.max_range_slider)
@@ -597,7 +598,8 @@ class MainWindow(QMainWindow):
             if self.lsm_filesList:
                 # Clear the main scene
                 self.main_scene.clear()
-                
+                self.max_range_slider.set_default()
+                self.min_range_slider.set_default()
                 # Reset certain variables
                 self.lsm_path = None
                 self.draw_bounding = 0
@@ -771,7 +773,9 @@ class MainWindow(QMainWindow):
         # If no file is selected, return
         if not lsm_path:
             return 0
-        
+        #After opening new image set sliders to default
+        self.max_range_slider.set_default()
+        self.min_range_slider.set_default()
         # If the selected file is an LSM file, call the open_lsm function
         if lsm_path.endswith(".lsm"):
             self.open_lsm(lsm_path)
