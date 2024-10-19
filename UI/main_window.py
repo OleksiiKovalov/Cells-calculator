@@ -31,9 +31,9 @@ class MainWindow(QMainWindow):
     and interacting with various models to perform cell calculations.
     """
     
-    object_size = { 'min_size' : 0.000,
-                   'max_size' : 10.000,
-                   'round_parametr' : 10**3
+    object_size = { 'min_size' : 0.0000,
+                   'max_size' : 0.0100,
+                   'round_parametr' : 10**4
     }
    
     # Default parameters for cell and nuclei channels
@@ -43,7 +43,7 @@ class MainWindow(QMainWindow):
 
     # Dictionary containing available models and their corresponding methods
     models = {
-        'Model 1': model1(object_size = object_size).calculate
+        'Model 1': model1(object_size = object_size)
     }
 
     # Initialize variables to None or default values
@@ -410,14 +410,14 @@ class MainWindow(QMainWindow):
         if model != "All_models":
             try:
                 # Attempt to calculate the result using the selected method
-                result = self.models[model](
+                result = self.models[model].calculate(
                     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                         nuclei_channel=self.parametrs['Nuclei'])
             except:
                 traceback.print_exc()
                 try:
                     # If an error occurs, try without channel information
-                    result = self.models[model](img_path=self.lsm_path)
+                    result = self.models[model].calculate(img_path=self.lsm_path)
                 except:
                     traceback.print_exc()
                     # If still not successful, show an error dialog
@@ -492,7 +492,7 @@ class MainWindow(QMainWindow):
                 
                 try:
                     # Attempt to calculate the result using the method
-                    result = model(
+                    result = model.calculate(
                         img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                             nuclei_channel=self.parametrs['Nuclei'])
                 except:
@@ -584,6 +584,7 @@ class MainWindow(QMainWindow):
         - Set the window title to include the selected folder name.
         - If no image files are found, reset variables and show a warning dialog.
         """
+        self.models['Model 1'].cell_counter.detections = None
         # Open a dialog window to select a folder
         self.folder_path = QFileDialog.getExistingDirectory(self, "Open Folder", "")
 
@@ -709,6 +710,7 @@ class MainWindow(QMainWindow):
         If lsm_file is a string (file path), it creates a QImage from the file path.
             If lsm_file is a numpy array, it creates a QImage from it with grayscale format.
         """
+        # self.models['Model 1'].cell_counter.detections = None
         # Check if the input is a string (file path)
         if isinstance(lsm_file, str):
             # If it's a string, create a QImage from the file path
@@ -766,6 +768,7 @@ class MainWindow(QMainWindow):
         - If the selected file is not an LSM file, it stores the file path, clears the main scene, and attempts to add the image to the scene.
         - If an error occurs during the process, it shows a warning dialog, resets variables, and clears the main scene.
         """
+        self.models['Model 1'].cell_counter.detections = None
         # Open a dialog window to select an image file
         lsm_path, _ = QFileDialog.getOpenFileName(
             self, "Open Image File", "", "Image Files (*.png *.jpg *.bmp *.lsm *.TIF)")

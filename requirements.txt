@@ -4,3 +4,4 @@ scikit-learn==1.4.1.post1
 opencv-python==4.8.1.78
 tiffile==2018.10.18
 pyqt5==5.15.9
+pyqtgraph==0.13.7
