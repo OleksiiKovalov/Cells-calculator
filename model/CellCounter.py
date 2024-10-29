@@ -113,6 +113,9 @@ class CellCounter():
             detections = pd.DataFrame(detections)
             self.detections = detections
             self.scale = scale
+            # change object_size for detection
+            self.object_size['set_size'](detections['box'].copy())
+
         detections = self.detections
         original_image = self.original_image.copy()
         scale = self.scale
@@ -124,7 +127,6 @@ class CellCounter():
         # by the filter_detections() function.
         # TODO: pass the min/max_size params to filter_detections() call below.
         # TODO: when opening a new image or folder of images, reset boundary sliders to their default values (min=0%, max=10%).
-        print(self.object_size)
         filtered_detections = filter_detections(detections, min_size = self.object_size['min_size'], max_size= self.object_size['max_size'])
         for i in range(filtered_detections.shape[0]):
             draw_bounding_box(

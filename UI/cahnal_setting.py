@@ -242,9 +242,11 @@ class DialogWindow(QMainWindow):
             return
         for option, combo_box in self.combo_box_dict.items():
             self.parametrs[option] = int(combo_box.currentText()[len("Channel "):]) - 1
-
+        #For recalculation
+        self.parent_.reset_detection()
         if self.call_back:
             self.call_back()
+        
         self.close()
 
     def next_action(self):

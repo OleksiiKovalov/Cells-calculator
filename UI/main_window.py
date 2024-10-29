@@ -33,7 +33,8 @@ class MainWindow(QMainWindow):
     
     object_size = { 'min_size' : 0.0000,
                    'max_size' : 0.0100,
-                   'round_parametr' : 10**4
+                   'set_size' : 'set_size',
+                   'round_parametr' : 10**6
     }
    
     # Default parameters for cell and nuclei channels
@@ -59,6 +60,7 @@ class MainWindow(QMainWindow):
 
         This method sets up the initial state of the main window.
         """
+        self.object_size['set_size'] = self.set_size
         super().__init__()
         # Add cache directory creation
         try:
@@ -584,7 +586,7 @@ class MainWindow(QMainWindow):
         - Set the window title to include the selected folder name.
         - If no image files are found, reset variables and show a warning dialog.
         """
-        self.models['Model 1'].cell_counter.detections = None
+        self.reset_detection()
         # Open a dialog window to select a folder
         self.folder_path = QFileDialog.getExistingDirectory(self, "Open Folder", "")
 
@@ -599,8 +601,8 @@ class MainWindow(QMainWindow):
             if self.lsm_filesList:
                 # Clear the main scene
                 self.main_scene.clear()
-                self.max_range_slider.set_default()
-                self.min_range_slider.set_default()
+                #self.max_range_slider.set_default()
+                #self.min_range_slider.set_default()
                 # Reset certain variables
                 self.lsm_path = None
                 self.draw_bounding = 0
@@ -768,7 +770,7 @@ class MainWindow(QMainWindow):
         - If the selected file is not an LSM file, it stores the file path, clears the main scene, and attempts to add the image to the scene.
         - If an error occurs during the process, it shows a warning dialog, resets variables, and clears the main scene.
         """
-        self.models['Model 1'].cell_counter.detections = None
+        self.reset_detection()
         # Open a dialog window to select an image file
         lsm_path, _ = QFileDialog.getOpenFileName(
             self, "Open Image File", "", "Image Files (*.png *.jpg *.bmp *.lsm *.TIF)")
@@ -777,8 +779,8 @@ class MainWindow(QMainWindow):
         if not lsm_path:
             return 0
         #After opening new image set sliders to default
-        self.max_range_slider.set_default()
-        self.min_range_slider.set_default()
+        #self.max_range_slider.set_default()
+        #self.min_range_slider.set_default()
         # If the selected file is an LSM file, call the open_lsm function
         if lsm_path.endswith(".lsm"):
             self.open_lsm(lsm_path)
@@ -950,7 +952,25 @@ class MainWindow(QMainWindow):
             # If an error occurs, show a warning dialog
             self.show_warning_dialog("Error during opening channels settings")
 
+    def reset_detection(self):
+        for key, model in self.models.items():
+            model.cell_counter.detections = None
+    def set_size(self, detection : list = [], img_size : tuple = (512,512), min_size : float = object_size["min_size"], max_size : float = object_size["max_size"]):
+        if all(len(cell) >= 4 for cell in detection):
+            img_sq = img_size[0] * img_size[1]
+            # Вычисляем произведения для каждого 
+            values = [cell[2] * cell[3] for cell in detection]
 
+            # Находим максимальное и минимальное произведение
+            min_size = min(values) / img_sq
+            max_size = max(values) / img_sq
+            
+        
+        assert(min_size <= max_size)
+        self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
+        self.max_range_slider.change_default(min_size = min_size, max_size = max_size)
+        
+    
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     try:
