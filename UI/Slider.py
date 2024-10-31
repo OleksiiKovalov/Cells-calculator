@@ -18,29 +18,28 @@ class CustomSlider(QSlider):
         super().mousePressEvent(event)
 
 class Slider(QWidget):
-    def __init__(self, object_size : dict, key : str): 
+    def __init__(self, object_size : dict, default_object_size : dict, key : str): 
         self.object_size = object_size
         self.key = key
-        self.round_parametr = object_size['round_parametr']
+        self.round_parametr_slider = object_size['round_parametr_slider']
+        self.round_parametr_value_input = object_size['round_parametr_value_input']
     
-        self.default_object_size = object_size.copy()
+        self.default_object_size = default_object_size
         super().__init__()
         self.initUI()
     def change_default(self, min_size, max_size):
         #TODO: some validation for min and max
-        self.freeze = 1
-        self.default_object_size['min_size'] = min_size
-        self.default_object_size['max_size'] = max_size
-        self.value_slider.setMinimum(int (self.default_object_size['min_size'] * self.round_parametr))
-        self.value_slider.setMaximum(int (self.default_object_size['max_size'] * self.round_parametr))
-        print(self.value_slider.minimum(), self.value_slider.maximum())
+        self.default_object_size['min_size'] = min_size - min_size / 100
+        self.default_object_size['max_size'] = max_size + max_size / 100
+        self.value_slider.setMinimum(int (self.default_object_size['min_size'] * self.round_parametr_slider))
+        self.value_slider.setMaximum(int (self.default_object_size['max_size'] * self.round_parametr_slider))
 
         self.set_default()
     def set_default(self):
         value = self.default_object_size[self.key]
         self.object_size[self.key] = value
-        self.value_input.setText(str(f'{value:.5f}'))
-        self.value_slider.setValue(int (value * self.round_parametr))
+        self.value_input.setText(str(f'{value * self.round_parametr_value_input:.2f}'))
+        self.value_slider.setValue(int (value * self.round_parametr_slider))
     def initUI(self):
         # Переменная для хранения значения
 
@@ -62,7 +61,7 @@ class Slider(QWidget):
         slider_layout = QHBoxLayout()
 
         # Создаем QLineEdit для отображения значения
-        self.value_input = QLineEdit(f"{self.object_size[self.key]:.5f}")
+        self.value_input = QLineEdit(f"")
         self.value_input.setFixedWidth(50)
         self.value_input.setAlignment(Qt.AlignCenter)
 
@@ -70,12 +69,12 @@ class Slider(QWidget):
         #self.value_input.setValidator(QDoubleValidator(self.object_size['min_size'], self.object_size['max_size'], 3))
 
         slider_layout.addWidget(self.value_input)
-        
+
         # Создаем QSlider
         self.value_slider = CustomSlider(Qt.Horizontal)
-        self.value_slider.setMinimum(int (self.object_size['min_size']) * self.round_parametr)
-        self.value_slider.setMaximum(int (self.object_size['max_size'] * self.round_parametr))
-        self.value_slider.setValue(int (self.object_size[self.key] * self.round_parametr) )
+        self.value_slider.setMinimum(int (self.object_size['min_size']) * self.round_parametr_slider)
+        self.value_slider.setMaximum(int (self.object_size['max_size'] * self.round_parametr_slider))
+        self.value_slider.setValue(int (self.object_size[self.key] * self.round_parametr_slider) )
         slider_layout.addWidget(self.value_slider)
 
         # Добавляем слайдер и поле ввода в основной layout
@@ -95,7 +94,7 @@ class Slider(QWidget):
         min_size = self.default_object_size['min_size']
         max_size = self.default_object_size['max_size']
         
-        value = self.value_slider.value() / self.round_parametr
+        value = self.value_slider.value() / self.round_parametr_slider
         # Проверяем значение на корректность, если вне диапазона — устанавливаем границы
         if self.key == 'min_size' and value > self.object_size['max_size']:
             value = self.object_size['max_size']
@@ -105,16 +104,16 @@ class Slider(QWidget):
             value = min_size
         elif value > max_size:
             value = max_size 
-        self.value_slider.setValue(int(value * self.round_parametr))
+        self.value_slider.setValue(int(value * self.round_parametr_slider))
         self.object_size[self.key] = value
-        self.value_input.setText(str(f'{value:.5f}'))
+        self.value_input.setText(str(f'{value * self.round_parametr_value_input:.2f}'))
 
     def update_value_from_input(self):
         # Обновляем переменную и слайдер при изменении значения в QLineEdit
         min_size = self.default_object_size['min_size']
         max_size = self.default_object_size['max_size']
         try:
-            value = float(self.value_input.text())
+            value = float(self.value_input.text()) / self.round_parametr_value_input
             # Проверяем значение на корректность, если вне диапазона — устанавливаем границы
             if self.key == 'min_size' and value >= self.object_size['max_size']:
                 value = self.object_size['max_size']
@@ -126,11 +125,11 @@ class Slider(QWidget):
                 value = max_size
 
             self.object_size[self.key] = value
-            self.value_slider.setValue(int(value * self.round_parametr))
-            self.value_input.setText(str(f'{value:.5f}'))
+            self.value_slider.setValue(int(value * self.round_parametr_slider))
+            self.value_input.setText(str(f'{value * self.round_parametr_value_input:.2f}'))
         except ValueError:
 
-            self.value_input.setText(str(f'{self.object_size[self.key]:.5f}'))
+            self.value_input.setText(str(f'{self.object_size[self.key] * self.round_parametr_value_input:.2f}'))
             
 
 if __name__ == '__main__':

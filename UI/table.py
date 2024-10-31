@@ -41,7 +41,7 @@ def calculate_table(model_dict: dict, files_name: list, parametrs: dict):
         for model_name, model in model_dict.items():
             try:
                 # Attempt to apply the method to the image file
-                result = model(img_path=file_path, cell_channel=parametrs['Cell'],\
+                result = model.calculate(img_path=file_path, cell_channel=parametrs['Cell'],\
                     nuclei_channel=parametrs['Nuclei'])
             except:
                 result = None

@@ -31,12 +31,14 @@ class MainWindow(QMainWindow):
     and interacting with various models to perform cell calculations.
     """
     
-    object_size = { 'min_size' : 0.0000,
-                   'max_size' : 0.0100,
+    object_size = { 'min_size' : 100,
+                   'max_size' : 0.000,
                    'set_size' : 'set_size',
-                   'round_parametr' : 10**6
+                   'round_parametr_slider' : 10**6,
+                   'round_parametr_value_input' : 10**4
+                   
     }
-   
+    default_object_size = object_size.copy()
     # Default parameters for cell and nuclei channels
     parametrs = {'Cell': 0,
                  'Nuclei': 1
@@ -61,6 +63,7 @@ class MainWindow(QMainWindow):
         This method sets up the initial state of the main window.
         """
         self.object_size['set_size'] = self.set_size
+        self.default_object_size = self.object_size.copy()
         super().__init__()
         # Add cache directory creation
         try:
@@ -289,8 +292,8 @@ class MainWindow(QMainWindow):
         range_lable.setFont(font)
         self.right_layout.addWidget(range_lable)
         #self.right_layout.addSpacing(1)
-        self.min_range_slider = Slider(self.object_size, 'min_size')
-        self.max_range_slider = Slider(self.object_size, 'max_size')
+        self.min_range_slider = Slider(self.object_size, self.default_object_size, 'min_size')
+        self.max_range_slider = Slider(self.object_size, self.default_object_size, 'max_size')
         
         self.right_layout.addWidget(self.min_range_slider)
         self.right_layout.addWidget(self.max_range_slider)
@@ -399,6 +402,9 @@ class MainWindow(QMainWindow):
             - Set flag to draw bounding boxes.
             - Draw bounding boxes.
         """
+        if self.lsm_filesList:
+            self.create_table()
+            return
         # Get the selected method from the combo box
         model = self.combo_box.currentText()
         
@@ -646,17 +652,23 @@ class MainWindow(QMainWindow):
             table = QTableWidget()
             
             try:
+                current_model = self.combo_box.currentText()
+                if current_model == "All_models":
+                    models = self.models
+                else:
+                    models = {current_model: self.models[current_model]} if current_model in self.models else {}
                 # Attempts to calculate table data using given methods, files, and parameters
                 df = calculate_table(
-                    model_dict=self.models, files_name=self.lsm_filesList, parametrs=self.parametrs)
+                    model_dict=models, files_name=self.lsm_filesList, parametrs=self.parametrs)
             except Exception as e:
                 traceback.print_exc()
                 # If an exception occurs during calculation disables certain actions,
                 # resets file list and data frame, and shows a warning dialog
                 self.settings_action.setEnabled(False)
                 self.save_as_action.setEnabled(False)
+                self.right_button.setEnabled(False)
                 self.lsm_filesList = None
-                self.show_warning_dialog("Error during calculation.")
+                self.show_warning_dialog("Error during calculation. \nTry another Model")
                 return
 
             # Stores the calculated data frame
@@ -688,6 +700,7 @@ class MainWindow(QMainWindow):
             
             # Adds the table to the main scene
             self.main_scene.addWidget(table)
+            self.right_button.setEnabled(True)
             
         except:
             traceback.print_exc()
@@ -695,9 +708,10 @@ class MainWindow(QMainWindow):
             # resets file list and data frame, and shows a warning dialog
             self.settings_action.setEnabled(False)
             self.save_as_action.setEnabled(False)
+            self.right_button.setEnabled(False)
             self.lsm_filesList = None
             self.df = None
-            self.show_warning_dialog("Error during creating table")
+            self.show_warning_dialog("Error during creating table. \nTry another Model")
 
     def add_image(self, lsm_file):
         """
@@ -955,20 +969,35 @@ class MainWindow(QMainWindow):
     def reset_detection(self):
         for key, model in self.models.items():
             model.cell_counter.detections = None
-    def set_size(self, detection : list = [], img_size : tuple = (512,512), min_size : float = object_size["min_size"], max_size : float = object_size["max_size"]):
+    def set_size(self, detection : list = [], img_size : tuple = (512,512), min_size : float = default_object_size["min_size"], max_size : float = default_object_size["max_size"]):
+        model = self.combo_box.currentText()
         if all(len(cell) >= 4 for cell in detection):
             img_sq = img_size[0] * img_size[1]
             # Вычисляем произведения для каждого 
             values = [cell[2] * cell[3] for cell in detection]
 
             # Находим максимальное и минимальное произведение
-            min_size = min(values) / img_sq
-            max_size = max(values) / img_sq
+            min_size_from_detection = min(values) / img_sq
+            max_size_from_detection = max(values) / img_sq
+            if self.lsm_filesList or model != "All_models":
+                if min_size_from_detection >= min_size:
+                    min_size = None
+                else:
+                    min_size = min_size_from_detection
+                if max_size_from_detection <= max_size:
+                    max_size = None
+                else:
+                    max_size = max_size_from_detection
+            else:
+                min_size = min_size_from_detection
+                max_size = max_size_from_detection
+                 
             
         
-        assert(min_size <= max_size)
-        self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
-        self.max_range_slider.change_default(min_size = min_size, max_size = max_size)
+        if min_size is not None:
+            self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
+        if max_size is not None:
+            self.max_range_slider.change_default(min_size = min_size, max_size = max_size)
         
     
 if __name__ == '__main__':
