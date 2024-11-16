@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
         QMessageBox, QTableWidget, QTableWidgetItem, QPushButton, QGraphicsView,\
             QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, \
                 QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, \
-                    QLabel, QHBoxLayout, QSlider
+                    QLabel, QHBoxLayout, QSlider, QLineEdit
 from PyQt5.QtGui import QPixmap, QImage, QFont, QColor, QPen
 from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
 import numpy as np
@@ -117,11 +117,14 @@ class CellDetector(QObject):
         - Connect button click event to calculate_button function.
         - Add widgets to the right layout with spacing.
         """
+        plugin_label = QLabel(self.get_name())
+        plugin_label.setFont(QFont("Arial", 32))
         # Create a combo box to choose models
         self.combo_box = QComboBox()
         
         # Create a label to prompt user to choose a model
         label = QLabel("Choose model:")
+        label.setFont(QFont("Arial", 24))
         
         # Create a graphics scene for the right view
         self.right_scene = QGraphicsScene()
@@ -146,8 +149,8 @@ class CellDetector(QObject):
         # Set current index to 1
         self.combo_box.setCurrentIndex(1)
         
-        # Set font for the label
-        label.setFont(QFont("Arial", 32))
+      
+        
         
         # Create a checkbox for showing detected cells
         self.checkbox = QCheckBox("Show Detected Cells")
@@ -171,32 +174,96 @@ class CellDetector(QObject):
         
         # Connect button click event to calculate_button function
         self.button.clicked.connect(self.calculate_button)
+
+        range_lable = QLabel("Object Size:")
+        font = QFont()
+        font.setPointSize(16) 
+        
+        range_lable.setFont(font)
+       
+        #self.right_layout.addSpacing(1)
+        self.min_range_slider = Slider(self.object_size, self.default_object_size, 'min_size')
+        self.max_range_slider = Slider(self.object_size, self.default_object_size, 'max_size')
+
+        LineWidth_label = QLabel("Line Width:")
+        LineWidth_label.setFont(QFont("Arial", 16))
+
+        self.LineWidth_edit = QLineEdit()
+        self.LineWidth_edit.setText(f"{self.object_size["line_width"]:.2f}")
+        self.LineWidth_edit.setFont(QFont("Arial", 12))
+        self.LineWidth_edit.returnPressed.connect(self.update_lineWidth)
+
+        LineWidth_layout = QHBoxLayout()
+        LineWidth_layout.addWidget(LineWidth_label)
+        LineWidth_layout.addWidget(self.LineWidth_edit)
+       
+        colormap_label = QLabel("Colormap:")
+        colormap_label.setFont(QFont("Arial", 24))
+
+        self.colormap_combo = QComboBox()
+        self.colormap_combo.setFont(QFont("Arial", 16))
+
+        self.colormaps =  self.object_size["color_map_list"]
+        self.colormap_combo.addItems(self.colormaps)
+        self.colormap_combo.setCurrentText(self.object_size['color_map'])  # Установить "Viridis" по умолчанию
+        self.colormap_combo.currentTextChanged.connect(self.update_colormap)
         
         # Add widgets to the right layout with spacing
-        self.right_layout.addWidget(label)
+        ###self.right_layout.addWidget(label)
+
+        self.right_layout.addWidget(plugin_label)
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.combo_box)
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.right_view)
         self.right_layout.addSpacing(20)
-        range_lable = QLabel("Object Size:")
-        font = QFont()
-        font.setPointSize(16) 
-        range_lable.setFont(font)
+
+        self.right_layout.addWidget(colormap_label)
+        self.right_layout.addWidget(self.colormap_combo)
+        self.right_layout.addSpacing(20)
+        self.right_layout.addLayout(LineWidth_layout)
+        self.right_layout.addSpacing(20)
+
         self.right_layout.addWidget(range_lable)
-        #self.right_layout.addSpacing(1)
-        self.min_range_slider = Slider(self.object_size, self.default_object_size, 'min_size')
-        self.max_range_slider = Slider(self.object_size, self.default_object_size, 'max_size')
-        
+        self.right_layout.addSpacing(20)
+
         self.right_layout.addWidget(self.min_range_slider)
         self.right_layout.addWidget(self.max_range_slider)
-
 
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.checkbox)
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.button)
         self.right_layout.addSpacing(20)
+
+
+        
+
+
+       
+
+        # Устанавливаем layout
+    def update_colormap(self, colormap):
+        
+        self.object_size["color_map"] = colormap
+    
+    def update_lineWidth(self):
+        # Получаем значение из QLineEdit
+        input_text = self.LineWidth_edit.text()
+
+        # Проверяем, является ли введённое значение числом
+        try:
+            # Преобразуем в число с плавающей точкой
+            line_width = float(input_text)
+
+            self.object_size["line_width"] = round(line_width, 2)
+            self.LineWidth_edit.setText(f"{float(input_text):.2f}")
+
+        except ValueError:
+            # Если введено некорректное значение, устанавливаем стандартное значение
+            self.LineWidth_edit.setText(f"{self.object_size["line_width"]:.2f}") 
+
+        
     def reset_detection(self):
         for key, model in self.models.items():
             model.cell_counter.detections = None

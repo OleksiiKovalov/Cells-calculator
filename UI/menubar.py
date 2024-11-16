@@ -58,6 +58,8 @@ class menubar(QMenuBar):
             # Устанавливаем состояние выбранного действия
             action.setChecked(True)
             self.current_plugin_name = action.text()
+            self.settings_action.setEnabled(False)
+            self.save_as_action.setEnabled(False)
             self.menubar_signal.emit("change_plugin", self.current_plugin_name)
             
         

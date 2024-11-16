@@ -25,12 +25,12 @@ import traceback
 
 class right_layout(QVBoxLayout):
     rightLayout_signal = pyqtSignal(str, object)
-    current_plagin_name = None
-    def __init__(self, current_plagin_name, plagin_list):
+    current_plugin_name = None
+    def __init__(self, current_plugin_name, plugin_list):
         super().__init__()
-        self.current_plagin = None
-        self.current_plagin_name = current_plagin_name
-        self.plagin_list = plagin_list
+        self.current_plugin = None
+        self.current_plugin_name = current_plugin_name
+        self.plugin_list = plugin_list
         self.init_rightLayout()
         
 
@@ -41,26 +41,27 @@ class right_layout(QVBoxLayout):
             if widget is not None:
                 widget.deleteLater()
                 
-    def set_current_plagin(self, plagin_name):
-        self.current_plagin_name = plagin_name
+    def set_current_plugin(self, plugin_name, plugin_list):
+        self.current_plugin_name = plugin_name
+        self.plugin_list = plugin_list
         self.clear()
-        del self.current_plagin
+        del self.current_plugin
         self.init_rightLayout()
 
     def init_rightLayout(self):
-        plagin =  self.plagin_list[self.current_plagin_name]['init']
-        arg = self.plagin_list[self.current_plagin_name]['arg']
-        self.current_plagin = plagin(self, *arg)
-        self.current_plagin.plagin_signal.connect(self.handel_plagin_signal)
+        plugin =  self.plugin_list[self.current_plugin_name]['init']
+        arg = self.plugin_list[self.current_plugin_name]['arg']
+        self.current_plugin = plugin(self, *arg)
+        self.current_plugin.plugin_signal.connect(self.handel_plugin_signal)
 
     @pyqtSlot(str, object)
     def handle_mainWindow_action(self, action_name, value):
-        self.current_plagin.handle_action(action_name, value)
+        self.current_plugin.handle_action(action_name, value)
         if action_name == "open_lsm":
             pass 
-    #TODO: сигнал с current_plagin
+    #TODO: сигнал с current_plugin
     @pyqtSlot(str, object)
-    def handel_plagin_signal(self, action_name, value):
+    def handel_plugin_signal(self, action_name, value):
         if action_name == "show_warning":
             self.rightLayout_signal.emit("show_warning", value)
         elif action_name == "":
@@ -71,7 +72,7 @@ class right_layout(QVBoxLayout):
 
     @pyqtSlot(str, object)
     def handle_menubar_action(self, action_name, value):
-        if action_name == "plagin":
-            self.set_current_plagin(plagin_name = value)
+        if action_name == "plugin":
+            self.set_current_plugin(plugin_name = value)
 
 

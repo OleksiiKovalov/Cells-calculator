@@ -97,10 +97,11 @@ class MainWindow(QMainWindow):
             self.show_warning_dialog(value)
         elif action_name == "change_plugin":
             if value in self.plugin_list:
+                self.main_scene.clear()
                 self.current_plugin_name = value
                 self.setWindowTitle(value)
                 self.init_value()
-                self.right_layout.set_current_plugin(value)
+                self.right_layout.set_current_plugin(value, self.plugin_list)
 
     
     @pyqtSlot(str, object)
@@ -128,7 +129,14 @@ class MainWindow(QMainWindow):
                    'max_size' : 0.000,
                    'signal' : self.mainWindow_signal.emit,
                    'round_parametr_slider' : 10**6,
-                   'round_parametr_value_input' : 10**4
+                   'round_parametr_value_input' : 10**4,
+                   'color_map' : "Virdis",
+                   'color_map_list' : [
+                        "Viridis", "Plasma", "Inferno", "Magma", "Cividis",  # Широко используемые палитры
+                            "Tab10", "Paired", "Set1", "Set2", "Set3",  # Традиционные палитры для категориальных данных
+            ],
+                   'line_width' : 100.00
+
                    
         }
         self.default_object_size = self.object_size.copy()
