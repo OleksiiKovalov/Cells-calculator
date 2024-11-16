@@ -30,6 +30,8 @@ class CellCounter():
     def __init__(self, path, object_size):
         self.model: cv2.dnn.Net = cv2.dnn.readNetFromONNX(path)
         self.object_size = object_size
+        self.detections=None
+        self.original_image = None
 
     def count(self, model, input_image):
         """
@@ -46,67 +48,77 @@ class CellCounter():
             class_name, confidence, etc.
         """
         # Read the input image
-        original_image: np.ndarray = cv2.imread(input_image)
-        [height, width, _] = original_image.shape
+        if self.detections is None:
+            original_image: np.ndarray = cv2.imread(input_image)
+            self.original_image = original_image.copy()
+            [height, width, _] = original_image.shape
 
-        # Prepare a square image for inference
-        length = max((height, width))
-        image = np.zeros((length, length, 3), np.uint8)
-        image[0:height, 0:width] = original_image
+            # Prepare a square image for inference
+            length = max((height, width))
+            image = np.zeros((length, length, 3), np.uint8)
+            image[0:height, 0:width] = original_image
 
-        # Calculate scale factor
-        scale = length / 512
+            # Calculate scale factor
+            scale = length / 512
 
-        # Preprocess the image and prepare blob for model
-        blob = cv2.dnn.blobFromImage(image, scalefactor=1 / 255, size=(512, 512), swapRB=True)
-        model.setInput(blob)
+            # Preprocess the image and prepare blob for model
+            blob = cv2.dnn.blobFromImage(image, scalefactor=1 / 255, size=(512, 512), swapRB=True)
+            model.setInput(blob)
 
-        # Perform inference
-        outputs = model.forward()
+            # Perform inference
+            outputs = model.forward()
 
-        # Prepare output array
-        outputs = np.array([cv2.transpose(outputs[0])])
-        rows = outputs.shape[1]
+            # Prepare output array
+            outputs = np.array([cv2.transpose(outputs[0])])
+            rows = outputs.shape[1]
 
-        boxes = []
-        scores = []
-        class_ids = []
+            boxes = []
+            scores = []
+            class_ids = []
 
-        # Iterate through output to collect bounding boxes, confidence scores, and class IDs
-        for i in range(rows):
-            classes_scores = outputs[0][i][4:]
-            (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(classes_scores)
-            if maxScore >= 0.2:  # originally >= .25
-                box = [
-                    outputs[0][i][0] - (0.5 * outputs[0][i][2]),
-                    outputs[0][i][1] - (0.5 * outputs[0][i][3]),
-                    outputs[0][i][2],
-                    outputs[0][i][3],
-                ]
-                boxes.append(box)
-                scores.append(maxScore)
-                class_ids.append(maxClassIndex)
+            # Iterate through output to collect bounding boxes, confidence scores, and class IDs
+            for i in range(rows):
+                classes_scores = outputs[0][i][4:]
+                (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(classes_scores)
+                if maxScore >= 0.2:  # originally >= .25
+                    box = [
+                        outputs[0][i][0] - (0.5 * outputs[0][i][2]),
+                        outputs[0][i][1] - (0.5 * outputs[0][i][3]),
+                        outputs[0][i][2],
+                        outputs[0][i][3],
+                    ]
+                    boxes.append(box)
+                    scores.append(maxScore)
+                    class_ids.append(maxClassIndex)
 
-        # Apply NMS (Non-maximum suppression)
-        result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)  # score, nms thresholds
-        # boxes_to_filter = np.array(boxes)[result_boxes,:]
+            # Apply NMS (Non-maximum suppression)
+            result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)  # score, nms thresholds
+            # boxes_to_filter = np.array(boxes)[result_boxes,:]
 
-        detections = []
+            detections = []
 
-        # Iterate through NMS results to draw bounding boxes and labels
-        for i in range(len(result_boxes)):
-            index = result_boxes[i]
-            box = boxes[index]
-            detection = {
-                "class_id": class_ids[index],
-                "class_name": CLASSES[class_ids[index]],
-                "confidence": scores[index],
-                "box": np.array(box),
-                "scale": scale,
-            }
-            detections.append(detection)
-        # perform square-based filtering of bboxes
-        detections = pd.DataFrame(detections)
+            # Iterate through NMS results to draw bounding boxes and labels
+            for i in range(len(result_boxes)):
+                index = result_boxes[i]
+                box = boxes[index]
+                detection = {
+                    "class_id": class_ids[index],
+                    "class_name": CLASSES[class_ids[index]],
+                    "confidence": scores[index],
+                    "box": np.array(box),
+                    "scale": scale,
+                }
+                detections.append(detection)
+            # perform square-based filtering of bboxes
+            detections = pd.DataFrame(detections)
+            self.detections = detections
+            self.scale = scale
+            # change object_size for detection
+            self.object_size['signal']("set_size", detections['box'].copy())
+
+        detections = self.detections
+        original_image = self.original_image.copy()
+        scale = self.scale
         # TODO: in this codeline, calculate max and min squares of obtained bboxes and automatically
         # set them as lower and upper bounds for the filtering sliders if the sliders currently
         # have default values (0 and 10) set up. Otherwise do not re-set up them.
@@ -115,7 +127,6 @@ class CellCounter():
         # by the filter_detections() function.
         # TODO: pass the min/max_size params to filter_detections() call below.
         # TODO: when opening a new image or folder of images, reset boundary sliders to their default values (min=0%, max=10%).
-        print(self.object_size)
         filtered_detections = filter_detections(detections, min_size = self.object_size['min_size'], max_size= self.object_size['max_size'])
         for i in range(filtered_detections.shape[0]):
             draw_bounding_box(
@@ -127,9 +138,13 @@ class CellCounter():
                 round((filtered_detections.iloc[i,-2][0] + filtered_detections.iloc[i,-2][2]) * filtered_detections.iloc[i,-1]),
                 round((filtered_detections.iloc[i,-2][1] + filtered_detections.iloc[i,-2][3]) * filtered_detections.iloc[i,-1]),
             )
+        try:
+            os.remove('.cache/cell_tmp_img_with_detections.png')
+        except:
+            pass
         cv2.imwrite('.cache/cell_tmp_img_with_detections.png', original_image)
 
-        return detections
+        return filtered_detections
 
     def countCells(self, img_path):
         """

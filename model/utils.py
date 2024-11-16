@@ -136,8 +136,7 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     if detections.empty:
         return detections
     img_sq = img_size[0] * img_size[1]
-    print(type(detections['box']))
-    print(detections['box'].head())
+    # print(type(detections['box']))
+    # print(detections['box'].head())
     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
-
     return filtered_detections

@@ -32,7 +32,7 @@ def has_duplicates(lst):
             return True
         seen.add(item)
     return False
-class DialogWindow(QMainWindow):
+class SettingsWindow(QMainWindow):
     """
     The DialogWindow class represents the dialog window for selecting channels
     in the Cells Calculator application.
@@ -242,7 +242,8 @@ class DialogWindow(QMainWindow):
             return
         for option, combo_box in self.combo_box_dict.items():
             self.parametrs[option] = int(combo_box.currentText()[len("Channel "):]) - 1
-
+        #For recalculation
+        self.parent_.mainWindow_signal.emit("reset_detection", None)
         if self.call_back:
             self.call_back()
         self.close()
