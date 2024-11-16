@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
             if value in self.plugin_list:
                 self.main_scene.clear()
                 self.current_plugin_name = value
+                self.setWindowTitle(self.current_plugin_name)
                 self.setWindowTitle(value)
                 self.init_value()
                 self.right_layout.set_current_plugin(value, self.plugin_list)
