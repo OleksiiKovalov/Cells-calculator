@@ -19,7 +19,7 @@ from UI.right_layout.right_layout import right_layout
 from UI.menubar import menubar
 import os
 import shutil
-from UI.right_layout.plagins.CellDetector import CellDetector
+from UI.right_layout.plugins.CellDetector import CellDetector
 import pyqtgraph as pg
 from UI.Slider import Slider
 
@@ -60,13 +60,15 @@ class MainWindow(QMainWindow):
         self.setFixedSize(screen_geometry.width(), desktop.availableGeometry().height() - self.menuBar().height())
 
         # Set the window title
-        self.setWindowTitle("Cells Calculator")
+        self.current_plugin_name = "CellDetector"
+        self.setWindowTitle(self.current_plugin_name)
+        
         self.init_value()
         # Initialize the user interface
 
-        self.menu_bar = menubar(self)
+        self.menu_bar = menubar(self, list(self.plugin_list.keys()), self.current_plugin_name)
         self.setMenuBar(self.menu_bar)
-        self.right_layout = right_layout(current_plagin_name= "CellDetector", plagin_list= self.plagin_list)
+        self.right_layout = right_layout(current_plugin_name= self.current_plugin_name, plugin_list= self.plugin_list)
         
 
         self.menu_bar.menubar_signal.connect(self.handle_menubar_action)
@@ -93,10 +95,16 @@ class MainWindow(QMainWindow):
             self.open_settings()
         elif action_name == "show_warning":
             self.show_warning_dialog(value)
+        elif action_name == "change_plugin":
+            if value in self.plugin_list:
+                self.current_plugin_name = value
+                self.setWindowTitle(value)
+                self.init_value()
+                self.right_layout.set_current_plugin(value)
+
     
     @pyqtSlot(str, object)
     def handle_rightLayout_action(self, action_name, value):
-        print(action_name, value)
         if action_name == "show_warning":
             self.show_warning_dialog(value)
         elif action_name == "create_table":
@@ -108,7 +116,7 @@ class MainWindow(QMainWindow):
         pass
 
     def init_value(self):
-        # TODO: сделать так что бы параметры собиралиьс относительно выброного plagin
+        # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
         # Initialize DataFrame to None
         
         
@@ -132,16 +140,21 @@ class MainWindow(QMainWindow):
         self.models = {
         'Model 1': model1(object_size = self.object_size)
     }
-        self.plagin_list = {
+        self.plugin_list = {
             "CellDetector" : {
                 "init" : CellDetector,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models]
+                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models],
+                "file_callback" : self.change_image,
+                "folder_callback" : self.create_table
             },
             "Test": {
                 "init" : CellDetector,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models]
+                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models],
+                "file_callback" : self.change_image,
+                "folder_callback" : self.create_table
             }
         }
+        
         # Dictionary containing available models and their corresponding methods
         # Initialize variables to None or default values
         self.lsm_path = None
@@ -596,10 +609,10 @@ class MainWindow(QMainWindow):
                # If LSM files are present, set the LSM path and callback function for table creation
                lsm_path = self.lsm_filesList
                 #TODO переделать callback так что бы он зависил от плагина
-               call_back = self.create_table
+               call_back = self.plugin_list[self.current_plugin_name]["folder_callback"]
             else:
                # If no LSM files in the list, set the callback function for image change
-               call_back = self.change_image
+               call_back = self.plugin_list[self.current_plugin_name]["file_callback"]
                lsm_path = self.lsm_path
             
             # If there's a valid LSM path

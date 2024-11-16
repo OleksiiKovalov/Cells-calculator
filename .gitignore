@@ -14,3 +14,4 @@
 /model/__pycache__
 /UI/__pycache__
 /myenv
+*/__pycache__

@@ -5,16 +5,17 @@ from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
 class menubar(QMenuBar):
     menubar_signal = pyqtSignal(str, object)
 
-    def __init__(self, parent):
+    def __init__(self, parent, plugin_list, current_plugin_name):
         super().__init__()
         self.parent = parent
+        self.plugin_list = plugin_list
+        self.current_plugin_name = current_plugin_name
         self.init_menubar()
 
     def init_menubar(self):
         file_menu = self.addMenu("File")
         settings_menu = self.addMenu("Settings")
-
-        # Add action to the 'Settings' menu
+        plugin_menu = self.addMenu("plugin")
         
         self.open_lsm_action = QAction("Open Image", self)
         self.open_lsm_action.triggered.connect(self.open_file)
@@ -22,20 +23,44 @@ class menubar(QMenuBar):
         self.open_folder_action = QAction("Open Folder", self)
         self.open_folder_action.triggered.connect(self.open_folder)
 
+        self.save_as_action = QAction("Save As", self)
+        self.save_as_action.setEnabled(False)
+        self.save_as_action.triggered.connect(self.save_as)
+
+        file_menu.addAction(self.open_lsm_action)
+        file_menu.addAction(self.open_folder_action)
+        file_menu.addAction(self.save_as_action)
+
         self.settings_action = QAction("Settings", self)
         self.settings_action.setEnabled(False)
         self.settings_action.triggered.connect(self.open_settings)
         settings_menu.addAction(self.settings_action)
 
-        self.save_as_action = QAction("Save As", self)
-        self.save_as_action.setEnabled(False)
-        self.save_as_action.triggered.connect(self.save_as)
+        self.plugin_actions = {}
+         
+        
+        # Добавляем плагины в меню
+        for plugin in self.plugin_list:
+            action = QAction(plugin, self, checkable=True)
+            action.triggered.connect(self.select_plugin)
+            plugin_menu.addAction(action)
+            self.plugin_actions[plugin] = action
+            if plugin == self.current_plugin_name:
+                action.setChecked(True)
 
-
-        # Add actions to the 'File' menu
-        file_menu.addAction(self.open_lsm_action)
-        file_menu.addAction(self.open_folder_action)
-        file_menu.addAction(self.save_as_action)
+    def select_plugin(self):
+        # Получаем действие, вызвавшее сигнал
+        action = self.sender()
+        if action and action.isCheckable():
+            # Сбрасываем состояние всех действий
+            for act in self.plugin_actions.values():
+                act.setChecked(False)
+            # Устанавливаем состояние выбранного действия
+            action.setChecked(True)
+            self.current_plugin_name = action.text()
+            self.menubar_signal.emit("change_plugin", self.current_plugin_name)
+            
+        
 
       
 

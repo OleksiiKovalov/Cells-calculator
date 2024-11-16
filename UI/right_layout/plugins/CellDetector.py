@@ -24,7 +24,7 @@ import traceback
 class CellDetector(QObject):
     def get_name(self):
         return "CellDetector"
-    plagin_signal = pyqtSignal(str, object)
+    plugin_signal = pyqtSignal(str, object)
     def __init__(self, parent, parametrs, object_size, default_object_size, models):
         super().__init__()
         self.show_boundry = 0
@@ -39,7 +39,7 @@ class CellDetector(QObject):
         try:
             self.init_rightLayout()
         except:
-            self.plagin_signal.emit("error",None)
+            self.plugin_signal.emit("error",None)
     def handle_action(self, action_name, value):
         if action_name == "reset_detection":
             self.reset_detection()
@@ -262,14 +262,14 @@ class CellDetector(QObject):
         # Get the selected method from the combo box
 
         if self.lsm_filesList:
-            self.plagin_signal.emit("create_table", None)
+            self.plugin_signal.emit("create_table", None)
             return
         model = self.combo_box.currentText()
         
         # Check if a method and file are selected
         if model == "" or self.lsm_path is None:
             # If not, show a warning dialog and return
-            self.plagin_signal.emit("show_warning", "Warning\n\nChoose model and file.")
+            self.plugin_signal.emit("show_warning", "Warning\n\nChoose model and file.")
             return 0
 
         # If a specific method is selected
@@ -287,7 +287,7 @@ class CellDetector(QObject):
                 except:
                     traceback.print_exc()
                     # If still not successful, show an error dialog
-                    self.plagin_signal.emit("show_warning", "Error during calculation \n\nChoose another model or change channels settings")
+                    self.plugin_signal.emit("show_warning", "Error during calculation \n\nChoose another model or change channels settings")
                     result = None
                     self.draw_bounding = 0
             
@@ -425,15 +425,15 @@ class CellDetector(QObject):
             # Check if the show boundary flag is set
             if self.show_boundry:
                 # If set, add an image with bounding box detections to the scene
-                self.plagin_signal.emit("add_image", ".cache\cell_tmp_img_with_detections.png" )
+                self.plugin_signal.emit("add_image", ".cache\cell_tmp_img_with_detections.png" )
             else:
                 # If not set, add the original image to the scene
-                self.plagin_signal.emit("add_image", ".cache\cell_tmp_img.png")
+                self.plugin_signal.emit("add_image", ".cache\cell_tmp_img.png")
         except Exception as e:
             # If an error occurs, print the traceback, show a warning dialog
           
             traceback.print_exc()
-            self.plagin_signal.emit("show_warning", "Error during opening image.")
+            self.plugin_signal.emit("show_warning", "Error during opening image.")
     def on_state_changed(self, state):
         """
         Handle the state change of the checkbox for showing bounding boxes.
