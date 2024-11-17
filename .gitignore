@@ -13,5 +13,7 @@
 *xlsx
 /model/__pycache__
 /UI/__pycache__
+/UI/right_layout/__pycache__
+/UI/right_layout/plugins/__pycache__
 /myenv
 */__pycache__

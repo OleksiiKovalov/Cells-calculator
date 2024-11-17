@@ -189,7 +189,8 @@ class CellDetector(QObject):
         LineWidth_label.setFont(QFont("Arial", 16))
 
         self.LineWidth_edit = QLineEdit()
-        self.LineWidth_edit.setText(f"{self.object_size["line_width"]:.2f}")
+        size = self.object_size['line_width']
+        self.LineWidth_edit.setText(f"{size:.2f}")
         self.LineWidth_edit.setFont(QFont("Arial", 12))
         self.LineWidth_edit.returnPressed.connect(self.update_lineWidth)
 
@@ -261,7 +262,8 @@ class CellDetector(QObject):
 
         except ValueError:
             # Если введено некорректное значение, устанавливаем стандартное значение
-            self.LineWidth_edit.setText(f"{self.object_size["line_width"]:.2f}") 
+            size = self.object_size["line_width"]
+            self.LineWidth_edit.setText(f"{size:.2f}") 
 
         
     def reset_detection(self):
