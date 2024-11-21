@@ -147,7 +147,8 @@ class MainWindow(QMainWindow):
                     'Nuclei': 1
         }
         self.models = {
-        'Detector': model1(object_size = self.object_size)
+        'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
+        'General Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
     }
         self.plugin_list = {
             "CellDetector" : {
@@ -158,7 +159,7 @@ class MainWindow(QMainWindow):
             },
             "General Segmenter": {
                 "init" : CellDetector,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size,  model1(path='model/yolov8n-seg.pt', object_size = self.object_size)],
+                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models],
                 "file_callback" : self.change_image,
                 "folder_callback" : self.create_table
             }
@@ -413,7 +414,7 @@ class MainWindow(QMainWindow):
             If lsm_file is a numpy array, it creates a QImage from it with grayscale format.
         """
         self.main_scene.clear()
-        
+
         if isinstance(lsm_file, str) and not lsm_file.endswith(".lsm"):
             image = QImage(lsm_file)
         elif isinstance(lsm_file, str):

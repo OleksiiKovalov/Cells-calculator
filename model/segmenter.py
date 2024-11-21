@@ -64,11 +64,11 @@ class Segmenter(BaseModel):
             self.detections = results_to_pandas(outputs)
             self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
             self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w, self.h, self.w, self.h]))
-            # self.object_size['set_size'](self.detections[detections['confidence'] >= min_score]['box'].copy())
-            self.object_size['set_size'](self.detections['box'].copy())
+
+            self.object_size['signal']("set_size", self.detections['box'].copy())
 
         detections = self.detections[self.detections['confidence'] >= min_score]
-        # self.object_size['set_size'](detections['box'].copy())
+
         original_image = self.original_image.copy()
 
         filtered_detections = filter_detections(detections,
@@ -81,5 +81,6 @@ class Segmenter(BaseModel):
         current_image = current_results.plot(conf=conf, labels=labels, boxes=boxes,
                                              masks=masks, probs=probs, show=show, save=save,
                                              color_mode=color_mode, filename=filename)
+        print(filter_detections, "\n\n\n", current_results)
         return filtered_detections
     
