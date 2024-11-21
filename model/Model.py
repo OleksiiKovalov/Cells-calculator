@@ -8,6 +8,7 @@ import os
 
 from model.CellCounter import CellCounter
 from model.NucleiCounter import NucleiCounter
+from model.segmenter import Segmenter
 from model.utils import is_image_valid, calculate_lsm, calculate_standard
 
 class Model():
@@ -28,11 +29,21 @@ class Model():
     - 'Cells': the number of cells detected;
     - '%': the target percentage value obtained.
     """
-    def __init__(self, path=os.path.join('model', 'best_m.onnx'),
+    def __init__(self, path=os.path.join('model', 'yolov8m-det.onnx'),
                  threshold=100, eps=5, min_samples=10, object_size = { 'min_size' : 0, 'max_size' : 1}):
         self.nuclei_counter = NucleiCounter(threshold=threshold,
                                             eps=eps, min_samples=min_samples)
-        self.cell_counter = CellCounter(path=path, object_size = object_size)
+        # self.cell_counter = CellCounter(path=path, object_size = object_size)
+        # self.cell_counter = Segmenter("model/best_n.pt", object_size = object_size)
+        self.init_counter(path, object_size)
+
+    def init_counter(self, path, object_size):
+        if "det" in path:
+            self.cell_counter = CellCounter(path=path, object_size = object_size)
+        elif "seg" in path:
+            self.cell_counter = Segmenter(path, object_size = object_size)
+        else:
+            raise ValueError("Unknown model type given as input. Expected 'det' for detection model or 'seg' for segmenting model to be presented in the model filename.")
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """

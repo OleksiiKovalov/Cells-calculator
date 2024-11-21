@@ -246,6 +246,7 @@ class SettingsWindow(QMainWindow):
         self.parent_.mainWindow_signal.emit("reset_detection", None)
         if self.call_back:
             self.call_back()
+        
         self.close()
 
     def next_action(self):

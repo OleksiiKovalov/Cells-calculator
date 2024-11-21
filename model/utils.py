@@ -2,9 +2,14 @@
 
 import os
 import cv2
-import tiffile
 import numpy as np
+import torch
 import pandas as pd
+import matplotlib.pyplot as plt
+
+import ultralytics
+import ultralytics.engine
+from ultralytics.engine.results import Results, Boxes, Masks
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
@@ -88,7 +93,7 @@ def calculate_standard(cell_counter, img_path):
     - Cells: count for all the cells detected;
     - %: -100 (encoding for NaN).
     """
-    cell_count = cell_counter.countCells(img_path)
+    cell_count = cell_counter.count_cells(img_path)
     return {'Nuclei': -100, 'Cells': cell_count, '%': -100}
 
 def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
@@ -117,7 +122,38 @@ def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_
     else:
         img = cv2.circle(img, (x, y), 2, color, -1)
 
+# def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512,512)) -> pd.DataFrame:
+#     """
+#     Filters bounding boxes based on their area.
+#     Bboxes of size < min_size or > max_size are removed.
+#     Area is measured in % of image size (between 0.0 and 1.0).
+#     This filtering function is implemented in October, 2024, to reduce the amount of garbage detected as cells.
+
+#     Input args:
+#     - detections: pd.DataFrame of detections, including bboxes in [x1, y1, x2, y2] format, where x1, y1 - lower-left corner coordinates;
+#     - min_size: float representing the minimal possible size of bbox;
+#     - max_size: float representing the maximal possible size of bbox;
+#     - img_size: tuple of size 2 representing width and height of image.
+
+#     Returns np.array of filtered bboxes.
+#     """
+#     assert(min_size <= max_size)
+#     if detections.empty:
+#         return detections
+#     img_sq = img_size[0] * img_size[1]
+#     # print(type(detections['box']))
+#     print(detections.head())
+#     print(detections['box'].head())
+#     print(detections['box'].iloc[0])
+#     detections['square'] = detections['box'].apply(lambda b: (b[2] - b[0]) * (b[3] - b[1]) / img_sq)
+#     print(detections['square'].head())
+#     print(detections['square'].max())
+#     print(detections.shape)
+#     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= (b[2] - b[0]) * (b[3] - b[1]) / img_sq <= max_size)]
+#     return filtered_detections
+
 def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512,512)) -> pd.DataFrame:
+    # NOTE: this function is deprecatedand no longer used, since we have implemented new inference pipeline
     """
     Filters bounding boxes based on their area.
     Bboxes of size < min_size or > max_size are removed.
@@ -132,7 +168,7 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
 
     Returns np.array of filtered bboxes.
     """
-    assert(min_size <= max_size)
+    # assert(min_size <= max_size)
     if detections.empty:
         return detections
     img_sq = img_size[0] * img_size[1]
@@ -140,3 +176,182 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     # print(detections['box'].head())
     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
     return filtered_detections
+
+def results_to_pandas(outputs: Results) -> pd.DataFrame:
+    """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
+    data = {
+        "id_label": [],
+        "box": [],
+        "mask": [],
+        "confidence": [],
+        "diameter": [],
+        "area": [],
+        "volume": [],
+        "bin_mask": []
+    }
+    for i, _ in enumerate(outputs.masks.xyn):
+        if len(outputs.masks.xyn[i]) == 0:
+            pass
+        else:
+            data['id_label'].append(i)
+            box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
+            box[2:] -= box[:2]
+            data['box'].append(box)
+            data['mask'].append(outputs.masks.xyn[i])
+            data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
+            bin_mask, morphology = plot_mask(outputs.masks.xyn[i])
+            data['diameter'].append(morphology['diameter'])
+            data['area'].append(morphology['area'])
+            data['volume'].append(morphology['volume'])
+            data['bin_mask'].append(bin_mask)
+    return pd.DataFrame(data)
+
+def pandas_to_ultralytics(df, original_image):
+    """Converts pandas DataFrame instance to ultralytics Results for easier plotting."""
+    path = '.cache/cell_tmp_img_with_detections.png'
+    names = {0: 'Cell'}    
+    conf_array = np.array(df['confidence'].tolist())
+    if len(conf_array) == 0:
+        return None
+    class_array = np.zeros(conf_array.shape)
+    box_array = np.array(df['box'].tolist())
+    box_array = np.hstack((box_array, np.expand_dims(conf_array, axis=1),
+                           np.expand_dims(class_array, axis=1)))
+    mask_array = np.stack(df['bin_mask'].tolist(), axis=0)
+    probs = torch.Tensor(conf_array)
+    boxes = torch.Tensor(box_array)
+    masks = torch.Tensor(mask_array)
+    results = Results(orig_img=original_image, path=path, names=names, boxes=boxes,
+                      masks=masks, probs=probs, keypoints=None, obb=None, speed=None)
+    return results
+
+def compute_iou(masks_1: list, masks_2: list) -> np.array:
+    """
+    Computes IoU matrix for 2 given sets of polygon masks.
+    The function is used for spheroid tracjing.
+
+    Input params:
+    - masks_1: list - first set of polygon masks defined as ultralytics.engine.Results.Masks.xyn numpy array;
+    - masks_2: list - second set of polygon masks defined as ultralytics.engine.Results.Masks.xyn numpy array.
+
+    Returns:
+    - iou_matrix: numpy array - matrix of IoU values for corresponding i-th mask from the first set and j-th mask from the second set.
+    """
+    iou_matrix = np.zeros((len(masks_1), len(masks_2)))
+    for i, _ in enumerate(masks_1):
+        for j, _ in enumerate(masks_2):
+            mask1, _ = plot_mask(masks_1[i])
+            mask2, _ = plot_mask(masks_2[j])
+            intersection = np.sum(mask1 * mask2)
+            union = np.sum(np.clip(mask1 + mask2, 0, 1))
+            iou_matrix[i,j] = intersection / union
+    return iou_matrix
+
+def plot_mask(in_mask: np.array, image_size=1000) -> np.array:
+    """
+    Plots given mask on a 1000x1000 canvas for its further processing.
+    This util is used as a helper for compute_iou() function above.
+
+    Input params:
+    - in_mask: np.array - np.array of contour points in ultralytics.engine.Results.Masks.xyn format;
+    - image_size = 1000 - size of the canvas for drawing. Larger size leads to slightly better
+    calculation precision, but it slows the processing significantly, and may be irrelevant in cases
+    where the size of input image is rather small.
+
+    Returns:
+    - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
+    the foreground (the polygon for the given mask).
+    """
+    coords = in_mask.reshape(-1, 2) * image_size
+    coords = coords.astype(np.int32)
+    bin_mask = np.zeros((image_size, image_size), dtype=np.uint8)
+    cv2.fillPoly(bin_mask, [coords], 1)
+    morphology = calculate_morphology(bin_mask)
+    return bin_mask, morphology
+
+def calculate_morphology(bin_mask: np.array) -> dict:
+    """
+    Calculates the morphology for the given segmented object.
+    The morphology includes: diameter, area, volume.
+    All the values (except area) are calculated under the assumption that the given object is spherical.
+    We measure these values in relative ratios as follows:
+    - diameter - relative to the square root of image area;
+    - area - relative to the image area;
+    - volume - relative to the image volume (image area multiplied by square root of image area).
+    """
+    img_area = bin_mask.shape[0] * bin_mask.shape[1]
+    area = np.sum(bin_mask)
+    diameter = 2 * np.sqrt(area / np.pi)
+    radius = diameter / 2
+    volume = (4/3) * np.pi * radius**3
+    return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
+
+
+
+
+
+if __name__ == "__main__":
+    mask = np.array([[    0.11406,     0.72024],
+        [    0.11406,     0.72917],
+        [     0.1125,     0.73214],
+        [     0.1125,     0.73512],
+        [    0.10781,     0.74405],
+        [    0.10781,     0.74702],
+        [    0.10469,     0.75298],
+        [    0.10469,     0.75595],
+        [    0.10312,     0.75893],
+        [   0.096875,     0.75893],
+        [   0.096875,     0.85417],
+        [    0.10625,     0.85417],
+        [    0.10781,     0.85119],
+        [    0.10938,     0.85119],
+        [    0.11094,     0.85417],
+        [      0.125,     0.85417],
+        [    0.12656,     0.85119],
+        [    0.12812,     0.85119],
+        [    0.13125,     0.84524],
+        [    0.13281,     0.84524],
+        [    0.13437,     0.84226],
+        [     0.1375,     0.84226],
+        [    0.13906,     0.83929],
+        [    0.14687,     0.83929],
+        [    0.14844,     0.83631],
+        [    0.15781,     0.83631],
+        [    0.15937,     0.83333],
+        [    0.16406,     0.83333],
+        [    0.16562,     0.83036],
+        [    0.17031,     0.83036],
+        [    0.17187,     0.83333],
+        [    0.17812,     0.83333],
+        [    0.17969,     0.83036],
+        [    0.18437,     0.83036],
+        [    0.18594,     0.82738],
+        [     0.1875,     0.82738],
+        [    0.18906,      0.8244],
+        [    0.19531,      0.8244],
+        [    0.19687,     0.82143],
+        [    0.19844,     0.82143],
+        [        0.2,     0.81845],
+        [    0.20156,     0.81845],
+        [    0.20469,      0.8125],
+        [    0.20469,     0.80952],
+        [    0.20625,     0.80655],
+        [    0.20625,     0.77083],
+        [    0.20469,     0.76786],
+        [    0.20469,      0.7619],
+        [    0.20312,     0.75893],
+        [    0.20312,     0.75595],
+        [    0.20156,     0.75298],
+        [    0.20156,        0.75],
+        [    0.19687,     0.74107],
+        [    0.19531,     0.74107],
+        [    0.19375,      0.7381],
+        [    0.19062,      0.7381],
+        [     0.1875,     0.73214],
+        [     0.1875,     0.72024]], dtype=np.float32)
+    masks1 = [mask]
+    masks2 = [mask+0.005, mask-0.01]
+    r, _ = plot_mask(mask)
+    print(r.shape)
+    plt.imshow(r)
+    plt.show()
