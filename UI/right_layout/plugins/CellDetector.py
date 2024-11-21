@@ -497,7 +497,7 @@ class CellDetector(QObject):
                 self.plugin_signal.emit("add_image", ".cache\cell_tmp_img_with_detections.png" )
             else:
                 # If not set, add the original image to the scene
-                self.plugin_signal.emit("add_image", ".cache\cell_tmp_img.png")
+                self.plugin_signal.emit("add_image", self.lsm_path)
         except Exception as e:
             # If an error occurs, print the traceback, show a warning dialog
           

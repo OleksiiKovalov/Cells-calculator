@@ -147,7 +147,7 @@ class MainWindow(QMainWindow):
                     'Nuclei': 1
         }
         self.models = {
-        'Model 1': model1(object_size = self.object_size)
+        'Detector': model1(object_size = self.object_size)
     }
         self.plugin_list = {
             "CellDetector" : {
@@ -156,9 +156,9 @@ class MainWindow(QMainWindow):
                 "file_callback" : self.change_image,
                 "folder_callback" : self.create_table
             },
-            "Test": {
+            "General Segmenter": {
                 "init" : CellDetector,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models],
+                "arg" : [self.parametrs, self.object_size, self.default_object_size,  model1(path='model/yolov8n-seg.pt', object_size = self.object_size)],
                 "file_callback" : self.change_image,
                 "folder_callback" : self.create_table
             }
@@ -413,10 +413,15 @@ class MainWindow(QMainWindow):
             If lsm_file is a numpy array, it creates a QImage from it with grayscale format.
         """
         self.main_scene.clear()
-        # Check if the input is a string (file path)
-        if isinstance(lsm_file, str):
-            # If it's a string, create a QImage from the file path
+        
+        if isinstance(lsm_file, str) and not lsm_file.endswith(".lsm"):
             image = QImage(lsm_file)
+        elif isinstance(lsm_file, str):
+            with tifffile.TiffFile(lsm_file) as tif:
+                # Read the first page of the LSM file as an array
+                lsm_file = tif.pages[0].asarray()
+            image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],
+                        lsm_file.shape[2], QImage.Format_Grayscale8)
         else:
             # If it's not a string, assume it's a numpy array representing an image
             # and create a QImage from it with grayscale format
@@ -432,6 +437,8 @@ class MainWindow(QMainWindow):
 
         # Calculate the aspect ratio of the image
         pixmap_aspect_ratio = pixmap.width() / pixmap.height()
+                
+        
 
         # Scale the image to fit within the view while maintaining aspect ratio
         if view_width / view_height > pixmap_aspect_ratio:

@@ -213,7 +213,7 @@ class CellCounter(BaseModel):
             self.detections = detections
             self.scale = scale
             # change object_size for detection
-            self.object_size['set_size'](detections['box'].copy())
+            self.object_size['signal']("set_size", detections['box'].copy())
 
         detections = self.detections
         original_image = self.original_image.copy()

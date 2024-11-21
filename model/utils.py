@@ -11,6 +11,8 @@ import ultralytics
 import ultralytics.engine
 from ultralytics.engine.results import Results, Boxes, Masks
 
+import tiffile
+
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
 colors = [(3,177,252)]
@@ -72,14 +74,14 @@ def calculate_lsm(cell_counter, nuclei_counter,
     cell_img = cv2.cvtColor(img[:,:,cell_channel], cv2.COLOR_GRAY2BGR)
     tmp_path = 'cell_tmp_img.png'
     cv2.imwrite(tmp_path, cell_img)
-    cell_count = cell_counter.countCells(tmp_path)
+    cell_count = cell_counter.count(tmp_path)
     try:
         os.remove(tmp_path)
     except FileNotFoundError:
         pass
     nuclei_count = nuclei_counter.countNuclei(img[:,:,nuclei_channel])
-    percentage = (1 - nuclei_count/cell_count) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage,3)}
+    #percentage = (1 - nuclei_count/cell_count) * 100
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(5,3)}
 
 def calculate_standard(cell_counter, img_path):
     """
