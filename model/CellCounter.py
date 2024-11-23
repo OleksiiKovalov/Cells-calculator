@@ -30,11 +30,13 @@ class CellCounter(BaseModel):
     """
     def __init__(self, path, object_size):
         super().__init__(path, object_size)
-        # self.model = YOLO(path, task="detect")
         self.detections=None
 
-    def init_model(self, path_to_model: str):
+    def init_x20_model(self, path_to_model: str):
         self.model = cv2.dnn.readNetFromONNX(path_to_model)
+
+    def init_x10_model(self, path_to_model):
+        self.model_x10 = None
 
     # def count_cells(self, img_path):
         # """
@@ -129,7 +131,7 @@ class CellCounter(BaseModel):
 
         # return filtered_detections
 
-    def count(self, input_image):
+    def count_x20(self, input_image):
         # # NOTE: this function is deprecated and no longer used, because we have implemented ultralytics-based inference pipeline for simplicity
         """
         Main function to load ONNX model, perform inference, draw bounding boxes,

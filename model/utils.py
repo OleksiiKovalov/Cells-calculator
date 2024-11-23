@@ -208,6 +208,42 @@ def results_to_pandas(outputs: Results) -> pd.DataFrame:
             data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
+def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
+    """
+    Converts predictions from SAHI model to pandas dataframe for further processing.
+
+    Input args:
+    - outputs: list - model predictions in COCO_predictions format (list of dictionaries);
+    - h: image height (for normalizing masks);
+    - w: image width (for normalizing masks).
+
+    Returns:
+    - pd.DataFrame of the standard form with the predictions in it.
+    """
+    data = {
+        "id_label": [],
+        "box": [],
+        "mask": [],
+        "confidence": [],
+        "diameter": [],
+        "area": [],
+        "volume": [],
+        "bin_mask": []
+    }
+    for i, obj in enumerate(outputs):
+        data['id_label'].append(i)
+        data['box'].append(np.array(obj['bbox']))
+        xs, ys = np.array(obj['segmentation'][0][::2]) / w, np.array(obj['segmentation'][0][1::2]) / h
+        mask_array = np.vstack((xs, ys)).T
+        data['mask'].append(mask_array)
+        data['confidence'].append(obj['score'])
+        bin_mask, morphology = plot_mask(mask_array)
+        data['diameter'].append(morphology['diameter'])
+        data['area'].append(morphology['area'])
+        data['volume'].append(morphology['volume'])
+        data['bin_mask'].append(bin_mask)
+    return pd.DataFrame(data)
+
 def pandas_to_ultralytics(df, original_image):
     """Converts pandas DataFrame instance to ultralytics Results for easier plotting."""
     path = '.cache/cell_tmp_img_with_detections.png'
