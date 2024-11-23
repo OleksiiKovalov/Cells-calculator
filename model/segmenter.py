@@ -10,9 +10,9 @@ import pandas as pd
 import cv2
 import numpy as np
 from ultralytics import YOLO
-from sahi import AutoDetectionModel
-from sahi.utils.cv import read_image
-from sahi.predict import get_prediction, get_sliced_prediction, predict
+from model.sahi.auto_model import AutoDetectionModel
+from model.sahi.utils.cv import read_image
+from model.sahi.predict import get_prediction, get_sliced_prediction, predict
 
 from model.BaseModel import BaseModel
 from model.utils import *

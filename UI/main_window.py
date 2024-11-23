@@ -429,9 +429,12 @@ class MainWindow(QMainWindow):
                     result = self.models[model].calculate(img_path=self.lsm_path)
                 except:
                     traceback.print_exc()
+                    msg = traceback.format_exc()
                     # If still not successful, show an error dialog
+                    # self.show_warning_dialog(
+                    #     "Error during calculation \n\nChoose another model or change channels settings")
                     self.show_warning_dialog(
-                        "Error during calculation \n\nChoose another model or change channels settings")
+                        msg)
                     result = None
                     self.draw_bounding = 0
             

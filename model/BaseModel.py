@@ -5,9 +5,9 @@ We define both the structure and the main functionality utils.
 import os
 import shutil
 
-from sahi import AutoDetectionModel
-from sahi.utils.cv import read_image
-from sahi.predict import get_prediction, get_sliced_prediction, predict
+from model.sahi.auto_model import AutoDetectionModel
+from model.sahi.utils.cv import read_image
+from model.sahi.predict import get_prediction, get_sliced_prediction, predict
 
 class BaseModel():
     def __init__(self, path_to_model: str, object_size):
