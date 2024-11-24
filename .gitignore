@@ -3,6 +3,12 @@
 /model/best_m_openvino_model
 /lsm_files
 /.cache
+/model/__pycache__
+/UI/__pycache__
+/myenv
+/model/sahi/__pycache__
+/model/sahi/*/__pycache__
+/output
 *.lsm
 *.TIF
 *.JPG
@@ -11,6 +17,4 @@
 *.exe
 *.csv
 *xlsx
-/model/__pycache__
-/UI/__pycache__
-/myenv
+*.pyc

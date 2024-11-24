@@ -25,7 +25,7 @@ class BaseModel():
         self.model_x10 = AutoDetectionModel.from_pretrained(
             model_type='yolov8',
             model_path=path_to_model,
-            confidence_threshold=0.2,
+            confidence_threshold=0.001,
             device="cpu", # or 'cuda:0'
         )
     

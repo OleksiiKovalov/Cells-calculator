@@ -512,7 +512,7 @@ class ObjectAnnotation:
             raise ValueError("category_id must be an integer")
         if (bbox is None) and (segmentation is None):
             raise ValueError("you must provide a bbox or segmentation")
-        if segmentation is not None:
+        if segmentation is not None and len(segmentation) == 1 and len(segmentation[0]) >= 8:
             self.mask = Mask(
                 segmentation=segmentation,
                 shift_amount=shift_amount,

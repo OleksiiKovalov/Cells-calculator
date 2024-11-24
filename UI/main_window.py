@@ -47,7 +47,8 @@ class MainWindow(QMainWindow):
     # Dictionary containing available models and their corresponding methods
     models = {
         'Detector': model1(path='model/yolov8m-det.onnx', object_size = object_size),
-        'General Segmenter': model1(path='model/yolov8n-seg.pt', object_size = object_size)
+        'General Segmenter': model1(path='model/yolo11x-seg-680.pt', object_size = object_size)
+        # 'General Segmenter': model1(path='model/yolov8m-det.onnx', object_size = object_size)
     }
 
     # Initialize variables to None or default values

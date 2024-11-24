@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 import ultralytics
 import ultralytics.engine
@@ -13,7 +14,7 @@ from ultralytics.engine.results import Results, Boxes, Masks
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
-colors = [(3,177,252)]
+COLORS = [(3,177,252)]
 
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
@@ -189,7 +190,7 @@ def results_to_pandas(outputs: Results) -> pd.DataFrame:
         "diameter": [],
         "area": [],
         "volume": [],
-        "bin_mask": []
+        # "bin_mask": []
     }
     for i, _ in enumerate(outputs.masks.xyn):
         if len(outputs.masks.xyn[i]) == 0:
@@ -205,7 +206,7 @@ def results_to_pandas(outputs: Results) -> pd.DataFrame:
             data['diameter'].append(morphology['diameter'])
             data['area'].append(morphology['area'])
             data['volume'].append(morphology['volume'])
-            data['bin_mask'].append(bin_mask)
+            # data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
 def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
@@ -228,20 +229,24 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
         "diameter": [],
         "area": [],
         "volume": [],
-        "bin_mask": []
+        # "bin_mask": []
     }
-    for i, obj in enumerate(outputs):
-        data['id_label'].append(i)
-        data['box'].append(np.array(obj['bbox']))
-        xs, ys = np.array(obj['segmentation'][0][::2]) / w, np.array(obj['segmentation'][0][1::2]) / h
-        mask_array = np.vstack((xs, ys)).T
-        data['mask'].append(mask_array)
-        data['confidence'].append(obj['score'])
-        bin_mask, morphology = plot_mask(mask_array)
-        data['diameter'].append(morphology['diameter'])
-        data['area'].append(morphology['area'])
-        data['volume'].append(morphology['volume'])
-        data['bin_mask'].append(bin_mask)
+    try:
+        for i, obj in enumerate(outputs):
+            if len(obj['bbox']) == 4 and len(obj['segmentation']) == 1 and len(obj['segmentation'][0]) >= 8:
+                data['id_label'].append(i)
+                data['box'].append(np.array(obj['bbox']))
+                xs, ys = np.array(obj['segmentation'][0][::2]) / w, np.array(obj['segmentation'][0][1::2]) / h
+                mask_array = np.vstack((xs, ys)).T
+                data['mask'].append(mask_array)
+                data['confidence'].append(obj['score'])
+                bin_mask, morphology = plot_mask(mask_array)
+                data['diameter'].append(morphology['diameter'])
+                data['area'].append(morphology['area'])
+                data['volume'].append(morphology['volume'])
+                # data['bin_mask'].append(bin_mask)
+    except:
+        print("Something wrong happenned...")
     return pd.DataFrame(data)
 
 def pandas_to_ultralytics(df, original_image):
@@ -258,7 +263,10 @@ def pandas_to_ultralytics(df, original_image):
     mask_array = np.stack(df['bin_mask'].tolist(), axis=0)
     probs = torch.Tensor(conf_array)
     boxes = torch.Tensor(box_array)
-    masks = torch.Tensor(mask_array)
+    try:
+        masks = torch.Tensor(mask_array)
+    except:
+        masks = torch.Tensor(mask_array.astype(np.uint8))
     results = Results(orig_img=original_image, path=path, names=names, boxes=boxes,
                       masks=masks, probs=probs, keypoints=None, obb=None, speed=None)
     return results
@@ -305,7 +313,77 @@ def plot_mask(in_mask: np.array, image_size=1000) -> np.array:
     bin_mask = np.zeros((image_size, image_size), dtype=np.uint8)
     cv2.fillPoly(bin_mask, [coords], 1)
     morphology = calculate_morphology(bin_mask)
-    return bin_mask, morphology
+    return bin_mask.astype(bool), morphology
+
+def colormap_to_hex(cmap_name):
+    """
+    Convert a matplotlib colormap into a list of discrete HEX colors.
+    
+    Parameters:
+        cmap_name (str): Name of the colormap (e.g., 'viridis', 'plasma', etc.).        
+    Returns:
+        List[str]: List of HEX color strings.
+    """
+    color_number = {
+        "gist_rainbow": 20,
+        "tab20": 20,
+        "tab20b": 20,
+        "tab20c": 20,
+        "tab10": 10,
+        "Set1": 9,
+        "Set2": 8,
+        "Set3": 12,
+        "Paired": 12,
+        "viridis": 10,
+        "plasma": 10
+    }
+    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
+    num_colors = color_number[cmap_name]
+    # Get the colormap object
+    cmap = plt.get_cmap(cmap_name)
+    color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
+    hex_colors = [mcolors.to_hex(c) for c in color_values]
+    return hex_colors
+
+def hex_to_bgr(hex_colors):
+    """
+    Convert a HEX color string to a BGR tuple for OpenCV.
+
+    Parameters:
+        hex_color (str): HEX color string (e.g., '#FF5733').
+    Returns:
+        Tuple[int, int, int]: BGR color tuple.
+    """
+    # Convert HEX to RGB
+    if isinstance(hex_colors, str):  # Single color
+        hex_colors = [hex_colors]
+    bgr_colors = []
+    for hex_color in hex_colors:
+        rgb = [int(c * 255) for c in mcolors.hex2color(hex_color)]
+        bgr_colors.append(tuple(reversed(rgb)))
+    return bgr_colors
+
+def denormalize_coordinates(coords, image_shape):
+    """Converts normalized coords to given image coordinates."""
+    return coords * np.array([image_shape[1], image_shape[0]])
+
+def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_with_detections.png",
+                     alpha=.75, colormap="tab20"):
+    """Draws predicted masks on the image."""
+    hex_colors = hex_to_bgr(colormap_to_hex(colormap))
+    if not pred_masks:
+        print("No masks found.")
+        return
+    overlay = image.copy()
+    for i, mask in enumerate(pred_masks):
+        coords = np.array(mask)
+        color = hex_colors[i % len(hex_colors)]
+        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
+            coords = denormalize_coordinates(coords, image.shape)
+        coords = coords.astype(int)
+        cv2.fillPoly(overlay, [coords], color)
+    cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
+    cv2.imwrite(filename, image)
 
 def calculate_morphology(bin_mask: np.array) -> dict:
     """
