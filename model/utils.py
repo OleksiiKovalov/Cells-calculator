@@ -180,18 +180,30 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     # filtered_detections = filtered_detections[filtered_detections['box'].apply(lambda b: (min_size <= b[2] * b[3] / img_sq <= max_size).item())]
     return filtered_detections
 
-def results_to_pandas(outputs: Results) -> pd.DataFrame:
+def results_to_pandas(outputs: Results, store_bin_mask=False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
-    data = {
-        "id_label": [],
-        "box": [],
-        "mask": [],
-        "confidence": [],
-        "diameter": [],
-        "area": [],
-        "volume": [],
-        # "bin_mask": []
-    }
+    if store_bin_mask is False:
+        data = {
+            "id_label": [],
+            "box": [],
+            "mask": [],
+            "confidence": [],
+            "diameter": [],
+            "area": [],
+            "volume": [],
+            # "bin_mask": []
+        }
+    else:
+        data = {
+            "id_label": [],
+            "box": [],
+            "mask": [],
+            "confidence": [],
+            "diameter": [],
+            "area": [],
+            "volume": [],
+            "bin_mask": []
+        }
     for i, _ in enumerate(outputs.masks.xyn):
         if len(outputs.masks.xyn[i]) == 0:
             pass
@@ -206,7 +218,8 @@ def results_to_pandas(outputs: Results) -> pd.DataFrame:
             data['diameter'].append(morphology['diameter'])
             data['area'].append(morphology['area'])
             data['volume'].append(morphology['volume'])
-            # data['bin_mask'].append(bin_mask)
+            if store_bin_mask is True:
+                data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
 def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
@@ -249,14 +262,16 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
         print("Something wrong happenned...")
     return pd.DataFrame(data)
 
-def pandas_to_ultralytics(df, original_image):
+def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
     """Converts pandas DataFrame instance to ultralytics Results for easier plotting."""
-    path = '.cache/cell_tmp_img_with_detections.png'
-    names = {0: 'Cell'}    
+    names = {}
+    for n in range(100):
+        names[n] = str(n)
     conf_array = np.array(df['confidence'].tolist())
     if len(conf_array) == 0:
         return None
-    class_array = np.zeros(conf_array.shape)
+    class_array = np.array(df['id_label'].tolist())
+    df['box'] = df['box'].apply(lambda b: [b[0], b[1], b[2] + b[0], b[3] + b[1]])
     box_array = np.array(df['box'].tolist())
     box_array = np.hstack((box_array, np.expand_dims(conf_array, axis=1),
                            np.expand_dims(class_array, axis=1)))
@@ -284,14 +299,16 @@ def compute_iou(masks_1: list, masks_2: list) -> np.array:
     - iou_matrix: numpy array - matrix of IoU values for corresponding i-th mask from the first set and j-th mask from the second set.
     """
     iou_matrix = np.zeros((len(masks_1), len(masks_2)))
+    mask_2_morphologies = []
     for i, _ in enumerate(masks_1):
         for j, _ in enumerate(masks_2):
             mask1, _ = plot_mask(masks_1[i])
-            mask2, _ = plot_mask(masks_2[j])
+            mask2, morphology = plot_mask(masks_2[j])
+            mask_2_morphologies.append(morphology)
             intersection = np.sum(mask1 * mask2)
             union = np.sum(np.clip(mask1 + mask2, 0, 1))
             iou_matrix[i,j] = intersection / union
-    return iou_matrix
+    return iou_matrix, mask_2_morphologies
 
 def plot_mask(in_mask: np.array, image_size=1000) -> np.array:
     """

@@ -18,3 +18,5 @@
 *.csv
 *xlsx
 *.pyc
+/test_images
+tracker_test.py

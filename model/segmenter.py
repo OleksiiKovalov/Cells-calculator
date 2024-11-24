@@ -18,9 +18,8 @@ from model.BaseModel import BaseModel
 from model.utils import *
 
 class Segmenter(BaseModel):
-    def __init__(self, path, object_size):
-        super().__init__(path, object_size)
-        self.detections=None
+    # def __init__(self, path, object_size):
+    #     super().__init__(path, object_size)
 
     def init_x20_model(self, path_to_model: str):
         self.model = YOLO(path_to_model, task="segment")
@@ -28,9 +27,9 @@ class Segmenter(BaseModel):
     def init_x10_model(self, path_to_model):
         return super().init_x10_model(path_to_model)
 
-    def count_x20(self, input_image, conf=False, labels=False, boxes=False,
+    def count_x20(self, input_image, plot = True, conf=False, labels=False, boxes=False,
               masks=True, probs=False, show=False, save=True, colormap="tab20",
-              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05, alpha=0.75, **kwargs):
+              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05, alpha=0.75, store_bin_mask=False, **kwargs):
         """
         This function performs inference on a given image using a pre-trained given model.
         The general pipeline can be described through the following steps:
@@ -58,19 +57,19 @@ class Segmenter(BaseModel):
             # outputs.plot(conf=conf, labels=labels, boxes=boxes,
             #                                  masks=masks, probs=probs, show=show, save=save,
             #                                  color_mode=color_mode, filename=filename)
-            self.detections = results_to_pandas(outputs)
+            self.detections = results_to_pandas(outputs, store_bin_mask)
             self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
             self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w, self.h, self.w, self.h]))
             # self.object_size['set_size'](self.detections[detections['confidence'] >= min_score]['box'].copy())
-            self.object_size['set_size'](self.detections['box'].copy())
+            # self.object_size['set_size'](self.detections['box'].copy())  #NOTE: uncomment
 
         detections = self.detections[self.detections['confidence'] >= min_score]
         # self.object_size['set_size'](detections['box'].copy())
         original_image = self.original_image.copy()
 
-        filtered_detections = filter_detections(detections,
-                                                min_size = self.object_size['min_size'],
-                                                max_size= self.object_size['max_size'])
+        filtered_detections = detections#filter_detections(detections,
+                                                #min_size = self.object_size['min_size'],
+                                                #max_size= self.object_size['max_size'])
         
         # current_results = pandas_to_ultralytics(filtered_detections, original_image)
         # if current_results is None:
@@ -78,9 +77,16 @@ class Segmenter(BaseModel):
         # current_image = current_results.plot(conf=conf, labels=labels, boxes=boxes,
         #                                      masks=masks, probs=probs, show=show, save=save,
         #                                      color_mode=color_mode, filename=filename)
-        
-        plot_predictions(original_image, filtered_detections['mask'].tolist(),
-                         filename=filename, colormap=colormap, alpha=alpha)
+        if plot is True:
+            plot_predictions(original_image, filtered_detections['mask'].tolist(),
+                            filename=filename, colormap=colormap, alpha=alpha)
+        # else:
+        #     current_results = pandas_to_ultralytics(filtered_detections, original_image)
+        #     if current_results is None:
+        #         return None
+        #     current_image = current_results.plot(conf=conf, labels=labels, boxes=boxes,
+        #                                          masks=masks, probs=probs, show=show, save=save,
+        #                                          color_mode="instance", filename=filename)
         return filtered_detections
 
     def count_x10(self, input_image: str, conf=False, labels=False, boxes=False,

@@ -3,6 +3,7 @@ Here we define tracker for cellular spheroids.
 This class differs a lot from an ordinary model, so we write it from scratch.
 """
 import os
+import shutil
 from pathlib import Path
 from model.segmenter import Segmenter
 import numpy as np
@@ -13,109 +14,162 @@ from model.utils import *
 class Tracker():
     def __init__(self, path_to_model: str, size):
         self.model = Segmenter(path_to_model, size)
-        self.output_dir = Path("output")
+        self.output_dir = Path("tracker_output")
+        self.img_dir = self.output_dir / "frames"
+        self.table_dir = self.output_dir / "tabular data"
+        self.results = {
+            "frame_num": [],
+            "t": [],
+            "id_label": [],
+            "old_label": [],
+            "box": [],
+            "mask": [],
+            "confidence": [],
+            "diameter": [],
+            "area": [],
+            "volume": []
+        }
+        try:
+            shutil.rmtree(self.output_dir)
+        except:
+            pass
+        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.img_dir, exist_ok=True)
+        os.makedirs(self.table_dir, exist_ok=True)
 
-    def track(self, img_seq_folder: str):
+    def track(self, img_seq_folder: str, time_period: float = 15):
         """
         Tracks spheroid instances through the sequence of frames.
+        Uses Segmenter segmentation model for segmenting given frames.
+        Afterwards, it saves the results in the tracker_output folder.
+        The obtained saved results include:
+        - all processed frames with masks visualized above;
+        - general CSV table of all spheroid instances and their size params at all frames;
+        - individual CSV tables for each spheroid instance with its size params at each frame.
 
         Input params include:
-        - img_seq_folder: str - directory containing sequence of frames.
+        - img_seq_folder: str - directory containing sequence of frames;
+        - time_period: time period (presumably, in seconds) between frame shots. Default to 15.
 
-        Output params:
-        - TODO
+        Output:
+        - None
         """
-        # TODO: we need the following algorithm here:
-        # 1) we process frame #0 and find all the spheroids there. We assign a unique ID to each spheroid on this frame.
-        # 2) we process the following frames one-by-one by doing the following:
-        # 3) obtain the mask of each spheroid;
-        # 4) calculate IoU values of each spheroid on the current frame with spheroids from the previous frame;
-        # 5) if a certain spheroid has max IoU with a spheroid from the previous frame, and this value exceeds some minimal required threshold, we assume this is the same instance
-        # 6) if some spheroid is lost somewhere in the middle, we keep waiting for it arriving back - in standard terms, we have infinite memory value here.
-        # 7) all the results are stored in one large pandas dataframe which has the following columns (each row describes certain spheroid instance on a certain frame):
-        #   - frame_num: number of current frame in the frame sequence;
-        #   - id_label: id of a spheroid about which this record in the dataframe is;
-        #   - box: array representing the bbox of this spheroid;
-        #   - mask: array representing the mask of this spheroid;
-        #   - conf: confidence score of this spheroid instance;
-        #   - diameter: diameter of this spheroid instance approximated to a circle shape. Is in ratio relative to the square root of the image square;
-        #   - area: area of this spheroid. Is in ratio relative to the area of the image;
-        #   - volume: volume of the spheroid extrapolated to a spherical shape. Is in ratio relative to image square multiplied by the square root of the image square
-        # 8) based on all of that, we build resulting pandas dataframe representing the time series data obtained. It has these columns:
-        #   - t: time point in seconds (by default defined as 0-15-30-45-60-...);
-        #   - diameter: diameter obtained above;
-        #   - area: area obtained above;
-        #   - volume: volume obtained above.
-        # 9) if any values in the middle are missing, we interpolate them linearly by taking the average value of the 2 values surrounding the missing one.
-        # 10) if any first or last values are missing, we do not extrapolate them and instead just mark them as NaN (-100);
-        # 11) if a spheroid instance is presented in fewer than minimal threshold value frames, we eliminate it as the one that got lost during the experiments.
-        self.results = pd.DataFrame(columns=[
-            "frame_num",
-            "id_label",
-            "box",
-            "mask",
-            "conf",
-            "diameter",
-            "area",
-            "volume"
-        ])
         frame_names = os.listdir(img_seq_folder)
         zero_frame = True
-        i = 0
-        os.makedirs(self.output_dir, exist_ok=True)
+        i = -1
+        # we process each frame one-by-one in the loop below
         for frame_name in frame_names:
+            i += 1
             path = os.path.join(img_seq_folder, frame_name)
-            output = self.model.count(path, calculate_morphology=True, filename=self.output_dir / ("frame_" + str(i).zfill(3) + ".png"))
+            filename = str(self.img_dir / ("frame_" + str(i).zfill(3) + ".png"))
+            output = self.model.count_x20(path, plot=False, filename=filename, store_bin_mask=True)
+            self.model.clear_cached_detections()
+            # if it is the first frame in the sequence, we need to process it a bit differently
             if zero_frame:
+                current_results = pandas_to_ultralytics(output, cv2.imread(path), path=filename, frame_num=i)
+                if current_results is None:
+                    continue
+                current_image = current_results.plot(conf=True, labels=True, boxes=True,  masks=True, probs=False,
+                                                    show=False, save=True, color_mode="class", filename=filename)
                 zero_frame_results = output.copy()
-                c = -1
-                for c, _ in enumerate(zero_frame_results.masks.xyn):
-                    if len(zero_frame_results.masks.xyn[c]) == 0:
+                for c, _ in enumerate(zero_frame_results['mask'].tolist()):
+                    # some masks are of 0 length, so we must filter and skip them
+                    if len(zero_frame_results['mask'].iloc[c]) == 0:
                         pass
                     else:
-                        _, morphology = plot_mask(zero_frame_results.masks.xyn[c])
-                        record = pd.DataFrame({
-                            "frame_num": i,
-                            "id_label": c,
-                            "box": zero_frame_results['box'].iloc[c],
-                            "mask": zero_frame_results['mask'].iloc[c],
-                            "conf": zero_frame_results['confidence'].iloc[c],
-                            "diameter": morphology['diameter'],
-                            "area": morphology['area'],
-                            "volume": morphology['volume'],
-                        })
-                        self.results = pd.concat(self.results, record, ignore_index=True)
-                        c += 1
+                        # but in general we just mine the needed data and save it
+                        bin_mask, morphology = plot_mask(zero_frame_results['mask'].iloc[c])
+
+                        self.results["frame_num"].append(i)
+                        self.results["t"].append(i * time_period)
+                        self.results["id_label"].append(c)
+                        self.results["old_label"].append(c)
+                        self.results["box"].append(zero_frame_results['box'].iloc[c])
+                        self.results["mask"].append(zero_frame_results['mask'].iloc[c])
+                        self.results["confidence"].append(zero_frame_results['confidence'].iloc[c])
+                        self.results["diameter"].append(morphology['diameter'])
+                        self.results["area"].append(morphology['area'])
+                        self.results["volume"].append(morphology['volume'])
+                        # self.results['bin_mask'].append(bin_mask)
+                
+            # below we process the other sequence frames
             else:
-                iou_matrix, morphology = compute_iou(zero_frame_results.masks.xyn, output.masks.xyn)
-                id_indices = np.argmax(iou_matrix, axis=0)                
-                i = 0
-                for _, record in output.iterrows():
-                    record["id_label"] = id_indices[i]
-                    i += 1
-                    self.results = pd.concat(self.results, record, ignore_index=True)
+                # firstly, converting current results to pandas dataframe
+                self.results = pd.DataFrame(self.results)
+                # then, we need to correspond the spheroid from current frame with spheroids
+                # from the very first frame to assign the same IDs to them
+                iou_matrix, morphology = compute_iou(zero_frame_results['mask'].tolist(), output['mask'].tolist())
+
+                # Mask to identify columns with non-zero elements
+                non_zero_columns = (iou_matrix != 0).any(axis=0)
+
+                # Create a reduced matrix with only the desired columns
+                filtered_matrix = iou_matrix[:, non_zero_columns]
+
+                # Compute argmax for the filtered matrix
+                id_indices = np.full(iou_matrix.shape[1], -1)  # Default value for excluded columns (-1 or another value)
+                iou_values = np.full(iou_matrix.shape[1], -1).astype(float)  # Default value for excluded columns (-1 or another value)
+                id_indices[non_zero_columns] = np.argmax(filtered_matrix, axis=0)
+                iou_values[non_zero_columns] = np.max(filtered_matrix, axis=0)
+
+                # now we need to filter out those instances which correspond to 2+
+                # original ones at the same time by choosing the "real" one
+                # Step 1: Identify unique id_indices (excluding -1 values) and their indices
+                unique_indices = np.unique(id_indices[non_zero_columns])
+
+                # Step 2: Iterate over unique indices and handle duplicates
+                for index in unique_indices:
+                    if np.sum(id_indices == index) > 1:  # If the index appears more than once
+                        # Find the position where iou_values are maximized for this index
+                        max_iou_index = np.argmax(iou_values[id_indices == index])
+
+                        # Set all occurrences of this index to -1 except the one with the maximum IOU value
+                        indices_to_update = np.where(id_indices == index)[0]
+                        for itu in indices_to_update:
+                            if itu != indices_to_update[max_iou_index]:
+                                id_indices[itu] = -1
+
+                for k, row in output.iterrows():
+                    if k >= len(id_indices):
+                        break
+                    row["id_label"] = id_indices[k]
+                    record = pd.DataFrame({
+                        "frame_num": [i],
+                        "t": [i * time_period],
+                        "id_label": [row['id_label']],
+                        "old_label": [k],
+                        "box": [row['box']],
+                        "mask": [row['mask']],
+                        "confidence": [row['confidence']],
+                        "diameter": [morphology[k]['diameter']],
+                        "area": [morphology[k]['area']],
+                        "volume": [morphology[k]['volume']]
+                    })
+                    # here we assigned all the iIDs, mined all the data and then save it below
+                    self.results = pd.concat((self.results, record), ignore_index=True)
+                filtered_results = self.results[(self.results['frame_num'] == i) & (self.results['id_label'] != -1)]
+                columns_of_interest = ["frame_num", "t", "old_label", "box", "mask",
+                                       "confidence", "diameter", "area", "volume"]
+                current_results = pd.merge(filtered_results[columns_of_interest], output[['id_label', 'bin_mask']],
+                                           left_on='old_label', right_on='id_label', how='inner')
+                current_results['id_label'] = filtered_results['id_label'].tolist()
+                current_results = pandas_to_ultralytics(current_results, cv2.imread(path),
+                                                        path=filename, frame_num=i)
+                if current_results is None:
+                    continue
+                current_image = current_results.plot(conf=True, labels=True, boxes=True,  masks=True, probs=False,
+                                                    show=False, save=True, color_mode="class", filename=filename)
             zero_frame = False
+        # now we processed all frames and start saving the results
+        self.results['id_label'].dropna(inplace=True)
+        self.results = self.results[self.results['id_label'] != -1]
         unique_spheroids = self.results['id_label'].unique().tolist()
-        general_t_series_data = pd.DataFrame(columns=[
-                "t",
-                "diameter",
-                "square",
-                "volume",
-            ])
         for spheroid in unique_spheroids:
             spheroid_records = self.results[self.results['id_label'] == spheroid]
-            t_series_data = pd.DataFrame(columns=[
-                "t",
-                "diameter",
-                "square",
-                "volume",
-            ])
-            i = 0
-            for _, record in spheroid_records.iterrows():
-                record = record.to_dict()
-                record['t'] = i * 15
-                i += 1
-                t_series_data = pd.concat(t_series_data, pd.DataFrame(record), ignore_index=True)
-            t_series_data.to_csv("spheroid_" + str(spheroid).zfill(2) + ".csv")
-            general_t_series_data = pd.concat(general_t_series_data, t_series_data, ignore_index=True)
-        general_t_series_data.to_csv("general_t_series_data.csv")
+            columns_of_interest = ["frame_num", "t", "confidence", "diameter", "area", "volume"]
+            filename = str(self.table_dir / ("spheroid_" + str(spheroid).zfill(2) + ".csv"))
+            spheroid_records[columns_of_interest].to_csv(filename, sep=';', index=False)
+        columns_of_interest = ["frame_num", "t", "id_label", "confidence", "diameter", "area", "volume"]
+        general_t_series_data = self.results[columns_of_interest]
+        filename = str(self.table_dir / ("general_t_series_data.csv"))
+        general_t_series_data.to_csv(filename, sep=';', index=False)

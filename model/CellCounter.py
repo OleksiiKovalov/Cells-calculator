@@ -28,9 +28,8 @@ class CellCounter(BaseModel):
 
     Output value is the number of cells detected.
     """
-    def __init__(self, path, object_size):
-        super().__init__(path, object_size)
-        self.detections=None
+    # def __init__(self, path, object_size):
+    #     super().__init__(path, object_size)
 
     def init_x20_model(self, path_to_model: str):
         self.model = cv2.dnn.readNetFromONNX(path_to_model)
@@ -131,7 +130,7 @@ class CellCounter(BaseModel):
 
         # return filtered_detections
 
-    def count_x20(self, input_image):
+    def count_x20(self, input_image, filename):
         # # NOTE: this function is deprecated and no longer used, because we have implemented ultralytics-based inference pipeline for simplicity
         """
         Main function to load ONNX model, perform inference, draw bounding boxes,
@@ -240,10 +239,10 @@ class CellCounter(BaseModel):
                 round((filtered_detections.iloc[i,-2][1] + filtered_detections.iloc[i,-2][3]) * filtered_detections.iloc[i,-1]),
             )
         try:
-            os.remove('.cache/cell_tmp_img_with_detections.png')
+            os.remove(filename)
         except:
             pass
-        cv2.imwrite('.cache/cell_tmp_img_with_detections.png', original_image)
+        cv2.imwrite(filename, original_image)
 
         return filtered_detections
         

@@ -16,6 +16,7 @@ class BaseModel():
         self.path_to_model = path_to_model
         self.object_size = object_size
         self.original_image = None
+        self.detections = None
     
     def init_models(self, path_to_model: str):
         self.init_x10_model(path_to_model)
@@ -46,18 +47,23 @@ class BaseModel():
             return 0
         return len(detections)
 
-    def count(self, input_image, scale: int = 10):
+    def count(self, input_image, scale: int = 10,
+              filename=".cache/cell_tmp_img_with_detections.png"):
         """General method for processing microimages of cells."""
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
         if scale == 20:
-            return self.count_x20(input_image)
+            return self.count_x20(input_image, filename=filename)
         else:
-            return self.count_x10(input_image)
+            return self.count_x10(input_image, filename=filename)
 
-    def count_x10(self, input_image):
+    def count_x10(self, input_image, filename):
         """Method for processing images of x10 scale by applying sliding window approach."""
         raise NotImplementedError
 
-    def count_x20(self, input_image):
+    def count_x20(self, input_image, filename):
         """Method for processing images of x20 scale using single-time inference, as usual."""
         raise NotImplementedError
+
+    def clear_cached_detections(self):
+        """Resets cached detections of needed."""
+        self.detections = None
