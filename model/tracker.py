@@ -62,7 +62,8 @@ class Tracker():
             i += 1
             path = os.path.join(img_seq_folder, frame_name)
             filename = str(self.img_dir / ("frame_" + str(i).zfill(3) + ".png"))
-            output = self.model.count_x20(path, plot=False, filename=filename, store_bin_mask=True)
+            output = self.model.count_x20(path, plot=False, filename=filename,
+                                          store_bin_mask=True, tracking=True)
             self.model.clear_cached_detections()
             # if it is the first frame in the sequence, we need to process it a bit differently
             if zero_frame:

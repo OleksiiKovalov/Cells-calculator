@@ -39,7 +39,7 @@ class Model():
 
     def init_counter(self, path, object_size):
         if "det" in path:
-            self.cell_counter = CellCounter(path=path, object_size = object_size)
+            self.cell_counter = CellCounter(path_to_model=path, object_size = object_size)
         elif "seg" in path:
             self.cell_counter = Segmenter(path, object_size = object_size)
         else:

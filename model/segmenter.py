@@ -28,7 +28,7 @@ class Segmenter(BaseModel):
         return super().init_x10_model(path_to_model)
 
     def count_x20(self, input_image, plot = True, conf=False, labels=False, boxes=False,
-              masks=True, probs=False, show=False, save=True, colormap="tab20",
+              masks=True, probs=False, show=False, save=True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05, alpha=0.75, store_bin_mask=False, **kwargs):
         """
         This function performs inference on a given image using a pre-trained given model.
@@ -61,16 +61,20 @@ class Segmenter(BaseModel):
             self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
             self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w, self.h, self.w, self.h]))
             # self.object_size['set_size'](self.detections[detections['confidence'] >= min_score]['box'].copy())
-            # self.object_size['set_size'](self.detections['box'].copy())  #NOTE: uncomment
+            if tracking is False:
+                self.object_size['set_size'](self.detections['box'].copy())  #TODO: make sure it works with tracker
 
         detections = self.detections[self.detections['confidence'] >= min_score]
-        # self.object_size['set_size'](detections['box'].copy())
+        if tracking is False:
+            self.object_size['set_size'](detections['box'].copy())  #TODO: make sure it works with tracker
         original_image = self.original_image.copy()
+        if tracking is False:
+            filtered_detections = filter_detections(detections,
+                                                    min_size = self.object_size['min_size'],
+                                                    max_size= self.object_size['max_size'])
+        else:
+            filtered_detections = detections
 
-        filtered_detections = detections#filter_detections(detections,
-                                                #min_size = self.object_size['min_size'],
-                                                #max_size= self.object_size['max_size'])
-        
         # current_results = pandas_to_ultralytics(filtered_detections, original_image)
         # if current_results is None:
         #     return None
@@ -109,8 +113,6 @@ class Segmenter(BaseModel):
             # self.original_image = outputs.orig_img
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
-            # self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w, self.h, self.w, self.h]))
-            # self.object_size['set_size'](self.detections[detections['confidence'] >= min_score]['box'].copy())
             self.object_size['set_size'](self.detections['box'].copy())
 
         detections = self.detections[self.detections['confidence'] >= min_score]
