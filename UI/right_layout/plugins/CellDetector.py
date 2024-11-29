@@ -23,7 +23,7 @@ import traceback
 
 class CellDetector(QObject):
     def get_name(self):
-        return "CellDetector"
+        return "Cell Processor"
     plugin_signal = pyqtSignal(str, object)
     def __init__(self, parent, parametrs, object_size, default_object_size, models):
         super().__init__()

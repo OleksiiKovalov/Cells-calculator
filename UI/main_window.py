@@ -60,7 +60,7 @@ class MainWindow(QMainWindow):
         self.setFixedSize(screen_geometry.width(), desktop.availableGeometry().height() - self.menuBar().height())
 
         # Set the window title
-        self.current_plugin_name = "CellDetector"
+        self.current_plugin_name = "Cell Processor"
         self.setWindowTitle(self.current_plugin_name)
         
         self.init_value()
@@ -151,7 +151,7 @@ class MainWindow(QMainWindow):
         'General Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
     }
         self.plugin_list = {
-            "CellDetector" : {
+            "Cell Processor" : {
                 "init" : CellDetector,
                 "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models],
                 "file_callback" : self.change_image,
