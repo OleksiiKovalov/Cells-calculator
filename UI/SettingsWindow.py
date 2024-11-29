@@ -156,9 +156,11 @@ class SettingsWindow(QMainWindow):
             self.add_images()
         except:
             traceback.print_exc()
+            
             # Handle error during layout image
             if self.warning_count == 0:
-                self.show_warning_dialog("Error during layout images\n\nUse Next button")
+                # self.show_warning_dialog("Error during layout images\n\nUse Next button")
+                self.show_warning_dialog(msg)
                 self.warning_count = 1
             if not self.call_back and self.warning_count == 0:
                 self.show_warning_dialog("Error during layout images")

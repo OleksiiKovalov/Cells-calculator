@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 
 import ultralytics
 import ultralytics.engine
@@ -15,7 +16,7 @@ import tiffile
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
-colors = [(3,177,252)]
+COLORS = [(3,177,252)]
 
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
@@ -179,18 +180,30 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
     return filtered_detections
 
-def results_to_pandas(outputs: Results) -> pd.DataFrame:
+def results_to_pandas(outputs: Results, store_bin_mask=False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
-    data = {
-        "id_label": [],
-        "box": [],
-        "mask": [],
-        "confidence": [],
-        "diameter": [],
-        "area": [],
-        "volume": [],
-        "bin_mask": []
-    }
+    if store_bin_mask is False:
+        data = {
+            "id_label": [],
+            "box": [],
+            "mask": [],
+            "confidence": [],
+            "diameter": [],
+            "area": [],
+            "volume": [],
+            # "bin_mask": []
+        }
+    else:
+        data = {
+            "id_label": [],
+            "box": [],
+            "mask": [],
+            "confidence": [],
+            "diameter": [],
+            "area": [],
+            "volume": [],
+            "bin_mask": []
+        }
     for i, _ in enumerate(outputs.masks.xyn):
         if len(outputs.masks.xyn[i]) == 0:
             pass
@@ -205,24 +218,70 @@ def results_to_pandas(outputs: Results) -> pd.DataFrame:
             data['diameter'].append(morphology['diameter'])
             data['area'].append(morphology['area'])
             data['volume'].append(morphology['volume'])
-            data['bin_mask'].append(bin_mask)
+            if store_bin_mask is True:
+                data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
-def pandas_to_ultralytics(df, original_image):
+def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
+    """
+    Converts predictions from SAHI model to pandas dataframe for further processing.
+
+    Input args:
+    - outputs: list - model predictions in COCO_predictions format (list of dictionaries);
+    - h: image height (for normalizing masks);
+    - w: image width (for normalizing masks).
+
+    Returns:
+    - pd.DataFrame of the standard form with the predictions in it.
+    """
+    data = {
+        "id_label": [],
+        "box": [],
+        "mask": [],
+        "confidence": [],
+        "diameter": [],
+        "area": [],
+        "volume": [],
+        # "bin_mask": []
+    }
+    try:
+        for i, obj in enumerate(outputs):
+            if len(obj['bbox']) == 4 and len(obj['segmentation']) == 1 and len(obj['segmentation'][0]) >= 8:
+                data['id_label'].append(i)
+                data['box'].append(np.array(obj['bbox']))
+                xs, ys = np.array(obj['segmentation'][0][::2]) / w, np.array(obj['segmentation'][0][1::2]) / h
+                mask_array = np.vstack((xs, ys)).T
+                data['mask'].append(mask_array)
+                data['confidence'].append(obj['score'])
+                bin_mask, morphology = plot_mask(mask_array)
+                data['diameter'].append(morphology['diameter'])
+                data['area'].append(morphology['area'])
+                data['volume'].append(morphology['volume'])
+                # data['bin_mask'].append(bin_mask)
+    except:
+        print("Something wrong happenned...")
+    return pd.DataFrame(data)
+
+def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
     """Converts pandas DataFrame instance to ultralytics Results for easier plotting."""
-    path = '.cache/cell_tmp_img_with_detections.png'
-    names = {0: 'Cell'}    
+    names = {}
+    for n in range(100):
+        names[n] = str(n)
     conf_array = np.array(df['confidence'].tolist())
     if len(conf_array) == 0:
         return None
-    class_array = np.zeros(conf_array.shape)
+    class_array = np.array(df['id_label'].tolist())
+    df['box'] = df['box'].apply(lambda b: [b[0], b[1], b[2] + b[0], b[3] + b[1]])
     box_array = np.array(df['box'].tolist())
     box_array = np.hstack((box_array, np.expand_dims(conf_array, axis=1),
                            np.expand_dims(class_array, axis=1)))
     mask_array = np.stack(df['bin_mask'].tolist(), axis=0)
     probs = torch.Tensor(conf_array)
     boxes = torch.Tensor(box_array)
-    masks = torch.Tensor(mask_array)
+    try:
+        masks = torch.Tensor(mask_array)
+    except:
+        masks = torch.Tensor(mask_array.astype(np.uint8))
     results = Results(orig_img=original_image, path=path, names=names, boxes=boxes,
                       masks=masks, probs=probs, keypoints=None, obb=None, speed=None)
     return results
@@ -240,14 +299,16 @@ def compute_iou(masks_1: list, masks_2: list) -> np.array:
     - iou_matrix: numpy array - matrix of IoU values for corresponding i-th mask from the first set and j-th mask from the second set.
     """
     iou_matrix = np.zeros((len(masks_1), len(masks_2)))
+    mask_2_morphologies = []
     for i, _ in enumerate(masks_1):
         for j, _ in enumerate(masks_2):
             mask1, _ = plot_mask(masks_1[i])
-            mask2, _ = plot_mask(masks_2[j])
+            mask2, morphology = plot_mask(masks_2[j])
+            mask_2_morphologies.append(morphology)
             intersection = np.sum(mask1 * mask2)
             union = np.sum(np.clip(mask1 + mask2, 0, 1))
             iou_matrix[i,j] = intersection / union
-    return iou_matrix
+    return iou_matrix, mask_2_morphologies
 
 def plot_mask(in_mask: np.array, image_size=1000) -> np.array:
     """
@@ -269,7 +330,77 @@ def plot_mask(in_mask: np.array, image_size=1000) -> np.array:
     bin_mask = np.zeros((image_size, image_size), dtype=np.uint8)
     cv2.fillPoly(bin_mask, [coords], 1)
     morphology = calculate_morphology(bin_mask)
-    return bin_mask, morphology
+    return bin_mask.astype(bool), morphology
+
+def colormap_to_hex(cmap_name):
+    """
+    Convert a matplotlib colormap into a list of discrete HEX colors.
+    
+    Parameters:
+        cmap_name (str): Name of the colormap (e.g., 'viridis', 'plasma', etc.).        
+    Returns:
+        List[str]: List of HEX color strings.
+    """
+    color_number = {
+        "gist_rainbow": 20,
+        "tab20": 20,
+        "tab20b": 20,
+        "tab20c": 20,
+        "tab10": 10,
+        "Set1": 9,
+        "Set2": 8,
+        "Set3": 12,
+        "Paired": 12,
+        "viridis": 10,
+        "plasma": 10
+    }
+    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
+    num_colors = color_number[cmap_name]
+    # Get the colormap object
+    cmap = plt.get_cmap(cmap_name)
+    color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
+    hex_colors = [mcolors.to_hex(c) for c in color_values]
+    return hex_colors
+
+def hex_to_bgr(hex_colors):
+    """
+    Convert a HEX color string to a BGR tuple for OpenCV.
+
+    Parameters:
+        hex_color (str): HEX color string (e.g., '#FF5733').
+    Returns:
+        Tuple[int, int, int]: BGR color tuple.
+    """
+    # Convert HEX to RGB
+    if isinstance(hex_colors, str):  # Single color
+        hex_colors = [hex_colors]
+    bgr_colors = []
+    for hex_color in hex_colors:
+        rgb = [int(c * 255) for c in mcolors.hex2color(hex_color)]
+        bgr_colors.append(tuple(reversed(rgb)))
+    return bgr_colors
+
+def denormalize_coordinates(coords, image_shape):
+    """Converts normalized coords to given image coordinates."""
+    return coords * np.array([image_shape[1], image_shape[0]])
+
+def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_with_detections.png",
+                     alpha=.75, colormap="tab20"):
+    """Draws predicted masks on the image."""
+    hex_colors = hex_to_bgr(colormap_to_hex(colormap))
+    if not pred_masks:
+        print("No masks found.")
+        return
+    overlay = image.copy()
+    for i, mask in enumerate(pred_masks):
+        coords = np.array(mask)
+        color = hex_colors[i % len(hex_colors)]
+        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
+            coords = denormalize_coordinates(coords, image.shape)
+        coords = coords.astype(int)
+        cv2.fillPoly(overlay, [coords], color)
+    cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
+    cv2.imwrite(filename, image)
 
 def calculate_morphology(bin_mask: np.array) -> dict:
     """
