@@ -51,6 +51,8 @@ class Segmenter(BaseModel):
             os.remove(filename)
         except FileNotFoundError:
             pass
+
+        colormap = self.object_size['color_map']
         if self.detections is None:
             outputs = self.model(input_image, conf=0.2, iou=0.6, retina_masks=True, **kwargs)[0]  # TODO: change the config definition point to a higher level
             self.original_image = outputs.orig_img
@@ -100,6 +102,7 @@ class Segmenter(BaseModel):
             os.remove(filename)
         except FileNotFoundError:
             pass
+        colormap = self.object_size['color_map']
         if self.detections is None:
             self.original_image = read_image(input_image)
             outputs = get_sliced_prediction(

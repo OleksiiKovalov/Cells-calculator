@@ -7,3 +7,4 @@ pyqt5==5.15.11
 pyqtgraph==0.13.7
 ultralytics==8.3.27
 auto-py-to-exe==2.44.2
+shapely==2.0.6

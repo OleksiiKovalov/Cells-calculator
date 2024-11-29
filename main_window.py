@@ -23,7 +23,7 @@ from UI.right_layout.plugins.CellDetector import CellDetector
 import pyqtgraph as pg
 from UI.Slider import Slider
 
-from model.Model import Model as model1
+from model.CellCounter import CellCounter as model1
 import traceback
 
 class MainWindow(QMainWindow):
@@ -147,8 +147,8 @@ class MainWindow(QMainWindow):
                     'Nuclei': 1
         }
         self.models = {
-        'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
-        'General Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
+        'Detector': model1(path_to_model='model/yolov8m-det.onnx', object_size = self.object_size),
+        'General Segmenter': model1(path_to_model='model/yolov8n-seg.pt', object_size = self.object_size)
     }
         self.plugin_list = {
             "Cell Processor" : {
@@ -653,13 +653,18 @@ class MainWindow(QMainWindow):
 
 
 if __name__ == '__main__':
+    # Create a QApplication instance
     app = QApplication(sys.argv)
     try:
-        
+        # Attempt to create and show the main window
         window = MainWindow()
         window.showMaximized()
+        # Start the application event loop
         sys.exit(app.exec_())
         
     except Exception as e:
+        traceback.print_exc()
+        # If an exception occurs, display a critical error message and exit the application
         QMessageBox.critical(None, "Critical Error", str(e), QMessageBox.Ok)
         sys.exit(1)
+
