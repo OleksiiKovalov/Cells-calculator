@@ -129,7 +129,8 @@ class CellCounter(BaseModel):
         # cv2.imwrite('.cache/cell_tmp_img_with_detections.png', original_image)
 
         # return filtered_detections
-
+    def count_x10(self, input_image, filename):
+        return self.count_x20(input_image, filename)
     def count_x20(self, input_image, filename):
         # # NOTE: this function is deprecated and no longer used, because we have implemented ultralytics-based inference pipeline for simplicity
         """

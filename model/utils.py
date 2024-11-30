@@ -18,6 +18,20 @@ VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
 COLORS = [(3,177,252)]
 
+COLOR_NUMBER = {
+        "gist_rainbow": 20,
+        "tab20": 20,
+        "tab20b": 20,
+        "tab20c": 20,
+        "tab10": 10,
+        "Set1": 9,
+        "Set2": 8,
+        "Set3": 12,
+        "Paired": 12,
+        "viridis": 10,
+        "plasma": 10
+    }
+
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
     with tiffile.TiffFile(img_path) as tif:
@@ -115,7 +129,7 @@ def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_
     """
     # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     # label = f"{CLASSES[class_id]} ({confidence:.2f})"
-    color = colors[0]
+    color = COLORS[0]
     if img.shape[0] < 800:
         thickness = 1
     else:
@@ -341,21 +355,9 @@ def colormap_to_hex(cmap_name):
     Returns:
         List[str]: List of HEX color strings.
     """
-    color_number = {
-        "gist_rainbow": 20,
-        "tab20": 20,
-        "tab20b": 20,
-        "tab20c": 20,
-        "tab10": 10,
-        "Set1": 9,
-        "Set2": 8,
-        "Set3": 12,
-        "Paired": 12,
-        "viridis": 10,
-        "plasma": 10
-    }
-    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
-    num_colors = color_number[cmap_name]
+    
+    assert cmap_name in COLOR_NUMBER, f"incorrect colormap specified: {cmap_name}"
+    num_colors = COLOR_NUMBER[cmap_name]
     # Get the colormap object
     cmap = plt.get_cmap(cmap_name)
     color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]

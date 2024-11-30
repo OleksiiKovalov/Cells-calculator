@@ -22,8 +22,8 @@ import shutil
 from UI.right_layout.plugins.CellDetector import CellDetector
 import pyqtgraph as pg
 from UI.Slider import Slider
-
-from model.CellCounter import CellCounter as model1
+from model.utils import COLOR_NUMBER as color_number
+from model.Model import Model as model1
 import traceback
 
 class MainWindow(QMainWindow):
@@ -132,10 +132,7 @@ class MainWindow(QMainWindow):
                    'round_parametr_slider' : 10**6,
                    'round_parametr_value_input' : 10**4,
                    'color_map' : "Virdis",
-                   'color_map_list' : [
-                        "Viridis", "Plasma", "Inferno", "Magma", "Cividis",  # Широко используемые палитры
-                            "Tab10", "Paired", "Set1", "Set2", "Set3",  # Традиционные палитры для категориальных данных
-            ],
+                   'color_map_list' : list(color_number.keys()),
                    'line_width' : 100.00
 
                    
@@ -147,8 +144,8 @@ class MainWindow(QMainWindow):
                     'Nuclei': 1
         }
         self.models = {
-        'Detector': model1(path_to_model='model/yolov8m-det.onnx', object_size = self.object_size),
-        'General Segmenter': model1(path_to_model='model/yolov8n-seg.pt', object_size = self.object_size)
+        'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
+        'General Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
     }
         self.plugin_list = {
             "Cell Processor" : {

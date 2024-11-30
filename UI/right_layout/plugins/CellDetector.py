@@ -143,7 +143,7 @@ class CellDetector(QObject):
         self.combo_box.setFont(QFont("Arial", 24))
         
         # Add 'All_method' option and method names to the combo box
-        self.combo_box.addItems(['All_models'])
+        #self.combo_box.addItems(['All_models'])
         self.combo_box.addItems([key for key in self.models])
         
         # Set current index to 1
