@@ -64,11 +64,11 @@ class Segmenter(BaseModel):
             self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w, self.h, self.w, self.h]))
 
             if tracking is False:
-                self.object_size['set_size'](self.detections['box'].copy())  #TODO: make sure it works with tracker
+                self.object_size['signal']("set_size", self.detections['box'].copy())  #TODO: make sure it works with tracker
 
         detections = self.detections[self.detections['confidence'] >= min_score]
         if tracking is False:
-            self.object_size['set_size'](detections['box'].copy())  #TODO: make sure it works with tracker
+            self.object_size['signal']("set_size", self.detections['box'].copy())  #TODO: make sure it works with tracker
         original_image = self.original_image.copy()
         if tracking is False:
             filtered_detections = filter_detections(detections,

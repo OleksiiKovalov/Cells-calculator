@@ -19,9 +19,11 @@ class menubar(QMenuBar):
         
         self.open_lsm_action = QAction("Open Image", self)
         self.open_lsm_action.triggered.connect(self.open_file)
+        self.open_lsm_action.setEnabled(False)
 
         self.open_folder_action = QAction("Open Folder", self)
         self.open_folder_action.triggered.connect(self.open_folder)
+        self.open_folder_action.setEnabled(False)
 
         self.save_as_action = QAction("Save As", self)
         self.save_as_action.setEnabled(False)
@@ -58,8 +60,6 @@ class menubar(QMenuBar):
             # Устанавливаем состояние выбранного действия
             action.setChecked(True)
             self.current_plugin_name = action.text()
-            self.settings_action.setEnabled(False)
-            self.save_as_action.setEnabled(False)
             self.menubar_signal.emit("change_plugin", self.current_plugin_name)
             
         
@@ -83,8 +83,9 @@ class menubar(QMenuBar):
 
         elif action_name == "open_folder":
             if value:
-                self.settings_action.setEnabled(True)
-                self.save_as_action.setEnabled(True)
+                if self.current_plugin_name != "Tracker":
+                    self.settings_action.setEnabled(True)
+                #self.save_as_action.setEnabled(True)
             else:
                 self.settings_action.setEnabled(False)
                 self.save_as_action.setEnabled(False)
@@ -93,7 +94,17 @@ class menubar(QMenuBar):
 
     @pyqtSlot(str, object)
     def handle_rightLayout_action(self, action_name, value):
-        pass
+        if action_name == "Open_lsm":
+            self.open_lsm_action.setEnabled(value)
+                 
+        if action_name == "Open_folder":
+            self.open_folder_action.setEnabled(value)
+          
+        if action_name == "Settings":
+           self.settings_action.setEnabled(value)
+
+        if action_name == "Save_as":
+            self.save_as_action.setEnabled(value)
         
 
     def open_file(self):

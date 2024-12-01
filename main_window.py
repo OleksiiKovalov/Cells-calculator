@@ -19,11 +19,14 @@ from UI.right_layout.right_layout import right_layout
 from UI.menubar import menubar
 import os
 import shutil
-from UI.right_layout.plugins.CellDetector import CellDetector
+from UI.right_layout.plugins.CellDetector import CellDetector as CellDetector_plugin
+from UI.right_layout.plugins.tracker import Tracker as Tracker_plugin
 import pyqtgraph as pg
 from UI.Slider import Slider
 from model.utils import COLOR_NUMBER as color_number
 from model.Model import Model as model1
+
+from model.tracker import Tracker as Tracker_model
 import traceback
 
 class MainWindow(QMainWindow):
@@ -80,6 +83,7 @@ class MainWindow(QMainWindow):
         self.mainWindow_signal.connect(self.menu_bar.handle_mainWindow_action)
         self.mainWindow_signal.connect(self.right_layout.handle_mainWindow_action)
 
+        self.right_layout.init_rightLayout()
         self.init_mainScene()
 
     @pyqtSlot(str, object)
@@ -87,12 +91,13 @@ class MainWindow(QMainWindow):
         """Обрабатываем сигнал от menubar"""
         if action_name == "open_file":
             self.open_file(value)
-        elif action_name == "open_folder":
+        if action_name == "open_folder":
             self.open_folder(value)
-        elif action_name == "save_as":
-            self.save_as()
+        #elif action_name == "save_as":
+        #    self.save_as()
         elif action_name == "open_settings":
             self.open_settings()
+
         elif action_name == "show_warning":
             self.show_warning_dialog(value)
         elif action_name == "change_plugin":
@@ -109,8 +114,8 @@ class MainWindow(QMainWindow):
     def handle_rightLayout_action(self, action_name, value):
         if action_name == "show_warning":
             self.show_warning_dialog(value)
-        elif action_name == "create_table":
-            self.create_table()
+        #elif action_name == "create_table":
+        #    self.create_table()
         elif action_name == "add_image":
 
             self.add_image(value)
@@ -121,19 +126,16 @@ class MainWindow(QMainWindow):
         # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
         # Initialize DataFrame to None
         
-        
-       
-        
-        self.df = None
         self.object_size = { 
                 'min_size' : 100,
                    'max_size' : 0.000,
                    'signal' : self.mainWindow_signal.emit,
                    'round_parametr_slider' : 10**6,
                    'round_parametr_value_input' : 10**4,
-                   'color_map' : "Virdis",
+                   'color_map' : "viridis",
                    'color_map_list' : list(color_number.keys()),
-                   'line_width' : 100.00
+                   'line_width' : 100.00,
+                   'scale' : 10
 
                    
         }
@@ -143,20 +145,29 @@ class MainWindow(QMainWindow):
         self.parametrs = {'Cell': 0,
                     'Nuclei': 1
         }
-        self.models = {
+        self.models_celldetector = {
         'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
         'General Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
     }
+        self.models_tracker = {
+            'Segmenter' : Tracker_model(path_to_model="model/yolov8n-seg.pt", size= self.object_size)
+        }
         self.plugin_list = {
             "Cell Processor" : {
-                "init" : CellDetector,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models],
+                "init" : CellDetector_plugin,
+                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models_celldetector],
                 "file_callback" : self.change_image,
                 "folder_callback" : self.create_table
             },
+            "Tracker" : {
+                "init" :  Tracker_plugin,
+                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_tracker],
+                "file_callback" : print,
+                "folder_callback" : print
+            },
             "General Segmenter": {
-                "init" : CellDetector,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models],
+                "init" : CellDetector_plugin,
+                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_celldetector],
                 "file_callback" : self.change_image,
                 "folder_callback" : self.create_table
             }
@@ -168,51 +179,54 @@ class MainWindow(QMainWindow):
         self.lsm_filesList = None
         self.lsm_folder = None
       
-    def save_as(self):
-        """
-        Save the current table data to a file.
+      
+   
+      
+    # def save_as(self):
+    #     """
+    #     Save the current table data to a file.
 
-        Notes:
-        - Check if there is data in the DataFrame.
-        - If there's no data, show a warning dialog and disable the "Save As" action.
-        - Prompt the user to choose the file name and type.
-        - Check if the user provided a file name.
-        - If the file name ends with '.xlsx', save as Excel file.
-        - If the file name ends with '.csv', save as CSV file.
-        - If an error occurs during saving, show a warning dialog and disable the "Save As" action.
-        """
-        # Check if there is data in the DataFrame
-        if self.df is None:
-            # If there's no data, show a warning dialog
-            self.show_warning_dialog("Nothing to Save")
+    #     Notes:
+    #     - Check if there is data in the DataFrame.
+    #     - If there's no data, show a warning dialog and disable the "Save As" action.
+    #     - Prompt the user to choose the file name and type.
+    #     - Check if the user provided a file name.
+    #     - If the file name ends with '.xlsx', save as Excel file.
+    #     - If the file name ends with '.csv', save as CSV file.
+    #     - If an error occurs during saving, show a warning dialog and disable the "Save As" action.
+    #     """
+    #     # Check if there is data in the DataFrame
+    #     if self.df is None:
+    #         # If there's no data, show a warning dialog
+    #         self.show_warning_dialog("Nothing to Save")
             
-            # Disable the "Save As" action
-            self.mainWindow_signal("error_save_as", None)
+    #         # Disable the "Save As" action
+    #         self.mainWindow_signal("error_save_as", None)
            
-            return
+    #         return
         
-        try:
-            # Prompt the user to choose the file name and type
-            file_name, _ = QFileDialog.getSaveFileName(
-                self, "Save File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
+    #     try:
+    #         # Prompt the user to choose the file name and type
+    #         file_name, _ = QFileDialog.getSaveFileName(
+    #             self, "Save File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
             
-            # Check if the user provided a file name
-            if file_name:
-                # If the file name ends with '.xlsx', save as Excel file
-                if file_name.endswith('.xlsx'):
-                    self.df.to_excel(file_name, index=False)
-                # If the file name ends with '.csv', save as CSV file
-                elif file_name.endswith('.csv'):
-                    self.df.to_csv(file_name, index=False)
-        except Exception as e:
-            traceback.print_exc()
-            # If an error occurs during saving, show a warning dialog
-            self.show_warning_dialog("Error during saving table")
+    #         # Check if the user provided a file name
+    #         if file_name:
+    #             # If the file name ends with '.xlsx', save as Excel file
+    #             if file_name.endswith('.xlsx'):
+    #                 self.df.to_excel(file_name, index=False)
+    #             # If the file name ends with '.csv', save as CSV file
+    #             elif file_name.endswith('.csv'):
+    #                 self.df.to_csv(file_name, index=False)
+    #     except Exception as e:
+    #         traceback.print_exc()
+    #         # If an error occurs during saving, show a warning dialog
+    #         self.show_warning_dialog("Error during saving table")
             
-            # Disable the "Save As" action
-            self.mainWindow_signal("error_save_as", None)
+    #         # Disable the "Save As" action
+    #         self.mainWindow_signal("error_save_as", None)
             
-            return
+    #         return
   
     def init_mainScene(self):
         """
@@ -296,7 +310,7 @@ class MainWindow(QMainWindow):
         """
 
         # Create a list of image files within the selected folder
-        self.lsm_folder = folder_path
+        lsm_folder = folder_path
         self.lsm_filesList = [os.path.join(folder_path, file) \
         for file in os.listdir(folder_path)\
             if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
@@ -308,7 +322,7 @@ class MainWindow(QMainWindow):
             self.mainWindow_signal.emit("open_folder", folder_path)
 
             # Open a dialog window
-            self.open_settings()
+            #self.open_settings()
 
             # Set the window title to include the selected folder name
             self.setWindowTitle(f"Cells Calculator - {os.path.basename(folder_path)}/")
@@ -332,7 +346,8 @@ class MainWindow(QMainWindow):
         - Configures table properties, populates the table with data from the data frame, sets minimum size, and resizes rows and columns to fit content.
         - Adds the table to the main scene.
         """
-
+        print("Expired")
+        return
         # Checks if there are any files in the list
         if not self.lsm_filesList:
             return
@@ -347,7 +362,7 @@ class MainWindow(QMainWindow):
             try:
                 # Attempts to calculate table data using given methods, files, and parameters
                 df = calculate_table(
-                    model_dict=self.models, files_name=self.lsm_filesList, parametrs=self.parametrs)
+                    model_dict=self.models_celldetector, files_name=self.lsm_filesList, parametrs=self.parametrs)
             except Exception as e:
                 traceback.print_exc()
                 # If an exception occurs during calculation disables certain actions,

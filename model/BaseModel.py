@@ -50,6 +50,7 @@ class BaseModel():
     def count(self, input_image, scale: int = 10,
               filename=".cache/cell_tmp_img_with_detections.png"):
         """General method for processing microimages of cells."""
+        scale = self.object_size["scale"]
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
         if scale == 20:
             return self.count_x20(input_image, filename=filename)
