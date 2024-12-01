@@ -123,7 +123,7 @@ class CellDetector(BasePlugin):
         if all(len(cell) >= 4 for cell in detection):
             img_sq = img_size[0] * img_size[1]
             # Вычисляем произведения для каждого 
-            values = [cell[2] * cell[3] for cell in detection]
+            values = [cell[2] * cell[3] for cell in detection] 
 
             # Находим максимальное и минимальное произведение
             min_size_from_detection = min(values) / img_sq
@@ -208,40 +208,122 @@ class CellDetector(BasePlugin):
             return 0
         
         # Create QGraphicsTextItems to display the results
-        label_cells = QGraphicsTextItem(f'Cells: {result["Cells"]}')
-        label_cells.setFont(QFont('Arial', 24))
-        label_cells.setPos(0, 0)
-        
-        if result["Nuclei"] == -100:
-            label_nuclei = QGraphicsTextItem(f'Nuclei: -')
-        else:
-            label_nuclei = QGraphicsTextItem(f'Nuclei: {result["Nuclei"]}')
-        label_nuclei.setFont(QFont('Arial', 24))
-        label_nuclei.setPos(0, 100)
-        
-        if result["%"] == -100:
-            label_alive = QGraphicsTextItem(f'Alive: -')
-        else:
-            label_alive = QGraphicsTextItem(f'Alive: {result["%"]}%')
-        label_alive.setFont(QFont('Arial', 24))
-        label_alive.setPos(0, 200)
-
-        # Clear the right scene
         self.right_scene.clear()
-        
-        # Add the results to the right scene
-        self.right_scene.addItem(label_cells)
-        self.right_scene.addItem(label_nuclei)
-        self.right_scene.addItem(label_alive)
-        self.right_view.update()
+        self.print_result(result)
         
         # Set flag to draw bounding boxes
         self.draw_bounding = 1
         
         # Draw bounding boxes
         self.draw_bounding_box()
+    def print_result(self, result):
+        model = self.combo_box.currentText()
         
-      
+        if model == "Detector":
+            self.print_result_detector(result)
+        elif model == "General Segmenter":
+            self.print_result_segmenter(result)
+
+    def print_result_detector(self, result):
+        results = []
+
+        # Добавить количество клеток
+        results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
+
+        try:
+            boxes = result["Cells"]["box"]
+
+            # Извлечение длины и ширины (второй и третий элемент в массивах)
+            lengths = boxes.apply(lambda x: x[2])
+            widths = boxes.apply(lambda x: x[3])
+
+            # Вычисление диагоналей (диаметры)
+            diagonals = np.sqrt(lengths**2 + widths**2)
+
+            # Вычисление площадей
+            areas = lengths * widths
+            
+            average_diameter = round(diagonals.mean(), 2)
+            average_area = round(areas.mean(), 2)
+        except:
+            average_diameter = "-"
+            average_area = "-"
+
+        results.append(f"Mean S: {average_area}")
+        results.append(f"Mean D: {average_diameter}")
+        results.append("")
+        
+
+        # Добавить количество ядер
+        if result["Nuclei"] == -100:
+            results.append('Nuclei: -')
+        else:
+            results.append(f'Nuclei: {result["Nuclei"]}')
+
+        # Добавить процент живых
+        if result["%"] == -100:
+            results.append('Alive: -')
+        else:
+            results.append(f'Alive: {result["%"]}%')
+
+        
+
+        # Шрифт для всех элементов
+        font = QFont('Arial', 12)
+
+        # Текущая вертикальная позиция
+        y_offset = 0
+        line_height = 25  # Высота строки (можно корректировать для нужного интервала)
+
+        # Добавляем текстовые элементы в сцену
+        for text in results:
+            label = QGraphicsTextItem(text)
+            label.setFont(font)
+            label.setPos(0, y_offset)
+            self.right_scene.addItem(label)
+            y_offset += line_height  # Увеличиваем позицию для следующего текста
+
+        # Обновить вид
+        self.right_view.update()
+    
+    def print_result_segmenter(self, result):
+        spheroid_df = result["Cells"]
+
+
+        # Вычисление средних значений и количества строк
+        try:
+            avg_diameter = round(spheroid_df["diameter"].mean(), 2)
+            avg_area = round(spheroid_df["area"].mean(), 2)
+            avg_volume = round(spheroid_df["volume"].mean(), 2)
+        except:
+            avg_diameter = "-"
+            avg_area = "-"
+            avg_volume = "-"
+        num_cells = spheroid_df.shape[0]
+
+        # Создание строк для вывода
+        results = [
+            f"Spheroid detected: {num_cells}",
+            f"Mean D: {avg_diameter}",
+            f"Mean S: {avg_area}",
+            f"Mean V: {avg_volume}",
+        ]
+
+        # Настройки для шрифта и отображения
+        font = QFont('Arial', 12)
+        y_offset = 0
+        line_height = 25  # Интервал между строками
+
+        # Добавление строк в сцену
+        for text in results:
+            label = QGraphicsTextItem(text)
+            label.setFont(font)
+            label.setPos(0, y_offset)
+            self.right_scene.addItem(label)
+            y_offset += line_height  # Сдвиг вниз для следующей строки
+
+        # Обновить вид
+        self.right_view.update()
     def draw_bounding_box(self):
         """
         Draw bounding boxes on the main scene if the checkbox is checked.

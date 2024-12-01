@@ -96,7 +96,7 @@ def calculate_lsm(cell_counter, nuclei_counter,
         pass
     nuclei_count = nuclei_counter.countNuclei(img[:,:,nuclei_channel])
     #percentage = (1 - nuclei_count/cell_count) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(5,3)}
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(nuclei_count / cell_count.shape[0] * 100, 2)}
 
 def calculate_standard(cell_counter, img_path):
     """
