@@ -21,6 +21,7 @@ import os
 import shutil
 from UI.right_layout.plugins.CellDetector import CellDetector as CellDetector_plugin
 from UI.right_layout.plugins.tracker import Tracker as Tracker_plugin
+from UI.right_layout.plugins.SpheroidSegmenter import SpheroidSegmenter as Spheroid_Segmenter_plugin
 import pyqtgraph as pg
 from UI.Slider import Slider
 from model.utils import COLOR_NUMBER as color_number
@@ -152,6 +153,9 @@ class MainWindow(QMainWindow):
         self.models_tracker = {
             'Segmenter' : Tracker_model(path_to_model="model/yolov8n-seg.pt", size= self.object_size)
         }
+        self.models_spheroid_segmentor = {
+            'Baseline Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
+        }
         self.plugin_list = {
             "Cell Processor" : {
                 "init" : CellDetector_plugin,
@@ -165,10 +169,10 @@ class MainWindow(QMainWindow):
                 "file_callback" : print,
                 "folder_callback" : print
             },
-            "General Segmenter": {
-                "init" : CellDetector_plugin,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_celldetector],
-                "file_callback" : self.change_image,
+            "Spheroid Segmenter": {
+                "init" : Spheroid_Segmenter_plugin,
+                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_spheroid_segmentor],
+                "file_callback" :   self.change_image,
                 "folder_callback" : self.create_table
             }
         }
