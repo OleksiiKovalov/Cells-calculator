@@ -291,9 +291,9 @@ class CellDetector(BasePlugin):
 
     def on_state_changed_scale(self, state):
         if state:
-            self.object_size["scale"] = 20
-        else:
             self.object_size["scale"] = 10
+        else:
+            self.object_size["scale"] = 20
         self.reset_detection()
 
     def init_rightLayout(self):
