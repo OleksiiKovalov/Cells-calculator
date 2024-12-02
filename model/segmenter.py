@@ -54,11 +54,13 @@ class Segmenter(BaseModel):
 
         colormap = self.object_size['color_map']
         if self.detections is None:
-            outputs = self.model(input_image, conf=0.2, iou=0.6, retina_masks=True, **kwargs)[0]  # TODO: change the config definition point to a higher level
+            outputs = self.model(input_image, conf=0.3, iou=0.6, retina_masks=True, **kwargs)[0]  # TODO: change the config definition point to a higher level
             self.original_image = outputs.orig_img
             # outputs.plot(conf=conf, labels=labels, boxes=boxes,
             #                                  masks=masks, probs=probs, show=show, save=save,
             #                                  color_mode=color_mode, filename=filename)
+            if outputs.masks is None:
+                return None
             self.detections = results_to_pandas(outputs, store_bin_mask)
             self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
             self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w, self.h, self.w, self.h]))

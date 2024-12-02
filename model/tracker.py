@@ -13,29 +13,30 @@ from model.utils import *
 
 class Tracker():
     def __init__(self, path_to_model: str, size):
+        self.path = path_to_model
         self.model = Segmenter(path_to_model, size)
         self.output_dir = Path("tracker_output")
         self.img_dir = self.output_dir / "frames"
         self.table_dir = self.output_dir / "tabular data"
-        self.results = {
-            "frame_num": [],
-            "t": [],
-            "id_label": [],
-            "old_label": [],
-            "box": [],
-            "mask": [],
-            "confidence": [],
-            "diameter": [],
-            "area": [],
-            "volume": []
-        }
-        try:
-            shutil.rmtree(self.output_dir)
-        except:
-            pass
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.img_dir, exist_ok=True)
-        os.makedirs(self.table_dir, exist_ok=True)
+        # self.results = {
+        #     "frame_num": [],
+        #     "t": [],
+        #     "id_label": [],
+        #     "old_label": [],
+        #     "box": [],
+        #     "mask": [],
+        #     "confidence": [],
+        #     "diameter": [],
+        #     "area": [],
+        #     "volume": []
+        # }
+        # try:
+        #     shutil.rmtree(self.output_dir)
+        # except:
+        #     pass
+        # os.makedirs(self.output_dir, exist_ok=True)
+        # os.makedirs(self.img_dir, exist_ok=True)
+        # os.makedirs(self.table_dir, exist_ok=True)
 
     def track(self, img_seq_folder: str, time_period: float = 15):
         """
@@ -54,6 +55,29 @@ class Tracker():
         Output:
         - None
         """
+
+        try:
+            shutil.rmtree(self.output_dir)
+        except:
+            pass
+        
+        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.img_dir, exist_ok=True)
+        os.makedirs(self.table_dir, exist_ok=True)
+
+        self.results = {
+            "frame_num": [],
+            "t": [],
+            "id_label": [],
+            "old_label": [],
+            "box": [],
+            "mask": [],
+            "confidence": [],
+            "diameter": [],
+            "area": [],
+            "volume": []
+        }
+
         frame_names = os.listdir(img_seq_folder)
         zero_frame = True
         i = -1

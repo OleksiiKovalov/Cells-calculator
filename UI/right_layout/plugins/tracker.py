@@ -10,6 +10,8 @@ from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
 import numpy as np
 import tifffile
 
+from model.tracker import Tracker as T
+
 import os
 
 
@@ -31,6 +33,8 @@ class Tracker(BasePlugin):
         self.plugin_signal.emit("Save_as", False)
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
         self.models = models
+        default_model = models[list(models.keys())[0]]
+        self.model = T(default_model['path'], default_model['size'])
         self.parametrs = parametrs
         self.object_size = object_size
         self.default_object_size = default_object_size
@@ -114,18 +118,18 @@ class Tracker(BasePlugin):
         self.min_range_slider = Slider(self.object_size, self.default_object_size, 'min_size')
         self.max_range_slider = Slider(self.object_size, self.default_object_size, 'max_size')
 
-        LineWidth_label = QLabel("Line Width:")
-        LineWidth_label.setFont(QFont("Arial", 16))
+        # LineWidth_label = QLabel("Line Width:")
+        # LineWidth_label.setFont(QFont("Arial", 16))
 
-        self.LineWidth_edit = QLineEdit()
-        size = self.object_size['line_width']
-        self.LineWidth_edit.setText(f"{size:.2f}")
-        self.LineWidth_edit.setFont(QFont("Arial", 12))
-        self.LineWidth_edit.returnPressed.connect(self.update_lineWidth)
+        # self.LineWidth_edit = QLineEdit()
+        # size = self.object_size['line_width']
+        # self.LineWidth_edit.setText(f"{size:.2f}")
+        # self.LineWidth_edit.setFont(QFont("Arial", 12))
+        # self.LineWidth_edit.returnPressed.connect(self.update_lineWidth)
 
-        LineWidth_layout = QHBoxLayout()
-        LineWidth_layout.addWidget(LineWidth_label)
-        LineWidth_layout.addWidget(self.LineWidth_edit)
+        # LineWidth_layout = QHBoxLayout()
+        # LineWidth_layout.addWidget(LineWidth_label)
+        # LineWidth_layout.addWidget(self.LineWidth_edit)
        
         colormap_label = QLabel("Colormap:")
         colormap_label.setFont(QFont("Arial", 24))
@@ -151,7 +155,7 @@ class Tracker(BasePlugin):
         self.right_layout.addWidget(colormap_label)
         self.right_layout.addWidget(self.colormap_combo)
         self.right_layout.addSpacing(20)
-        self.right_layout.addLayout(LineWidth_layout)
+        # self.right_layout.addLayout(LineWidth_layout)
         self.right_layout.addSpacing(20)
 
         self.right_layout.addWidget(range_lable)
@@ -169,22 +173,22 @@ class Tracker(BasePlugin):
         
         self.object_size["color_map"] = colormap
     
-    def update_lineWidth(self):
-        # Получаем значение из QLineEdit
-        input_text = self.LineWidth_edit.text()
+    # def update_lineWidth(self):
+    #     # Получаем значение из QLineEdit
+    #     input_text = self.LineWidth_edit.text()
 
-        # Проверяем, является ли введённое значение числом
-        try:
-            # Преобразуем в число с плавающей точкой
-            line_width = float(input_text)
+    #     # Проверяем, является ли введённое значение числом
+    #     try:
+    #         # Преобразуем в число с плавающей точкой
+    #         line_width = float(input_text)
 
-            self.object_size["line_width"] = round(line_width, 2)
-            self.LineWidth_edit.setText(f"{float(input_text):.2f}")
+    #         self.object_size["line_width"] = round(line_width, 2)
+    #         self.LineWidth_edit.setText(f"{float(input_text):.2f}")
 
-        except ValueError:
-            # Если введено некорректное значение, устанавливаем стандартное значение
-            size = self.object_size["line_width"]
-            self.LineWidth_edit.setText(f"{size:.2f}") 
+    #     except ValueError:
+    #         # Если введено некорректное значение, устанавливаем стандартное значение
+    #         size = self.object_size["line_width"]
+    #         self.LineWidth_edit.setText(f"{size:.2f}") 
 
         
     def reset_detection(self):
@@ -233,12 +237,20 @@ class Tracker(BasePlugin):
             self.plugin_signal.emit("show_warning", "Warning\n\nChoose model and folder.")
             return 0
         try:
-            self.models[model].track(img_seq_folder=self.folder_path, time_period = 15)
-            text_to_show ="""Success!"""
-            self.show_result(text_to_show)
-        except:
+            if self.model.path == self.models[model]['path']:
+                self.model.track(img_seq_folder=self.folder_path, time_period = 15)
+                text_to_show ="""Success!"""
+                self.show_result(text_to_show)
+            else:
+                self.model = T(path=self.models[model]['path'],
+                                     size=self.models[model]['object_size'])
+                self.model.track(img_seq_folder=self.folder_path, time_period = 15)
+                text_to_show ="""Success!"""
+                self.show_result(text_to_show)
+        except Exception as e:
             traceback.print_exc()
-            self.plugin_signal.emit("show_warning", "error during tracking")
+            # self.plugin_signal.emit("show_warning", traceback.format_exc())
+            self.plugin_signal.emit("show_warning", str(e))
     
     def show_result(self, text):
         msgBox = QMessageBox()

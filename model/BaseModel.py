@@ -45,9 +45,9 @@ class BaseModel():
         detections = self.count(dst)
         if detections is None:
             return 0
-        return len(detections)
+        return detections
 
-    def count(self, input_image, scale: int = 10,
+    def count(self, input_image, scale: int = 20,
               filename=".cache/cell_tmp_img_with_detections.png"):
         """General method for processing microimages of cells."""
         scale = self.object_size["scale"]

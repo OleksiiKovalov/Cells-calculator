@@ -1,7 +1,8 @@
 from PyQt5.QtWidgets import QApplication, QMessageBox
 
 import sys
-from UI.main_window import MainWindow
+# from UI.main_window import MainWindow
+from main_window import MainWindow
 import traceback
 if __name__ == '__main__':
     # Create a QApplication instance

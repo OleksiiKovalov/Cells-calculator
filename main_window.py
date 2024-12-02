@@ -141,21 +141,30 @@ class MainWindow(QMainWindow):
                    
         }
         self.default_object_size = self.object_size.copy()
-   
+
         # Default parameters for cell and nuclei channels
         self.parametrs = {'Cell': 0,
                     'Nuclei': 1
         }
+        # self.models_celldetector = {
+        # 'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
+        # 'YOLO-512 Segmenter': model1(path='model/YOLO11x-512-seg.pt', object_size = self.object_size),
+        # 'YOLO-680 Segmenter': model1(path='model/YOLO11x-680-seg.pt', object_size = self.object_size),
+        # }
         self.models_celldetector = {
-        'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
-        'General Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
-    }
+        'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size},
+        'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size},
+        'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size},
+        }
+        # self.models_tracker = {
+        #     'Baseline Segmenter' : Tracker_model(path_to_model="model/YOLO11x-sphero-seg.pt", size=self.object_size)
+        # }
         self.models_tracker = {
-            'Segmenter' : Tracker_model(path_to_model="model/yolov8n-seg.pt", size= self.object_size)
+            'Baseline Segmenter' : {"path": 'model/YOLO11x-sphero-seg.pt', "size": self.object_size}
         }
-        self.models_spheroid_segmentor = {
-            'Baseline Segmenter': model1(path='model/yolov8n-seg.pt', object_size = self.object_size)
-        }
+        # self.models_spheroid_segmentor = {
+        #     'Baseline Segmenter': model1(path='model/YOLO11x-sphero-seg.pt', object_size=self.object_size)
+        # }
         self.plugin_list = {
             "Cell Processor" : {
                 "init" : CellDetector_plugin,
@@ -169,12 +178,12 @@ class MainWindow(QMainWindow):
                 "file_callback" : print,
                 "folder_callback" : print
             },
-            "Spheroid Segmenter": {
-                "init" : Spheroid_Segmenter_plugin,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_spheroid_segmentor],
-                "file_callback" :   self.change_image,
-                "folder_callback" : self.create_table
-            }
+            # "Spheroid Segmenter": {
+            #     "init" : Spheroid_Segmenter_plugin,
+            #     "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_spheroid_segmentor],
+            #     "file_callback" :   self.change_image,
+            #     "folder_callback" : self.create_table
+            # }
         }
         
         # Dictionary containing available models and their corresponding methods

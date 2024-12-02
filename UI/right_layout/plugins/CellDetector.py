@@ -14,6 +14,7 @@ import os
 
 from UI.Slider import Slider
 from UI.right_layout.plugins.BasePlagin import BasePlugin
+from model.Model import Model
 import traceback
 
 
@@ -27,6 +28,8 @@ class CellDetector(BasePlugin):
         self.plugin_signal.emit("Open_folder", False)
         self.plugin_signal.emit("Settings", False)
         self.plugin_signal.emit("Save_as", False)
+        self.model = Model(path=arg[-1][self.combo_box.currentText()]['path'],
+                           object_size=arg[-1][self.combo_box.currentText()]['object_size'])
         
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
         self.show_boundry = 0
@@ -60,7 +63,9 @@ class CellDetector(BasePlugin):
                 
 
         elif action_name == "open_image":
+            self.reset_sliders()
             self.reset_detection()
+
             self.right_scene.clear()
             self.max_range_slider.set_default()
             self.min_range_slider.set_default()
@@ -96,27 +101,29 @@ class CellDetector(BasePlugin):
         
         self.object_size["color_map"] = colormap
     
-    def update_lineWidth(self):
-        # Получаем значение из QLineEdit
-        input_text = self.LineWidth_edit.text()
+    # def update_lineWidth(self):
+    #     # Получаем значение из QLineEdit
+    #     input_text = self.LineWidth_edit.text()
 
-        # Проверяем, является ли введённое значение числом
-        try:
-            # Преобразуем в число с плавающей точкой
-            line_width = float(input_text)
+    #     # Проверяем, является ли введённое значение числом
+    #     try:
+    #         # Преобразуем в число с плавающей точкой
+    #         line_width = float(input_text)
 
-            self.object_size["line_width"] = round(line_width, 2)
-            self.LineWidth_edit.setText(f"{float(input_text):.2f}")
+    #         self.object_size["line_width"] = round(line_width, 2)
+    #         self.LineWidth_edit.setText(f"{float(input_text):.2f}")
 
-        except ValueError:
-            # Если введено некорректное значение, устанавливаем стандартное значение
-            size = self.object_size["line_width"]
-            self.LineWidth_edit.setText(f"{size:.2f}") 
+    #     except ValueError:
+    #         # Если введено некорректное значение, устанавливаем стандартное значение
+    #         size = self.object_size["line_width"]
+    #         self.LineWidth_edit.setText(f"{size:.2f}") 
 
-        
     def reset_detection(self):
-        for key, model in self.models.items():
-            model.cell_counter.detections = None
+        try:
+            self.model.cell_counter.detections = None
+        except:
+            pass
+
     def set_size(self, detection, img_size : tuple = (512,512)):
         min_size, max_size = self.default_object_size["min_size"], self.default_object_size["max_size"]
         model = self.combo_box.currentText()
@@ -140,9 +147,6 @@ class CellDetector(BasePlugin):
             else:
                 min_size = min_size_from_detection
                 max_size = max_size_from_detection
-                 
-            
-        
         if min_size is not None:
             self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
         if max_size is not None:
@@ -188,14 +192,32 @@ class CellDetector(BasePlugin):
 
         try:
             # Attempt to calculate the result using the selected method
-            result = self.models[model].calculate(
-                img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                    nuclei_channel=self.parametrs['Nuclei'])
+            if self.models[model]['path'] == self.model.path:
+                # result = self.models[model].calculate(
+                #     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                #         nuclei_channel=self.parametrs['Nuclei'])
+                result = self.model.calculate(
+                    img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                        nuclei_channel=self.parametrs['Nuclei'])
+            else:
+                del self.model
+                self.model = Model(path=self.models[model]['path'],
+                                   object_size=self.models[model]['object_size'])
+                result = self.model.calculate(
+                    img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                        nuclei_channel=self.parametrs['Nuclei'])
         except:
             traceback.print_exc()
             try:
                 # If an error occurs, try without channel information
-                result = self.models[model].calculate(img_path=self.lsm_path)
+                if self.models[model]['path'] == self.model.path:
+                    # result = self.models[model].calculate(img_path=self.lsm_path)
+                    result = self.model.calculate(img_path=self.lsm_path)
+                else:
+                    del self.model
+                    self.model = Model(path=self.models[model]['path'],
+                                       object_size=self.models[model]['object_size'])
+                    result = self.model.calculate(img_path=self.lsm_path)
             except:
                 traceback.print_exc()
                 # If still not successful, show an error dialog
@@ -216,12 +238,13 @@ class CellDetector(BasePlugin):
         
         # Draw bounding boxes
         self.draw_bounding_box()
+
     def print_result(self, result):
         model = self.combo_box.currentText()
         
         if model == "Detector":
             self.print_result_detector(result)
-        elif model == "General Segmenter":
+        else:
             self.print_result_segmenter(result)
 
     def print_result_detector(self, result):
@@ -229,6 +252,11 @@ class CellDetector(BasePlugin):
 
         # Добавить количество клеток
         results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
+        # try:
+        #     results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
+        # except:
+        #     results.append(f'Cells: {result["Cells"]}')
+
 
         try:
             boxes = result["Cells"]["box"]
@@ -237,20 +265,26 @@ class CellDetector(BasePlugin):
             lengths = boxes.apply(lambda x: x[2])
             widths = boxes.apply(lambda x: x[3])
 
+            img_area = self.models['Detector'].cell_counter.original_image.shape[0] * self.models['Detector'].cell_counter.original_image.shape[0]
+
             # Вычисление диагоналей (диаметры)
-            diagonals = np.sqrt(lengths**2 + widths**2)
+            arithmetic_diameters = (lengths + widths) / 2
+            geometric_diameters = (lengths * widths)**(1/2)
 
             # Вычисление площадей
             areas = lengths * widths
             
-            average_diameter = round(diagonals.mean(), 2)
-            average_area = round(areas.mean(), 2)
+            average_arithmetic_diameter = arithmetic_diameters.mean() / img_area * 10000
+            average_geometric_diameters = geometric_diameters.mean() / img_area * 10000
+            average_area = areas.mean() / img_area * 10000
         except:
-            average_diameter = "-"
+            average_arithmetic_diameter = "-"
+            average_geometric_diameters = "-"
             average_area = "-"
 
-        results.append(f"Mean S: {average_area}")
-        results.append(f"Mean D: {average_diameter}")
+        results.append(f"Mean S: {average_area}‱")
+        results.append(f"Mean Arithmetic D: {round(average_arithmetic_diameter, 2)}‱")
+        results.append(f"Mean Geometric D: {round(average_geometric_diameters, 2)}‱")
         results.append("")
         
 
@@ -289,25 +323,31 @@ class CellDetector(BasePlugin):
     def print_result_segmenter(self, result):
         spheroid_df = result["Cells"]
 
-
         # Вычисление средних значений и количества строк
         try:
-            avg_diameter = round(spheroid_df["diameter"].mean(), 2)
-            avg_area = round(spheroid_df["area"].mean(), 2)
-            avg_volume = round(spheroid_df["volume"].mean(), 2)
+            avg_diameter = spheroid_df["diameter"].mean()
+            avg_area = spheroid_df["area"].mean()
+            avg_volume = spheroid_df["volume"].mean()
         except:
             avg_diameter = "-"
             avg_area = "-"
             avg_volume = "-"
-        num_cells = spheroid_df.shape[0]
-
-        # Создание строк для вывода
-        results = [
-            f"Spheroid detected: {num_cells}",
-            f"Mean D: {avg_diameter}",
-            f"Mean S: {avg_area}",
-            f"Mean V: {avg_volume}",
-        ]
+        try:
+            num_cells = spheroid_df.shape[0]
+            # Создание строк для вывода
+            results = [
+                f"Objects detected: {num_cells}",
+                f"Mean D: {round(avg_diameter*10000, 3)}‱",
+                f"Mean S: {round(avg_area*10000, 3)}‱",
+                f"Mean V: {round(avg_volume*10000, 3)}‱",
+            ]
+        except AttributeError:
+            num_cells = spheroid_df
+            # Создание строк для вывода
+            results = [
+                f"Cells detected: {num_cells}"
+            ]
+        
 
         # Настройки для шрифта и отображения
         font = QFont('Arial', 12)
@@ -324,6 +364,7 @@ class CellDetector(BasePlugin):
 
         # Обновить вид
         self.right_view.update()
+
     def draw_bounding_box(self):
         """
         Draw bounding boxes on the main scene if the checkbox is checked.
@@ -378,11 +419,18 @@ class CellDetector(BasePlugin):
             self.object_size["scale"] = 20
         self.reset_detection()
 
+    def reset_sliders(self):
+        self.default_object_size['min_size'] = 100
+        self.default_object_size['max_size'] = 0
+
+        self.reset_detection()
+
     def init_rightLayout(self):
         plugin_label = QLabel(self.get_name())
         plugin_label.setFont(QFont("Arial", 32))
         # Create a combo box to choose models
         self.combo_box = QComboBox()
+        self.combo_box.currentIndexChanged.connect(self.reset_sliders)
         
         # Create a label to prompt user to choose a model
         label = QLabel("Choose model:")
@@ -463,18 +511,18 @@ class CellDetector(BasePlugin):
         self.min_range_slider = Slider(self.object_size, self.default_object_size, 'min_size')
         self.max_range_slider = Slider(self.object_size, self.default_object_size, 'max_size')
 
-        LineWidth_label = QLabel("Line Width:")
-        LineWidth_label.setFont(QFont("Arial", 16))
+        # LineWidth_label = QLabel("Line Width:")
+        # LineWidth_label.setFont(QFont("Arial", 16))
 
-        self.LineWidth_edit = QLineEdit()
-        size = self.object_size['line_width']
-        self.LineWidth_edit.setText(f"{size:.2f}")
-        self.LineWidth_edit.setFont(QFont("Arial", 12))
-        self.LineWidth_edit.returnPressed.connect(self.update_lineWidth)
+        # self.LineWidth_edit = QLineEdit()
+        # size = self.object_size['line_width']
+        # self.LineWidth_edit.setText(f"{size:.2f}")
+        # self.LineWidth_edit.setFont(QFont("Arial", 12))
+        # self.LineWidth_edit.returnPressed.connect(self.update_lineWidth)
 
-        LineWidth_layout = QHBoxLayout()
-        LineWidth_layout.addWidget(LineWidth_label)
-        LineWidth_layout.addWidget(self.LineWidth_edit)
+        # LineWidth_layout = QHBoxLayout()
+        # LineWidth_layout.addWidget(LineWidth_label)
+        # LineWidth_layout.addWidget(self.LineWidth_edit)
        
         colormap_label = QLabel("Colormap:")
         colormap_label.setFont(QFont("Arial", 24))
@@ -500,7 +548,7 @@ class CellDetector(BasePlugin):
         self.right_layout.addWidget(colormap_label)
         self.right_layout.addWidget(self.colormap_combo)
         self.right_layout.addSpacing(20)
-        self.right_layout.addLayout(LineWidth_layout)
+        # self.right_layout.addLayout(LineWidth_layout)
         self.right_layout.addSpacing(20)
 
         self.right_layout.addWidget(range_lable)

@@ -12,8 +12,6 @@ import ultralytics
 import ultralytics.engine
 from ultralytics.engine.results import Results, Boxes, Masks
 
-import tiffile
-
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
 COLORS = [(3,177,252)]
@@ -89,14 +87,14 @@ def calculate_lsm(cell_counter, nuclei_counter,
     cell_img = cv2.cvtColor(img[:,:,cell_channel], cv2.COLOR_GRAY2BGR)
     tmp_path = 'cell_tmp_img.png'
     cv2.imwrite(tmp_path, cell_img)
-    cell_count = cell_counter.count(tmp_path)
+    cell_count = cell_counter.countCells(tmp_path)
     try:
         os.remove(tmp_path)
     except FileNotFoundError:
         pass
     nuclei_count = nuclei_counter.countNuclei(img[:,:,nuclei_channel])
-    #percentage = (1 - nuclei_count/cell_count) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(nuclei_count / cell_count.shape[0] * 100, 2)}
+    percentage = (1 - nuclei_count/cell_count) * 100
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage,3)}
 
 def calculate_standard(cell_counter, img_path):
     """
@@ -190,8 +188,10 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
         return detections
     img_sq = img_size[0] * img_size[1]
     # print(type(detections['box']))
+    # print(detections.head())
     # print(detections['box'].head())
     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
+    # filtered_detections = filtered_detections[filtered_detections['box'].apply(lambda b: (min_size <= b[2] * b[3] / img_sq <= max_size).item())]
     return filtered_detections
 
 def results_to_pandas(outputs: Results, store_bin_mask=False) -> pd.DataFrame:
@@ -228,7 +228,7 @@ def results_to_pandas(outputs: Results, store_bin_mask=False) -> pd.DataFrame:
             data['box'].append(box)
             data['mask'].append(outputs.masks.xyn[i])
             data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
-            bin_mask, morphology = plot_mask(outputs.masks.xyn[i])
+            bin_mask, morphology = plot_mask(outputs.masks.xyn[i], image_size=outputs.orig_shape)
             data['diameter'].append(morphology['diameter'])
             data['area'].append(morphology['area'])
             data['volume'].append(morphology['volume'])
@@ -324,7 +324,7 @@ def compute_iou(masks_1: list, masks_2: list) -> np.array:
             iou_matrix[i,j] = intersection / union
     return iou_matrix, mask_2_morphologies
 
-def plot_mask(in_mask: np.array, image_size=1000) -> np.array:
+def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
     """
     Plots given mask on a 1000x1000 canvas for its further processing.
     This util is used as a helper for compute_iou() function above.
@@ -339,9 +339,9 @@ def plot_mask(in_mask: np.array, image_size=1000) -> np.array:
     - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
     the foreground (the polygon for the given mask).
     """
-    coords = in_mask.reshape(-1, 2) * image_size
+    coords = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
     coords = coords.astype(np.int32)
-    bin_mask = np.zeros((image_size, image_size), dtype=np.uint8)
+    bin_mask = np.zeros(image_size, dtype=np.uint8)
     cv2.fillPoly(bin_mask, [coords], 1)
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
@@ -355,9 +355,21 @@ def colormap_to_hex(cmap_name):
     Returns:
         List[str]: List of HEX color strings.
     """
-    
-    assert cmap_name in COLOR_NUMBER, f"incorrect colormap specified: {cmap_name}"
-    num_colors = COLOR_NUMBER[cmap_name]
+    color_number = {
+        "gist_rainbow": 20,
+        "tab20": 20,
+        "tab20b": 20,
+        "tab20c": 20,
+        "tab10": 10,
+        "Set1": 9,
+        "Set2": 8,
+        "Set3": 12,
+        "Paired": 12,
+        "viridis": 10,
+        "plasma": 10
+    }
+    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
+    num_colors = color_number[cmap_name]
     # Get the colormap object
     cmap = plt.get_cmap(cmap_name)
     color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
