@@ -479,7 +479,7 @@ class CellDetector(BasePlugin):
             }
         ''')
 
-        self.checkbox_scale = QCheckBox("Preocess at x10 scale")
+        self.checkbox_scale = QCheckBox("Process at x10 scale")
         
         # Connect checkbox state change to handler function
         self.checkbox_scale.stateChanged.connect(self.on_state_changed_scale)
