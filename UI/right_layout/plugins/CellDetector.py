@@ -265,7 +265,7 @@ class CellDetector(BasePlugin):
             lengths = boxes.apply(lambda x: x[2])
             widths = boxes.apply(lambda x: x[3])
 
-            img_area = self.models['Detector'].cell_counter.original_image.shape[0] * self.models['Detector'].cell_counter.original_image.shape[0]
+            img_area = self.model.cell_counter.original_image.shape[0] * self.model.cell_counter.original_image.shape[0]
 
             # Вычисление диагоналей (диаметры)
             arithmetic_diameters = (lengths + widths) / 2
