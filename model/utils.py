@@ -12,6 +12,8 @@ import ultralytics
 import ultralytics.engine
 from ultralytics.engine.results import Results, Boxes, Masks
 
+import tiffile
+
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
 COLORS = [(3,177,252)]
