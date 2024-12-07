@@ -1,11 +1,14 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider, QLineEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout,\
+     QHBoxLayout, QLabel, QSlider, QLineEdit
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from PyQt5.QtGui import QIntValidator, QDoubleValidator
 
 
 class CustomSlider(QSlider):
+    """
+    Class for filtering sliders in the right layout menu.
+    """
     def __init__(self, orientation, parent=None):
         super().__init__(orientation, parent)
 
@@ -18,38 +21,40 @@ class CustomSlider(QSlider):
         super().mousePressEvent(event)
 
 class Slider(QWidget):
+    """
+    Class for filtering sliders in the right layout menu.
+    """
     def __init__(self, object_size : dict, default_object_size : dict, key : str): 
         self.object_size = object_size
         self.key = key
         self.round_parametr_slider = object_size['round_parametr_slider']
         self.round_parametr_value_input = object_size['round_parametr_value_input']
-    
         self.default_object_size = default_object_size
         super().__init__()
         self.initUI()
+
     def change_default(self, min_size, max_size):
         #TODO: some validation for min and max
         self.default_object_size['min_size'] = min_size - min_size / 100
         self.default_object_size['max_size'] = max_size + max_size / 100
         self.value_slider.setMinimum(int (self.default_object_size['min_size'] * self.round_parametr_slider))
         self.value_slider.setMaximum(int (self.default_object_size['max_size'] * self.round_parametr_slider))
-
         self.set_default()
+
     def set_default(self):
         value = self.default_object_size[self.key]
         self.object_size[self.key] = value
         self.value_input.setText(str(f'{value * self.round_parametr_value_input:.2f}'))
         self.value_slider.setValue(int (value * self.round_parametr_slider))
+
     def initUI(self):
         # Переменная для хранения значения
-
-
         # Основной вертикальный layout
         main_layout = QVBoxLayout()
 
         # Первая строка с надписью "Value"
         label_layout = QHBoxLayout()
-        
+
         value_label = QLabel(self.key.capitalize().replace('_size', ''))
         font = QFont()
         font.setPointSize(16)  # Устанавливаем размер шрифта 16 пунктов
@@ -93,7 +98,7 @@ class Slider(QWidget):
         # Обновляем переменную и QLineEdit при изменении значения слайдера
         min_size = self.default_object_size['min_size']
         max_size = self.default_object_size['max_size']
-        
+
         value = self.value_slider.value() / self.round_parametr_slider
         # Проверяем значение на корректность, если вне диапазона — устанавливаем границы
         if self.key == 'min_size' and value > self.object_size['max_size']:
@@ -130,7 +135,7 @@ class Slider(QWidget):
         except ValueError:
 
             self.value_input.setText(str(f'{self.object_size[self.key] * self.round_parametr_value_input:.2f}'))
-            
+
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

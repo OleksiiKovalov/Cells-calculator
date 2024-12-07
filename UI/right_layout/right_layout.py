@@ -1,27 +1,6 @@
-import sys
-from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
-    QSizePolicy, QGraphicsProxyWidget, QGraphicsRectItem, QHeaderView, \
-        QMessageBox, QTableWidget, QTableWidgetItem, QPushButton, QGraphicsView,\
-            QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, \
-                QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, \
-                    QLabel, QHBoxLayout, QSlider
-from PyQt5.QtGui import QPixmap, QImage, QFont, QColor, QPen
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
-import numpy as np
-import tifffile
+from PyQt5.QtWidgets import QVBoxLayout
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
-
-import os
-import shutil
-
-import pyqtgraph as pg
-from UI.Slider import Slider
-from UI.SettingsWindow import SettingsWindow
-from model.Model import Model as model1
-from UI.table import calculate_table
-
-
-import traceback
 
 class right_layout(QVBoxLayout):
     rightLayout_signal = pyqtSignal(str, object)
@@ -31,8 +10,6 @@ class right_layout(QVBoxLayout):
         self.current_plugin = None
         self.current_plugin_name = current_plugin_name
         self.plugin_list = plugin_list
-        
-        
 
     def clear(self):
         while self.count():
@@ -58,7 +35,7 @@ class right_layout(QVBoxLayout):
                 sub_layout = item.layout()
                 if sub_layout is not None:
                     self._clear_layout(sub_layout)
-                
+
     def set_current_plugin(self, plugin_name, plugin_list):
         self.current_plugin_name = plugin_name
         self.plugin_list = plugin_list
@@ -70,7 +47,6 @@ class right_layout(QVBoxLayout):
         plugin =  self.plugin_list[self.current_plugin_name]['init']
         arg = self.plugin_list[self.current_plugin_name]['arg']
         self.current_plugin = plugin(self.handel_plugin_signal, self, *arg)
-        
 
     @pyqtSlot(str, object)
     def handle_mainWindow_action(self, action_name, value):
@@ -95,5 +71,3 @@ class right_layout(QVBoxLayout):
             pass
         else:
             self.current_plugin.handle_action(action_name, value)
-
-

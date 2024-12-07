@@ -1,28 +1,20 @@
-import sys
-from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
-    QSizePolicy, QGraphicsProxyWidget, QGraphicsRectItem, QHeaderView, \
-        QMessageBox, QTableWidget, QTableWidgetItem, QPushButton, QGraphicsView,\
-            QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, \
-                QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, \
-                    QLabel, QHBoxLayout, QSlider, QLineEdit
-from PyQt5.QtGui import QPixmap, QImage, QFont, QColor, QPen
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
-import numpy as np
-import tifffile
-
 import os
+import traceback
+from PyQt5.QtWidgets import QCheckBox, QPushButton, QGraphicsView, QGraphicsView, QGraphicsScene,\
+    QGraphicsTextItem, QComboBox, QLabel
+from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt
 
 from UI.Slider import Slider
 from UI.right_layout.plugins.BasePlagin import BasePlugin
 from model.Model import Model
-import traceback
 
 
 class CellDetector(BasePlugin):
     def get_name(self):
         return "Cell Processor"
     def __init__(self, *arg):
-        
+
         super().__init__(*arg)
         self.plugin_signal.emit("Open_lsm", True)
         self.plugin_signal.emit("Open_folder", False)
@@ -30,7 +22,7 @@ class CellDetector(BasePlugin):
         self.plugin_signal.emit("Save_as", False)
         self.model = Model(path=arg[-1][self.combo_box.currentText()]['path'],
                            object_size=arg[-1][self.combo_box.currentText()]['object_size'])
-        
+
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
         self.show_boundry = 0
         self.draw_bounding = 0
@@ -40,7 +32,7 @@ class CellDetector(BasePlugin):
         self.default_object_size = default_object_size
         self.right_layout = parent
         self.lsm_filesList = None
-        
+
     def handle_action(self, action_name, value):
         if action_name == "reset_detection":
             self.reset_detection()
@@ -56,12 +48,9 @@ class CellDetector(BasePlugin):
             if value:
                 self.lsm_path = value
                 self.button.setEnabled(True)
-                
             else:
                 self.lsm_path = None
                 self.button.setEnabled(False)
-                
-
         elif action_name == "open_image":
             self.reset_sliders()
             self.reset_detection()
@@ -73,18 +62,13 @@ class CellDetector(BasePlugin):
             self.lsm_filesList = None
             self.folder_path = None
             self.button.setEnabled(True)
-         
-
         elif action_name == "open_folder":
             self.reset_detection()
             self.right_scene.clear()
             if value:
-               
                 self.lsm_filesList = [os.path.join(value, file) \
         for file in os.listdir(value)\
             if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
-                
-                
                 self.folder_path = value
                 self.max_range_slider.set_default()
                 self.min_range_slider.set_default()
@@ -95,12 +79,9 @@ class CellDetector(BasePlugin):
                 self.folder_path = None
                 self.lsm_filesList = None
                 self.button.setEnabled(False)
-            
 
     def update_colormap(self, colormap):
-        
         self.object_size["color_map"] = colormap
-    
     # def update_lineWidth(self):
     #     # Получаем значение из QLineEdit
     #     input_text = self.LineWidth_edit.text()
@@ -151,7 +132,7 @@ class CellDetector(BasePlugin):
             self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
         if max_size is not None:
             self.max_range_slider.change_default(min_size = min_size, max_size = max_size)
-        
+
     def calculate_button(self):
         """
         Calculate the cells using the selected method and display the results.
@@ -181,7 +162,7 @@ class CellDetector(BasePlugin):
             - Draw bounding boxes.
         """
         model = self.combo_box.currentText()
-        
+
         # Check if a method and file are selected
         if model == "" or self.lsm_path is None:
             # If not, show a warning dialog and return
@@ -224,24 +205,23 @@ class CellDetector(BasePlugin):
                 self.plugin_signal.emit("show_warning", "Error during calculation \n\nChoose another model or change channels settings")
                 result = None
                 self.draw_bounding = 0
-        
+
         # If no result, return
         if not result:
             return 0
-        
+
         # Create QGraphicsTextItems to display the results
         self.right_scene.clear()
         self.print_result(result)
-        
+
         # Set flag to draw bounding boxes
         self.draw_bounding = 1
-        
+
         # Draw bounding boxes
         self.draw_bounding_box()
 
     def print_result(self, result):
         model = self.combo_box.currentText()
-        
         if model == "Detector":
             self.print_result_detector(result)
         else:
@@ -249,15 +229,12 @@ class CellDetector(BasePlugin):
 
     def print_result_detector(self, result):
         results = []
-
         # Добавить количество клеток
         results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
         # try:
         #     results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
         # except:
         #     results.append(f'Cells: {result["Cells"]}')
-
-
         try:
             boxes = result["Cells"]["box"]
 
@@ -273,7 +250,7 @@ class CellDetector(BasePlugin):
 
             # Вычисление площадей
             areas = lengths * widths
-            
+
             average_arithmetic_diameter = arithmetic_diameters.mean() / img_area * 10000
             average_geometric_diameters = geometric_diameters.mean() / img_area * 10000
             average_area = areas.mean() / img_area * 10000
@@ -286,7 +263,6 @@ class CellDetector(BasePlugin):
         results.append(f"Mean Arithmetic D: {round(average_arithmetic_diameter, 2)}‱")
         results.append(f"Mean Geometric D: {round(average_geometric_diameters, 2)}‱")
         results.append("")
-        
 
         # Добавить количество ядер
         if result["Nuclei"] == -100:
@@ -299,8 +275,6 @@ class CellDetector(BasePlugin):
             results.append('Alive: -')
         else:
             results.append(f'Alive: {result["%"]}%')
-
-        
 
         # Шрифт для всех элементов
         font = QFont('Arial', 12)
@@ -319,7 +293,7 @@ class CellDetector(BasePlugin):
 
         # Обновить вид
         self.right_view.update()
-    
+
     def print_result_segmenter(self, result):
         spheroid_df = result["Cells"]
 
@@ -347,7 +321,6 @@ class CellDetector(BasePlugin):
             results = [
                 f"Cells detected: {num_cells}"
             ]
-        
 
         # Настройки для шрифта и отображения
         font = QFont('Arial', 12)
@@ -382,9 +355,9 @@ class CellDetector(BasePlugin):
         if self.draw_bounding == 0:
             # If not set, return without performing any action
             return
-        
+
         # Clear the main scene
-        
+
         try:
             # Check if the show boundary flag is set
             if self.show_boundry:
@@ -395,20 +368,20 @@ class CellDetector(BasePlugin):
                 self.plugin_signal.emit("add_image", self.lsm_path)
         except Exception as e:
             # If an error occurs, print the traceback, show a warning dialog
-          
+
             traceback.print_exc()
             self.plugin_signal.emit("show_warning", "Error during opening image.")
     def on_state_changed(self, state):
         """
         Handle the state change of the checkbox for showing bounding boxes.
-        
+
         Args:
         state (int): The new state of the checkbox.
-    
+
         """
         # Update the show_boundry flag with the new state of the checkbox
         self.show_boundry = state
-        
+
         # Redraw bounding boxes
         self.draw_bounding_box()
 
@@ -431,17 +404,17 @@ class CellDetector(BasePlugin):
         # Create a combo box to choose models
         self.combo_box = QComboBox()
         self.combo_box.currentIndexChanged.connect(self.reset_sliders)
-        
+
         # Create a label to prompt user to choose a model
         label = QLabel("Choose model:")
         label.setFont(QFont("Arial", 24))
-        
+
         # Create a graphics scene for the right view
         self.right_scene = QGraphicsScene()
 
         # Create a graphics view for the right scene
         self.right_view = QGraphicsView(self.right_scene)
-        
+
         # Align the graphics view to the top-left corner
         self.right_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
 
@@ -451,26 +424,23 @@ class CellDetector(BasePlugin):
 
         # Set font for the combo box
         self.combo_box.setFont(QFont("Arial", 24))
-        
+
         # Add 'All_method' option and method names to the combo box
         #self.combo_box.addItems(['All_models'])
         self.combo_box.addItems([key for key in self.models])
-        
+
         # Set current index to 1
         self.combo_box.setCurrentIndex(0)
-        
-      
-        
-        
+
         # Create a checkbox for showing detected cells
         self.checkbox = QCheckBox("Show Detected Cells")
-        
+
         # Connect checkbox state change to handler function
         self.checkbox.stateChanged.connect(self.on_state_changed)
-        
+
         # Set font for the checkbox
         self.checkbox.setFont(QFont("Arial", 24))
-        
+
         # Set style sheet for the checkbox to customize its indicator size
         self.checkbox.setStyleSheet('''
             QCheckBox::indicator {
@@ -480,13 +450,13 @@ class CellDetector(BasePlugin):
         ''')
 
         self.checkbox_scale = QCheckBox("Process at x10 scale")
-        
+
         # Connect checkbox state change to handler function
         self.checkbox_scale.stateChanged.connect(self.on_state_changed_scale)
-        
+
         # Set font for the checkbox
         self.checkbox_scale.setFont(QFont("Arial", 24))
-        
+
         # Set style sheet for the checkbox to customize its indicator size
         self.checkbox_scale.setStyleSheet('''
             QCheckBox::indicator {
@@ -494,19 +464,19 @@ class CellDetector(BasePlugin):
                 height: 24px;
             }
         ''')
-        
+
         # Set font for the calculate button
         self.button.setFont(QFont("Arial", 32))
-        
+
         # Connect button click event to calculate_button function
         self.button.clicked.connect(self.calculate_button)
 
         range_lable = QLabel("Object Size:")
         font = QFont()
         font.setPointSize(16) 
-        
+
         range_lable.setFont(font)
-       
+
         #self.right_layout.addSpacing(1)
         self.min_range_slider = Slider(self.object_size, self.default_object_size, 'min_size')
         self.max_range_slider = Slider(self.object_size, self.default_object_size, 'max_size')
@@ -523,7 +493,7 @@ class CellDetector(BasePlugin):
         # LineWidth_layout = QHBoxLayout()
         # LineWidth_layout.addWidget(LineWidth_label)
         # LineWidth_layout.addWidget(self.LineWidth_edit)
-       
+
         colormap_label = QLabel("Colormap:")
         colormap_label.setFont(QFont("Arial", 24))
 
@@ -534,10 +504,9 @@ class CellDetector(BasePlugin):
         self.colormap_combo.addItems(self.colormaps)
         self.colormap_combo.setCurrentText(self.object_size['color_map'])  # Установить "Viridis" по умолчанию
         self.colormap_combo.currentTextChanged.connect(self.update_colormap)
-        
+
         # Add widgets to the right layout with spacing
         ###self.right_layout.addWidget(label)
-
         self.right_layout.addWidget(plugin_label)
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.combo_box)

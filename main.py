@@ -3,32 +3,22 @@ This module defines the MainWindow class for the Cells Calculator application.
 The application is designed to open, process, and analyze cell images.
 """
 import sys
-from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
-    QSizePolicy, QGraphicsProxyWidget, QGraphicsRectItem, QHeaderView, \
-        QMessageBox, QTableWidget, QTableWidgetItem, QPushButton, QGraphicsView,\
-            QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, \
-                QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, \
-                    QLabel, QHBoxLayout, QSlider
-from PyQt5.QtGui import QPixmap, QImage, QFont, QColor, QPen
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
-import numpy as np
+import os
+import shutil
+import traceback
+from PyQt5.QtWidgets import QAbstractItemView, QMessageBox, QTableWidget, QTableWidgetItem, \
+     QGraphicsView, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QWidget, QHBoxLayout
+from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
 import tifffile
 from UI.SettingsWindow import SettingsWindow
 from UI.table import calculate_table
 from UI.right_layout.right_layout import right_layout
 from UI.menubar import menubar
-import os
-import shutil
 from UI.right_layout.plugins.CellDetector import CellDetector as CellDetector_plugin
 from UI.right_layout.plugins.tracker import Tracker as Tracker_plugin
-from UI.right_layout.plugins.SpheroidSegmenter import SpheroidSegmenter as Spheroid_Segmenter_plugin
-import pyqtgraph as pg
-from UI.Slider import Slider
 from model.utils import COLOR_NUMBER as color_number
-from model.Model import Model as model1
 
-from model.tracker import Tracker as Tracker_model
-import traceback
 
 class MainWindow(QMainWindow):
     """
@@ -36,11 +26,9 @@ class MainWindow(QMainWindow):
     This class handles the initialization of the UI, loading and processing images, 
     and interacting with various models to perform cell calculations.
     """
-    
-   
     mainWindow_signal = pyqtSignal(str, object)
     def __init__(self):
-        
+
         """
         Initialize the MainWindow.
 
@@ -61,19 +49,21 @@ class MainWindow(QMainWindow):
         screen_geometry = desktop.availableGeometry()
 
         # Set the fixed size of the main window to match the screen width and height minus the height of the menu bar
-        self.setFixedSize(screen_geometry.width(), desktop.availableGeometry().height() - self.menuBar().height())
+        self.setFixedSize(screen_geometry.width(),
+                          desktop.availableGeometry().height() - self.menuBar().height())
 
         # Set the window title
         self.current_plugin_name = "Cell Processor"
         self.setWindowTitle(self.current_plugin_name)
-        
+
         self.init_value()
         # Initialize the user interface
 
         self.menu_bar = menubar(self, list(self.plugin_list.keys()), self.current_plugin_name)
         self.setMenuBar(self.menu_bar)
-        self.right_layout = right_layout(current_plugin_name= self.current_plugin_name, plugin_list= self.plugin_list)
-        
+        self.right_layout = right_layout(current_plugin_name=self.current_plugin_name,
+                                         plugin_list= self.plugin_list)
+
 
         self.menu_bar.menubar_signal.connect(self.handle_menubar_action)
         self.menu_bar.menubar_signal.connect(self.right_layout.handle_menubar_action)
@@ -94,8 +84,6 @@ class MainWindow(QMainWindow):
             self.open_file(value)
         if action_name == "open_folder":
             self.open_folder(value)
-        #elif action_name == "save_as":
-        #    self.save_as()
         elif action_name == "open_settings":
             self.open_settings()
 
@@ -115,18 +103,14 @@ class MainWindow(QMainWindow):
     def handle_rightLayout_action(self, action_name, value):
         if action_name == "show_warning":
             self.show_warning_dialog(value)
-        #elif action_name == "create_table":
-        #    self.create_table()
         elif action_name == "add_image":
-
             self.add_image(value)
-
         pass
 
     def init_value(self):
         # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
         # Initialize DataFrame to None
-        
+
         self.object_size = { 
                 'min_size' : 100,
                    'max_size' : 0.000,
@@ -137,8 +121,6 @@ class MainWindow(QMainWindow):
                    'color_map_list' : list(color_number.keys()),
                    'line_width' : 100.00,
                    'scale' : 20
-
-                   
         }
         self.default_object_size = self.object_size.copy()
 
@@ -146,101 +128,37 @@ class MainWindow(QMainWindow):
         self.parametrs = {'Cell': 0,
                     'Nuclei': 1
         }
-        # self.models_celldetector = {
-        # 'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
-        # 'YOLO-512 Segmenter': model1(path='model/YOLO11x-512-seg.pt', object_size = self.object_size),
-        # 'YOLO-680 Segmenter': model1(path='model/YOLO11x-680-seg.pt', object_size = self.object_size),
-        # }
         self.models_celldetector = {
         'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size},
         'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size},
         'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size},
         }
-        # self.models_tracker = {
-        #     'Baseline Segmenter' : Tracker_model(path_to_model="model/YOLO11x-sphero-seg.pt", size=self.object_size)
-        # }
         self.models_tracker = {
             'Baseline Segmenter' : {"path": 'model/YOLO11x-sphero-seg.pt', "size": self.object_size}
         }
-        # self.models_spheroid_segmentor = {
-        #     'Baseline Segmenter': model1(path='model/YOLO11x-sphero-seg.pt', object_size=self.object_size)
-        # }
         self.plugin_list = {
             "Cell Processor" : {
                 "init" : CellDetector_plugin,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size, self.models_celldetector],
+                "arg" : [self.parametrs, self.object_size, self.default_object_size,
+                         self.models_celldetector],
                 "file_callback" : self.change_image,
                 "folder_callback" : self.create_table
             },
             "Tracker" : {
                 "init" :  Tracker_plugin,
-                "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_tracker],
+                "arg" : [self.parametrs, self.object_size, self.default_object_size,
+                         self.models_tracker],
                 "file_callback" : print,
                 "folder_callback" : print
-            },
-            # "Spheroid Segmenter": {
-            #     "init" : Spheroid_Segmenter_plugin,
-            #     "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_spheroid_segmentor],
-            #     "file_callback" :   self.change_image,
-            #     "folder_callback" : self.create_table
-            # }
+            }
         }
-        
+
         # Dictionary containing available models and their corresponding methods
         # Initialize variables to None or default values
         self.lsm_path = None
         self.lsm_filesList = None
         self.lsm_folder = None
-      
-      
-   
-      
-    # def save_as(self):
-    #     """
-    #     Save the current table data to a file.
 
-    #     Notes:
-    #     - Check if there is data in the DataFrame.
-    #     - If there's no data, show a warning dialog and disable the "Save As" action.
-    #     - Prompt the user to choose the file name and type.
-    #     - Check if the user provided a file name.
-    #     - If the file name ends with '.xlsx', save as Excel file.
-    #     - If the file name ends with '.csv', save as CSV file.
-    #     - If an error occurs during saving, show a warning dialog and disable the "Save As" action.
-    #     """
-    #     # Check if there is data in the DataFrame
-    #     if self.df is None:
-    #         # If there's no data, show a warning dialog
-    #         self.show_warning_dialog("Nothing to Save")
-            
-    #         # Disable the "Save As" action
-    #         self.mainWindow_signal("error_save_as", None)
-           
-    #         return
-        
-    #     try:
-    #         # Prompt the user to choose the file name and type
-    #         file_name, _ = QFileDialog.getSaveFileName(
-    #             self, "Save File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
-            
-    #         # Check if the user provided a file name
-    #         if file_name:
-    #             # If the file name ends with '.xlsx', save as Excel file
-    #             if file_name.endswith('.xlsx'):
-    #                 self.df.to_excel(file_name, index=False)
-    #             # If the file name ends with '.csv', save as CSV file
-    #             elif file_name.endswith('.csv'):
-    #                 self.df.to_csv(file_name, index=False)
-    #     except Exception as e:
-    #         traceback.print_exc()
-    #         # If an error occurs during saving, show a warning dialog
-    #         self.show_warning_dialog("Error during saving table")
-            
-    #         # Disable the "Save As" action
-    #         self.mainWindow_signal("error_save_as", None)
-            
-    #         return
-  
     def init_mainScene(self):
         """
         Initialize the main scene and its layout.
@@ -257,7 +175,7 @@ class MainWindow(QMainWindow):
         # Create a central widget
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
-        
+
         # Create a horizontal layout for the main scene and other widgets
         self.main_layout = QHBoxLayout()
 
@@ -267,16 +185,13 @@ class MainWindow(QMainWindow):
         self.main_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.main_view.setFixedWidth(int(self.width() * 0.75))
 
-        
-    
-
         # Add the main view and right layout to the main layout
         self.main_layout.addWidget(self.main_view)
         self.main_layout.addLayout(self.right_layout)
-        
+
         # Set the main layout for the central widget
         self.central_widget.setLayout(self.main_layout)
-        
+
         # Set the scene rectangle to match the size of the main view
         self.main_scene.setSceneRect(
             0, 0, self.main_view.width()-10, self.main_view.height())
@@ -290,24 +205,21 @@ class MainWindow(QMainWindow):
         """
         # Create a QMessageBox instance
         msgBox = QMessageBox()
-        
+
         # Set the icon of the message box to a warning icon
         msgBox.setIcon(QMessageBox.Warning)
-        
+
         # Set the text of the message box
         msgBox.setText(text)
-        
+
         # Set the title of the message box
         msgBox.setWindowTitle("Warning")
-        
+
         # Adjust the size of the message box
         msgBox.adjustSize()
-        
+
         # Execute the message box (display it)
         msgBox.exec_()
-
-
-     
 
     def open_folder(self, folder_path):
         """
@@ -453,7 +365,7 @@ class MainWindow(QMainWindow):
             # and create a QImage from it with grayscale format
             image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],
                         lsm_file.shape[2], QImage.Format_Grayscale8)
-        
+
         # Convert the QImage to a QPixmap
         pixmap = QPixmap.fromImage(image)
 
@@ -463,8 +375,6 @@ class MainWindow(QMainWindow):
 
         # Calculate the aspect ratio of the image
         pixmap_aspect_ratio = pixmap.width() / pixmap.height()
-                
-        
 
         # Scale the image to fit within the view while maintaining aspect ratio
         if view_width / view_height > pixmap_aspect_ratio:
@@ -492,7 +402,7 @@ class MainWindow(QMainWindow):
     def change_image(self):
         """
         Change displayed image. 
-        
+
         Notes:
             This method is called when there is a need to change the currently displayed image, typically when 
                 switching between different LSM files. It attempts to open the specified LSM file, reads the first 
@@ -507,17 +417,16 @@ class MainWindow(QMainWindow):
             with tifffile.TiffFile(self.lsm_path) as tif:
                 # Read the first page of the LSM file as an array
                 lsm_file = tif.pages[0].asarray()
-            
+
             # Clear the main scene
             self.main_scene.clear()
-            
+
             # Add the new image to the scene
             self.add_image(lsm_file)
         except Exception as e:
             traceback.print_exc()
             # If an error occurs, show a warning dialog
             self.show_warning_dialog("Error during opening image.")
-
 
     def open_file(self, lsm_path):
         """
@@ -533,8 +442,7 @@ class MainWindow(QMainWindow):
         - If the selected file is not an LSM file, it stores the file path, clears the main scene, and attempts to add the image to the scene.
         - If an error occurs during the process, it shows a warning dialog, resets variables, and clears the main scene.
         """
-        
-    
+
         # If the selected file is an LSM file, call the open_lsm function
         if lsm_path.endswith(".lsm"):
             self.mainWindow_signal.emit("open_lsm", lsm_path)
@@ -544,19 +452,11 @@ class MainWindow(QMainWindow):
             # If the selected file is not an LSM file
             # Store the file path
             self.lsm_path = lsm_path
-            
+
             # Clear the main scene
             self.main_scene.clear()
-            
             # Disable certain actions
-        
-            
-            
-            
             # Reset file list
-
-            
-            
             try:
                 # Try to add the image to the scene and set the window title
                 self.add_image(self.lsm_path)
@@ -573,7 +473,7 @@ class MainWindow(QMainWindow):
                 self.lsm_filesList = None
                 self.lsm_folder = None
                 self.main_scene.clear()
-                
+
                 return 0
 
 
@@ -587,26 +487,22 @@ class MainWindow(QMainWindow):
         """
         # Store the LSM file path
         self.lsm_path = lsm_path
-        
+
         # Clear the main scene
         self.main_scene.clear()
-    
-        
         # Reset the file list
-        
-        
         try:
             # Attempt to open the LSM file using tifffile
             with tifffile.TiffFile(self.lsm_path) as tif:
                 # Read the first page of the LSM file as an array
                 lsm_file = tif.pages[0].asarray()
-            
+
             # Check if the number of channels in the LSM file is less than the maximum channel index specified in parameters
             if lsm_file.shape[0] < max([value+1 for key, value in self.parametrs.items()]):
                 # If so, reset the parameters to default
                 self.parametrs['Cell'] = 0
                 self.parametrs['Nuclei'] = 1
-            
+
             # Check if the number of channels in the LSM file is less than or equal to 1
             if lsm_file.shape[0] <= 1:
                 # If so, show a warning dialog and return
@@ -630,7 +526,6 @@ class MainWindow(QMainWindow):
             self.lsm_folder = None
             return 0
 
- 
     def open_settings(self):
         """
         Open the Settings window for adjusting channel settings.
@@ -644,7 +539,7 @@ class MainWindow(QMainWindow):
             it's closed. If any error occurs during the process, a warning dialog is displayed to 
             notify the user about the error.
         """
-        
+
         try:
            # Check if there are LSM files in the list
             if self.lsm_filesList:
@@ -656,19 +551,19 @@ class MainWindow(QMainWindow):
                # If no LSM files in the list, set the callback function for image change
                call_back = self.plugin_list[self.current_plugin_name]["file_callback"]
                lsm_path = self.lsm_path
-            
+
             # If there's a valid LSM path
             if lsm_path:
                 # Create an instance of SettingsWindow
                 dialog = SettingsWindow(
                     parent=self, lsm_path=lsm_path, parametrs=self.parametrs, call_back=call_back)
-                
+
                 # Set window modality to block other windows until this one is closed
                 dialog.setWindowModality(Qt.ApplicationModal)
-                
+
                 # Show the dialog window
                 dialog.show()
-                
+
                 # Center the dialog window on the screen
                 dialog.center()
         except:
@@ -686,10 +581,9 @@ if __name__ == '__main__':
         window.showMaximized()
         # Start the application event loop
         sys.exit(app.exec_())
-        
+
     except Exception as e:
         traceback.print_exc()
         # If an exception occurs, display a critical error message and exit the application
         QMessageBox.critical(None, "Critical Error", str(e), QMessageBox.Ok)
         sys.exit(1)
-
