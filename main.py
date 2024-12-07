@@ -36,11 +36,11 @@ class MainWindow(QMainWindow):
     This class handles the initialization of the UI, loading and processing images, 
     and interacting with various models to perform cell calculations.
     """
-    
-   
+
+
     mainWindow_signal = pyqtSignal(str, object)
     def __init__(self):
-        
+
         """
         Initialize the MainWindow.
 
@@ -66,14 +66,14 @@ class MainWindow(QMainWindow):
         # Set the window title
         self.current_plugin_name = "Cell Processor"
         self.setWindowTitle(self.current_plugin_name)
-        
+
         self.init_value()
         # Initialize the user interface
 
         self.menu_bar = menubar(self, list(self.plugin_list.keys()), self.current_plugin_name)
         self.setMenuBar(self.menu_bar)
         self.right_layout = right_layout(current_plugin_name= self.current_plugin_name, plugin_list= self.plugin_list)
-        
+
 
         self.menu_bar.menubar_signal.connect(self.handle_menubar_action)
         self.menu_bar.menubar_signal.connect(self.right_layout.handle_menubar_action)
@@ -94,8 +94,6 @@ class MainWindow(QMainWindow):
             self.open_file(value)
         if action_name == "open_folder":
             self.open_folder(value)
-        #elif action_name == "save_as":
-        #    self.save_as()
         elif action_name == "open_settings":
             self.open_settings()
 
@@ -115,18 +113,14 @@ class MainWindow(QMainWindow):
     def handle_rightLayout_action(self, action_name, value):
         if action_name == "show_warning":
             self.show_warning_dialog(value)
-        #elif action_name == "create_table":
-        #    self.create_table()
         elif action_name == "add_image":
-
             self.add_image(value)
-
         pass
 
     def init_value(self):
         # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
         # Initialize DataFrame to None
-        
+
         self.object_size = { 
                 'min_size' : 100,
                    'max_size' : 0.000,
@@ -137,8 +131,6 @@ class MainWindow(QMainWindow):
                    'color_map_list' : list(color_number.keys()),
                    'line_width' : 100.00,
                    'scale' : 20
-
-                   
         }
         self.default_object_size = self.object_size.copy()
 
@@ -146,25 +138,14 @@ class MainWindow(QMainWindow):
         self.parametrs = {'Cell': 0,
                     'Nuclei': 1
         }
-        # self.models_celldetector = {
-        # 'Detector': model1(path='model/yolov8m-det.onnx', object_size = self.object_size),
-        # 'YOLO-512 Segmenter': model1(path='model/YOLO11x-512-seg.pt', object_size = self.object_size),
-        # 'YOLO-680 Segmenter': model1(path='model/YOLO11x-680-seg.pt', object_size = self.object_size),
-        # }
         self.models_celldetector = {
         'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size},
         'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size},
         'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size},
         }
-        # self.models_tracker = {
-        #     'Baseline Segmenter' : Tracker_model(path_to_model="model/YOLO11x-sphero-seg.pt", size=self.object_size)
-        # }
         self.models_tracker = {
             'Baseline Segmenter' : {"path": 'model/YOLO11x-sphero-seg.pt', "size": self.object_size}
         }
-        # self.models_spheroid_segmentor = {
-        #     'Baseline Segmenter': model1(path='model/YOLO11x-sphero-seg.pt', object_size=self.object_size)
-        # }
         self.plugin_list = {
             "Cell Processor" : {
                 "init" : CellDetector_plugin,
@@ -177,70 +158,15 @@ class MainWindow(QMainWindow):
                 "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_tracker],
                 "file_callback" : print,
                 "folder_callback" : print
-            },
-            # "Spheroid Segmenter": {
-            #     "init" : Spheroid_Segmenter_plugin,
-            #     "arg" : [self.parametrs, self.object_size, self.default_object_size,  self.models_spheroid_segmentor],
-            #     "file_callback" :   self.change_image,
-            #     "folder_callback" : self.create_table
-            # }
+            }
         }
-        
+
         # Dictionary containing available models and their corresponding methods
         # Initialize variables to None or default values
         self.lsm_path = None
         self.lsm_filesList = None
         self.lsm_folder = None
-      
-      
-   
-      
-    # def save_as(self):
-    #     """
-    #     Save the current table data to a file.
 
-    #     Notes:
-    #     - Check if there is data in the DataFrame.
-    #     - If there's no data, show a warning dialog and disable the "Save As" action.
-    #     - Prompt the user to choose the file name and type.
-    #     - Check if the user provided a file name.
-    #     - If the file name ends with '.xlsx', save as Excel file.
-    #     - If the file name ends with '.csv', save as CSV file.
-    #     - If an error occurs during saving, show a warning dialog and disable the "Save As" action.
-    #     """
-    #     # Check if there is data in the DataFrame
-    #     if self.df is None:
-    #         # If there's no data, show a warning dialog
-    #         self.show_warning_dialog("Nothing to Save")
-            
-    #         # Disable the "Save As" action
-    #         self.mainWindow_signal("error_save_as", None)
-           
-    #         return
-        
-    #     try:
-    #         # Prompt the user to choose the file name and type
-    #         file_name, _ = QFileDialog.getSaveFileName(
-    #             self, "Save File", "", "Excel Files (*.xlsx);;CSV Files (*.csv)")
-            
-    #         # Check if the user provided a file name
-    #         if file_name:
-    #             # If the file name ends with '.xlsx', save as Excel file
-    #             if file_name.endswith('.xlsx'):
-    #                 self.df.to_excel(file_name, index=False)
-    #             # If the file name ends with '.csv', save as CSV file
-    #             elif file_name.endswith('.csv'):
-    #                 self.df.to_csv(file_name, index=False)
-    #     except Exception as e:
-    #         traceback.print_exc()
-    #         # If an error occurs during saving, show a warning dialog
-    #         self.show_warning_dialog("Error during saving table")
-            
-    #         # Disable the "Save As" action
-    #         self.mainWindow_signal("error_save_as", None)
-            
-    #         return
-  
     def init_mainScene(self):
         """
         Initialize the main scene and its layout.

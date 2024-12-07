@@ -10,29 +10,57 @@ from model.sahi.utils.cv import read_image
 from model.sahi.predict import get_prediction, get_sliced_prediction, predict
 
 class BaseModel():
+    """
+    Base class for general YOLO instance models.
+    Implements the neccessary high-level functional utils for using the model.
+    """
     def __init__(self, path_to_model: str, object_size):
-        """Model constructor. Slightly differs for detectors and segmenters."""
+        """
+        Model constructor. Slightly differs for detectors and segmenters.
+
+        Input:
+        - path_to_model: str - path to .pt YOLO model file;
+        - object_size: UI util param 
+        """
         self.init_models(path_to_model)
         self.path_to_model = path_to_model
         self.object_size = object_size
         self.original_image = None
         self.detections = None
-    
+
     def init_models(self, path_to_model: str):
+        """
+        Helper function for initialization of actual YOLO model instances.
+
+        Input:
+        - path_to_model: str - path to .pt YOLO model file.
+        """
         self.init_x10_model(path_to_model)
         self.init_x20_model(path_to_model)
-    
+
     def init_x10_model(self, path_to_model: str):
+        """
+        Helper function for initialization of actual YOLO model instance for x10 images processing.
+
+        Input:
+        - path_to_model: str - path to .pt YOLO model file.
+        """
         self.model_x10 = AutoDetectionModel.from_pretrained(
             model_type='yolov8',
             model_path=path_to_model,
-            confidence_threshold=0.001,
+            confidence_threshold=0.01,
             device="cpu", # or 'cuda:0'
         )
-    
+
     def init_x20_model(self, path_to_model: str):
+        """
+        Helper function for initialization of actual YOLO model instance for x20 images processing.
+
+        Input:
+        - path_to_model: str - path to .pt YOLO model file.
+        """
         raise NotImplementedError
-    
+
     def count_cells(self, img_path):
         """
         By calling this method, the model class instance calculates cells on a given image.
@@ -50,6 +78,7 @@ class BaseModel():
     def count(self, input_image, scale: int = 20,
               filename=".cache/cell_tmp_img_with_detections.png"):
         """General method for processing microimages of cells."""
+
         scale = self.object_size["scale"]
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
         if scale == 20:

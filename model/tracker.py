@@ -5,38 +5,25 @@ This class differs a lot from an ordinary model, so we write it from scratch.
 import os
 import shutil
 from pathlib import Path
-from model.segmenter import Segmenter
 import numpy as np
 import pandas as pd
 import cv2
+
+from model.segmenter import Segmenter
 from model.utils import *
 
 class Tracker():
+    """
+    Class for spheroid tracking model.
+    The model implements tracking-by-detection approach and is built on top of
+    a pre-trained YOLO11x instance segmentation model (defined as Segmenter class instance).
+    """
     def __init__(self, path_to_model: str, size):
         self.path = path_to_model
         self.model = Segmenter(path_to_model, size)
         self.output_dir = Path("tracker_output")
         self.img_dir = self.output_dir / "frames"
         self.table_dir = self.output_dir / "tabular data"
-        # self.results = {
-        #     "frame_num": [],
-        #     "t": [],
-        #     "id_label": [],
-        #     "old_label": [],
-        #     "box": [],
-        #     "mask": [],
-        #     "confidence": [],
-        #     "diameter": [],
-        #     "area": [],
-        #     "volume": []
-        # }
-        # try:
-        #     shutil.rmtree(self.output_dir)
-        # except:
-        #     pass
-        # os.makedirs(self.output_dir, exist_ok=True)
-        # os.makedirs(self.img_dir, exist_ok=True)
-        # os.makedirs(self.table_dir, exist_ok=True)
 
     def track(self, img_seq_folder: str, time_period: float = 15):
         """
@@ -60,7 +47,7 @@ class Tracker():
             shutil.rmtree(self.output_dir)
         except:
             pass
-        
+
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.img_dir, exist_ok=True)
         os.makedirs(self.table_dir, exist_ok=True)
@@ -91,11 +78,14 @@ class Tracker():
             self.model.clear_cached_detections()
             # if it is the first frame in the sequence, we need to process it a bit differently
             if zero_frame:
-                current_results = pandas_to_ultralytics(output, cv2.imread(path), path=filename, frame_num=i)
+                current_results = pandas_to_ultralytics(output, cv2.imread(path),
+                                                        path=filename, frame_num=i)
                 if current_results is None:
                     continue
-                current_image = current_results.plot(conf=True, labels=True, boxes=True,  masks=True, probs=False,
-                                                    show=False, save=True, color_mode="class", filename=filename)
+                current_image = current_results.plot(conf=True, labels=True, boxes=True,
+                                                     masks=True, probs=False, show=False,
+                                                     save=True, color_mode="class",
+                                                     filename=filename)
                 zero_frame_results = output.copy()
                 for c, _ in enumerate(zero_frame_results['mask'].tolist()):
                     # some masks are of 0 length, so we must filter and skip them
@@ -103,7 +93,7 @@ class Tracker():
                         pass
                     else:
                         # but in general we just mine the needed data and save it
-                        bin_mask, morphology = plot_mask(zero_frame_results['mask'].iloc[c])
+                        _, morphology = plot_mask(zero_frame_results['mask'].iloc[c])
 
                         self.results["frame_num"].append(i)
                         self.results["t"].append(i * time_period)
@@ -115,7 +105,6 @@ class Tracker():
                         self.results["diameter"].append(morphology['diameter'])
                         self.results["area"].append(morphology['area'])
                         self.results["volume"].append(morphology['volume'])
-                        # self.results['bin_mask'].append(bin_mask)
                 
             # below we process the other sequence frames
             else:
@@ -172,18 +161,22 @@ class Tracker():
                     })
                     # here we assigned all the iIDs, mined all the data and then save it below
                     self.results = pd.concat((self.results, record), ignore_index=True)
-                filtered_results = self.results[(self.results['frame_num'] == i) & (self.results['id_label'] != -1)]
+                filtered_results = self.results[(self.results['frame_num'] == i)
+                                                & (self.results['id_label'] != -1)]
                 columns_of_interest = ["frame_num", "t", "old_label", "box", "mask",
                                        "confidence", "diameter", "area", "volume"]
-                current_results = pd.merge(filtered_results[columns_of_interest], output[['id_label', 'bin_mask']],
+                current_results = pd.merge(filtered_results[columns_of_interest],
+                                           output[['id_label', 'bin_mask']],
                                            left_on='old_label', right_on='id_label', how='inner')
                 current_results['id_label'] = filtered_results['id_label'].tolist()
                 current_results = pandas_to_ultralytics(current_results, cv2.imread(path),
                                                         path=filename, frame_num=i)
                 if current_results is None:
                     continue
-                current_image = current_results.plot(conf=True, labels=True, boxes=True,  masks=True, probs=False,
-                                                    show=False, save=True, color_mode="class", filename=filename)
+                current_image = current_results.plot(conf=True, labels=True, boxes=True,
+                                                     masks=True, probs=False, show=False,
+                                                     save=True, color_mode="class",
+                                                     filename=filename)
             zero_frame = False
         # now we processed all frames and start saving the results
         self.results['id_label'].dropna(inplace=True)
@@ -194,7 +187,8 @@ class Tracker():
             columns_of_interest = ["frame_num", "t", "confidence", "diameter", "area", "volume"]
             filename = str(self.table_dir / ("spheroid_" + str(spheroid).zfill(2) + ".csv"))
             spheroid_records[columns_of_interest].to_csv(filename, sep=';', index=False)
-        columns_of_interest = ["frame_num", "t", "id_label", "confidence", "diameter", "area", "volume"]
+        columns_of_interest = ["frame_num", "t", "id_label",
+                               "confidence", "diameter", "area", "volume"]
         general_t_series_data = self.results[columns_of_interest]
         filename = str(self.table_dir / ("general_t_series_data.csv"))
         general_t_series_data.to_csv(filename, sep=';', index=False)

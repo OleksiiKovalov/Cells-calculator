@@ -30,7 +30,8 @@ class Model():
     - '%': the target percentage value obtained.
     """
     def __init__(self, path=os.path.join('model', 'yolov8m-det.onnx'),
-                 threshold=100, eps=5, min_samples=10, object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20}):
+                 threshold=100, eps=5, min_samples=10,
+                 object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20}):
         self.nuclei_counter = NucleiCounter(threshold=threshold,
                                             eps=eps, min_samples=min_samples)
         self.path = path
@@ -39,6 +40,11 @@ class Model():
         self.init_counter(path, object_size)
 
     def init_counter(self, path, object_size):
+        """
+        Helper constructor method for initializing cell counter param.
+        Depending on the model file name, either CellCounter or Segmenter
+        class is being called for initialization.
+        """
         if "det" in path:
             self.cell_counter = CellCounter(path_to_model=path, object_size = object_size)
         elif "seg" in path:
