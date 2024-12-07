@@ -38,8 +38,8 @@ class Tracker(BasePlugin):
     def handle_action(self, action_name, value):
         if action_name == "reset_detection":
             self.reset_detection()
-        elif action_name == "set_size":
-            self.set_size(value)
+        # elif action_name == "set_size":
+        #     self.set_size(value)
 
         elif action_name == "open_folder":
             self.reset_detection()
@@ -49,8 +49,8 @@ class Tracker(BasePlugin):
         for file in os.listdir(value)\
             if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
                 self.folder_path = value
-                self.max_range_slider.set_default()
-                self.min_range_slider.set_default()
+                # self.max_range_slider.set_default()
+                # self.min_range_slider.set_default()
                 self.button.setEnabled(True)
             else:
                 self.lsm_filesList = None
@@ -93,41 +93,6 @@ class Tracker(BasePlugin):
 
         # Connect button click event to calculate_button function
         self.button.clicked.connect(self.calculate_button)
-
-        range_lable = QLabel("Object Size:")
-        font = QFont()
-        font.setPointSize(16) 
-
-        range_lable.setFont(font)
-
-        #self.right_layout.addSpacing(1)
-        self.min_range_slider = Slider(self.object_size, self.default_object_size, 'min_size')
-        self.max_range_slider = Slider(self.object_size, self.default_object_size, 'max_size')
-        # LineWidth_label = QLabel("Line Width:")
-        # LineWidth_label.setFont(QFont("Arial", 16))
-
-        # self.LineWidth_edit = QLineEdit()
-        # size = self.object_size['line_width']
-        # self.LineWidth_edit.setText(f"{size:.2f}")
-        # self.LineWidth_edit.setFont(QFont("Arial", 12))
-        # self.LineWidth_edit.returnPressed.connect(self.update_lineWidth)
-
-        # LineWidth_layout = QHBoxLayout()
-        # LineWidth_layout.addWidget(LineWidth_label)
-        # LineWidth_layout.addWidget(self.LineWidth_edit)
-
-        colormap_label = QLabel("Colormap:")
-        colormap_label.setFont(QFont("Arial", 24))
-
-        self.colormap_combo = QComboBox()
-        self.colormap_combo.setFont(QFont("Arial", 16))
-
-        self.colormaps =  self.object_size["color_map_list"]
-        self.colormap_combo.addItems(self.colormaps)
-        self.colormap_combo.setCurrentText(self.object_size['color_map'])  # Установить "Viridis" по умолчанию
-        self.colormap_combo.currentTextChanged.connect(self.update_colormap)
-
-        # Add widgets to the right layout with spacing
         ###self.right_layout.addWidget(label)
         self.right_layout.addWidget(plugin_label)
         self.right_layout.addSpacing(20)
@@ -135,18 +100,6 @@ class Tracker(BasePlugin):
         self.right_layout.addSpacing(20)
         self.right_layout.addWidget(self.right_view)
         self.right_layout.addSpacing(20)
-
-        self.right_layout.addWidget(colormap_label)
-        self.right_layout.addWidget(self.colormap_combo)
-        self.right_layout.addSpacing(20)
-        # self.right_layout.addLayout(LineWidth_layout)
-        self.right_layout.addSpacing(20)
-
-        self.right_layout.addWidget(range_lable)
-        self.right_layout.addSpacing(20)
-
-        self.right_layout.addWidget(self.min_range_slider)
-        self.right_layout.addWidget(self.max_range_slider)
 
         self.right_layout.addSpacing(20)
         self.right_layout.addSpacing(20)
@@ -156,56 +109,11 @@ class Tracker(BasePlugin):
     def update_colormap(self, colormap):
         self.object_size["color_map"] = colormap
 
-    # def update_lineWidth(self):
-    #     # Получаем значение из QLineEdit
-    #     input_text = self.LineWidth_edit.text()
-
-    #     # Проверяем, является ли введённое значение числом
-    #     try:
-    #         # Преобразуем в число с плавающей точкой
-    #         line_width = float(input_text)
-
-    #         self.object_size["line_width"] = round(line_width, 2)
-    #         self.LineWidth_edit.setText(f"{float(input_text):.2f}")
-
-    #     except ValueError:
-    #         # Если введено некорректное значение, устанавливаем стандартное значение
-    #         size = self.object_size["line_width"]
-    #         self.LineWidth_edit.setText(f"{size:.2f}") 
-
     def reset_detection(self):
         print("reset_detection")
         return
         for key, model in self.models.items():
             model.cell_counter.detections = None
-
-    def set_size(self, detection, img_size : tuple = (512,512)):
-        min_size, max_size = self.default_object_size["min_size"], self.default_object_size["max_size"]
-        model = self.combo_box.currentText()
-        if all(len(cell) >= 4 for cell in detection):
-            img_sq = img_size[0] * img_size[1]
-            # Вычисляем произведения для каждого 
-            values = [cell[2] * cell[3] for cell in detection]
-
-            # Находим максимальное и минимальное произведение
-            min_size_from_detection = min(values) / img_sq
-            max_size_from_detection = max(values) / img_sq
-            if self.lsm_filesList or model != "All_models":
-                if min_size_from_detection >= min_size:
-                    min_size = None
-                else:
-                    min_size = min_size_from_detection
-                if max_size_from_detection <= max_size:
-                    max_size = None
-                else:
-                    max_size = max_size_from_detection
-            else:
-                min_size = min_size_from_detection
-                max_size = max_size_from_detection
-        if min_size is not None:
-            self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
-        if max_size is not None:
-            self.max_range_slider.change_default(min_size = min_size, max_size = max_size)
 
     def calculate_button(self):
         model = self.combo_box.currentText()
@@ -232,7 +140,7 @@ class Tracker(BasePlugin):
 
     def show_result(self, text):
         msgBox = QMessageBox()
-        
+
         # Set the icon of the message box to a warning icon
         msgBox.setIcon(QMessageBox.Information)
 
