@@ -3,6 +3,8 @@ This module defines the MainWindow class for the Cells Calculator application.
 The application is designed to open, process, and analyze cell images.
 """
 import sys
+import os
+import shutil
 from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
     QSizePolicy, QGraphicsProxyWidget, QGraphicsRectItem, QHeaderView, \
         QMessageBox, QTableWidget, QTableWidgetItem, QPushButton, QGraphicsView,\
@@ -17,8 +19,6 @@ from UI.SettingsWindow import SettingsWindow
 from UI.table import calculate_table
 from UI.right_layout.right_layout import right_layout
 from UI.menubar import menubar
-import os
-import shutil
 from UI.right_layout.plugins.CellDetector import CellDetector as CellDetector_plugin
 from UI.right_layout.plugins.tracker import Tracker as Tracker_plugin
 from UI.right_layout.plugins.SpheroidSegmenter import SpheroidSegmenter as Spheroid_Segmenter_plugin
@@ -36,8 +36,6 @@ class MainWindow(QMainWindow):
     This class handles the initialization of the UI, loading and processing images, 
     and interacting with various models to perform cell calculations.
     """
-
-
     mainWindow_signal = pyqtSignal(str, object)
     def __init__(self):
 
