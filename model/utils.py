@@ -8,9 +8,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-import ultralytics
-import ultralytics.engine
-from ultralytics.engine.results import Results, Boxes, Masks
+from ultralytics.engine.results import Results
 
 import tiffile
 
@@ -127,8 +125,6 @@ def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_
         x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
         y_plus_h (int): Y-coordinate of the bottom-right corner of the bounding box.
     """
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # label = f"{CLASSES[class_id]} ({confidence:.2f})"
     color = COLORS[0]
     if img.shape[0] < 800:
         thickness = 1
@@ -138,36 +134,6 @@ def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_
         cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
     else:
         img = cv2.circle(img, (x, y), 2, color, -1)
-
-# def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512,512)) -> pd.DataFrame:
-#     """
-#     Filters bounding boxes based on their area.
-#     Bboxes of size < min_size or > max_size are removed.
-#     Area is measured in % of image size (between 0.0 and 1.0).
-#     This filtering function is implemented in October, 2024, to reduce the amount of garbage detected as cells.
-
-#     Input args:
-#     - detections: pd.DataFrame of detections, including bboxes in [x1, y1, x2, y2] format, where x1, y1 - lower-left corner coordinates;
-#     - min_size: float representing the minimal possible size of bbox;
-#     - max_size: float representing the maximal possible size of bbox;
-#     - img_size: tuple of size 2 representing width and height of image.
-
-#     Returns np.array of filtered bboxes.
-#     """
-#     assert(min_size <= max_size)
-#     if detections.empty:
-#         return detections
-#     img_sq = img_size[0] * img_size[1]
-#     # print(type(detections['box']))
-#     print(detections.head())
-#     print(detections['box'].head())
-#     print(detections['box'].iloc[0])
-#     detections['square'] = detections['box'].apply(lambda b: (b[2] - b[0]) * (b[3] - b[1]) / img_sq)
-#     print(detections['square'].head())
-#     print(detections['square'].max())
-#     print(detections.shape)
-#     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= (b[2] - b[0]) * (b[3] - b[1]) / img_sq <= max_size)]
-#     return filtered_detections
 
 def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512,512)) -> pd.DataFrame:
     # NOTE: this function is deprecatedand no longer used, since we have implemented new inference pipeline
@@ -206,8 +172,7 @@ def results_to_pandas(outputs: Results, store_bin_mask=False) -> pd.DataFrame:
             "confidence": [],
             "diameter": [],
             "area": [],
-            "volume": [],
-            # "bin_mask": []
+            "volume": []
         }
     else:
         data = {
@@ -257,8 +222,7 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
         "confidence": [],
         "diameter": [],
         "area": [],
-        "volume": [],
-        # "bin_mask": []
+        "volume": []
     }
     try:
         for i, obj in enumerate(outputs):
@@ -269,11 +233,10 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
                 mask_array = np.vstack((xs, ys)).T
                 data['mask'].append(mask_array)
                 data['confidence'].append(obj['score'])
-                bin_mask, morphology = plot_mask(mask_array)
+                _, morphology = plot_mask(mask_array)
                 data['diameter'].append(morphology['diameter'])
                 data['area'].append(morphology['area'])
                 data['volume'].append(morphology['volume'])
-                # data['bin_mask'].append(bin_mask)
     except:
         print("Something wrong happenned...")
     return pd.DataFrame(data)
@@ -434,73 +397,3 @@ def calculate_morphology(bin_mask: np.array) -> dict:
     radius = diameter / 2
     volume = (4/3) * np.pi * radius**3
     return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
-
-
-
-
-
-if __name__ == "__main__":
-    mask = np.array([[    0.11406,     0.72024],
-        [    0.11406,     0.72917],
-        [     0.1125,     0.73214],
-        [     0.1125,     0.73512],
-        [    0.10781,     0.74405],
-        [    0.10781,     0.74702],
-        [    0.10469,     0.75298],
-        [    0.10469,     0.75595],
-        [    0.10312,     0.75893],
-        [   0.096875,     0.75893],
-        [   0.096875,     0.85417],
-        [    0.10625,     0.85417],
-        [    0.10781,     0.85119],
-        [    0.10938,     0.85119],
-        [    0.11094,     0.85417],
-        [      0.125,     0.85417],
-        [    0.12656,     0.85119],
-        [    0.12812,     0.85119],
-        [    0.13125,     0.84524],
-        [    0.13281,     0.84524],
-        [    0.13437,     0.84226],
-        [     0.1375,     0.84226],
-        [    0.13906,     0.83929],
-        [    0.14687,     0.83929],
-        [    0.14844,     0.83631],
-        [    0.15781,     0.83631],
-        [    0.15937,     0.83333],
-        [    0.16406,     0.83333],
-        [    0.16562,     0.83036],
-        [    0.17031,     0.83036],
-        [    0.17187,     0.83333],
-        [    0.17812,     0.83333],
-        [    0.17969,     0.83036],
-        [    0.18437,     0.83036],
-        [    0.18594,     0.82738],
-        [     0.1875,     0.82738],
-        [    0.18906,      0.8244],
-        [    0.19531,      0.8244],
-        [    0.19687,     0.82143],
-        [    0.19844,     0.82143],
-        [        0.2,     0.81845],
-        [    0.20156,     0.81845],
-        [    0.20469,      0.8125],
-        [    0.20469,     0.80952],
-        [    0.20625,     0.80655],
-        [    0.20625,     0.77083],
-        [    0.20469,     0.76786],
-        [    0.20469,      0.7619],
-        [    0.20312,     0.75893],
-        [    0.20312,     0.75595],
-        [    0.20156,     0.75298],
-        [    0.20156,        0.75],
-        [    0.19687,     0.74107],
-        [    0.19531,     0.74107],
-        [    0.19375,      0.7381],
-        [    0.19062,      0.7381],
-        [     0.1875,     0.73214],
-        [     0.1875,     0.72024]], dtype=np.float32)
-    masks1 = [mask]
-    masks2 = [mask+0.005, mask-0.01]
-    r, _ = plot_mask(mask)
-    print(r.shape)
-    plt.imshow(r)
-    plt.show()

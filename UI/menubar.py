@@ -1,6 +1,5 @@
 from PyQt5.QtWidgets import QAction, QFileDialog, QMenuBar
-from PyQt5.QtGui import QPixmap, QImage, QFont, QColor, QPen
-from PyQt5.QtCore import Qt, QObject, pyqtSignal, pyqtSlot
+from PyQt5.QtCore import pyqtSignal, pyqtSlot
 
 class menubar(QMenuBar):
     menubar_signal = pyqtSignal(str, object)
@@ -39,8 +38,7 @@ class menubar(QMenuBar):
         settings_menu.addAction(self.settings_action)
 
         self.plugin_actions = {}
-         
-        
+
         # Добавляем плагины в меню
         for plugin in self.plugin_list:
             action = QAction(plugin, self, checkable=True)
@@ -61,10 +59,6 @@ class menubar(QMenuBar):
             action.setChecked(True)
             self.current_plugin_name = action.text()
             self.menubar_signal.emit("change_plugin", self.current_plugin_name)
-            
-        
-
-      
 
     @pyqtSlot(str, object)
     def handle_mainWindow_action(self, action_name, value):
@@ -79,7 +73,6 @@ class menubar(QMenuBar):
         elif action_name == "open_image":
             self.settings_action.setEnabled(False)
             self.save_as_action.setEnabled(False)
-            
 
         elif action_name == "open_folder":
             if value:
@@ -105,7 +98,6 @@ class menubar(QMenuBar):
 
         if action_name == "Save_as":
             self.save_as_action.setEnabled(value)
-        
 
     def open_file(self):
         file_path, _ = QFileDialog.getOpenFileName(

@@ -6,13 +6,10 @@ These are the models for:
 - segmenting spheroids.
 """
 import os
-import pandas as pd
-import cv2
 import numpy as np
 from ultralytics import YOLO
-from model.sahi.auto_model import AutoDetectionModel
 from model.sahi.utils.cv import read_image
-from model.sahi.predict import get_prediction, get_sliced_prediction, predict
+from model.sahi.predict import get_sliced_prediction
 
 from model.BaseModel import BaseModel
 from model.utils import *

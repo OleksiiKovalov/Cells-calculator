@@ -4,12 +4,9 @@ to calculate cells on a given contrast microimage.
 """
 
 import os
-# import shutil
 import cv2
-# import torch
 import numpy as np
 import pandas as pd
-from ultralytics import YOLO
 from model.BaseModel import BaseModel
 from model.utils import draw_bounding_box, filter_detections
 

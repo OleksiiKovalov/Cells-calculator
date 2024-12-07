@@ -1,20 +1,14 @@
 """
 This module defines the dialog window for selecting channels in the Cells Calculator application.
 """
-import sys
-from PyQt5.QtWidgets import QAbstractItemView, QCheckBox,QGraphicsPixmapItem,\
-    QSizePolicy, QGraphicsProxyWidget, QGraphicsRectItem, QHeaderView, \
-        QMessageBox, QTableWidget, QTableWidgetItem, QPushButton, QGraphicsView,\
-            QApplication, QMainWindow, QAction, QGraphicsView, QGraphicsScene, \
-                QVBoxLayout, QWidget, QFileDialog, QGraphicsTextItem, QComboBox, \
-                    QLabel, QHBoxLayout
-from PyQt5.QtGui import QPixmap, QImage, QFont
-from PyQt5.QtCore import Qt
-import numpy as np
 import os
-import tifffile
-
 import traceback
+import tifffile
+from PyQt5.QtWidgets import QGraphicsPixmapItem,\
+        QMessageBox, QPushButton, QGraphicsView, QMainWindow, QGraphicsView, QGraphicsScene, \
+                QVBoxLayout, QWidget, QGraphicsTextItem, QComboBox, QLabel, QHBoxLayout
+from PyQt5.QtGui import QPixmap, QImage
+
 
 def has_duplicates(lst):
     """
@@ -82,7 +76,7 @@ class SettingsWindow(QMainWindow):
             call_back: Callback function.
         """
         super().__init__(parent)
-        
+
         # Initialize instance variables
         self.parent_ = parent
         self.warning_count = 0
@@ -96,14 +90,14 @@ class SettingsWindow(QMainWindow):
         self.lsm_list = None
         self.parametrs = parametrs
         self.number = 0
-        
+
         # If multiple LSM files are selected, use the first one
         if isinstance(lsm_path, list):
             self.lsm_path = lsm_path[0]
             self.lsm_list = lsm_path
         else:
             self.lsm_path = lsm_path
-        
+
         self.num_channels = 0
         self.setWindowTitle("Dialog Window")
         self.initUI()
@@ -115,16 +109,16 @@ class SettingsWindow(QMainWindow):
         # Calculate dimensions based on parent size
         self.parent_width = self.parent().width()
         self.parent_height = self.parent().height()
-        
+
         # Set fixed size for the dialog window
         self.setFixedSize(int(self.parent_width * 0.75), int(self.parent_height * 0.75))
-        
+
         # Set window title with basename of the LSM path
         self.setWindowTitle(f'Settings - {os.path.basename(self.lsm_path)}')
-        
+
         # Create the scene
         self.makeScene()
-            
+
     def makeScene(self):
         """
         Create the scene and layout for the dialog window.
@@ -138,20 +132,20 @@ class SettingsWindow(QMainWindow):
         # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         # Create main layout
         main_layout = QHBoxLayout()
         self.scene = QGraphicsScene()
-        
+
         # Create QGraphicsView for the scene
         self.view = QGraphicsView(self.scene)
         self.view.setFixedWidth(int(self.parent_width * 0.75 * 0.75))
         self.view.setFixedHeight(int(self.parent_height * 0.70))
-        
+
         # Create layout for right side widgets
         right_layout = QVBoxLayout()
         self.combo_box_dict = None
-        
+
         try:
             self.add_images()
         except:
@@ -167,15 +161,15 @@ class SettingsWindow(QMainWindow):
                 self.warning_count = 1
             self.num_channels = 5
             self.scene.clear()
-        
+
         options = list(self.parametrs.keys())
-        
+
         # Determine the maximum number of channels from parameters
         for option in options:
             self.num_channels = max(self.num_channels, self.parametrs[option] + 1)
-        
+
         self.combo_box_dict = self.parametrs.copy()
-        
+
         # Create combo boxes for channel selection
         for option in options:
             label = QLabel(option)
@@ -187,7 +181,7 @@ class SettingsWindow(QMainWindow):
             label_combo_layout.addWidget(label)
             label_combo_layout.addWidget(combo_box)
             right_layout.addLayout(label_combo_layout)
-        
+
         # Create layout for buttons
         buttons_layout = QHBoxLayout()
         cancel_button = QPushButton("Cancel")
@@ -197,7 +191,7 @@ class SettingsWindow(QMainWindow):
         buttons_layout.addWidget(cancel_button)
         buttons_layout.addWidget(choose_button)
         right_layout.addLayout(buttons_layout)
-        
+
         # Create layout for navigation buttons
         buttons_next_layout = QHBoxLayout()
         next_button = QPushButton("Next")
@@ -206,7 +200,7 @@ class SettingsWindow(QMainWindow):
         next_button.clicked.connect(self.next_action)
         buttons_next_layout.addWidget(next_button)
         right_layout.addLayout(buttons_next_layout)
-        
+
         # Add main view and right layout to the main layout
         main_layout.addWidget(self.view)
         main_layout.addLayout(right_layout)
@@ -248,7 +242,6 @@ class SettingsWindow(QMainWindow):
         self.parent_.mainWindow_signal.emit("reset_detection", None)
         if self.call_back:
             self.call_back()
-        
         self.close()
 
     def next_action(self):
@@ -277,7 +270,6 @@ class SettingsWindow(QMainWindow):
             self.scene.clear()
         self.setWindowTitle(f'Settings - {os.path.basename(self.lsm_path)}')
 
-        
     def add_images(self):
         """
         Add images to the scene.
@@ -321,8 +313,7 @@ class SettingsWindow(QMainWindow):
             text_item.setPos((i % 2) * (image_width + 20) + image_width / 4,\
                 current_image_height + image_height)
             self.scene.addItem(text_item)
-        
-        
+
     def center(self):
         """
         Center the dialog window relative to its parent widget.

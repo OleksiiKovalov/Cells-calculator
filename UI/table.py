@@ -1,9 +1,8 @@
 """
 This module defines the function to calculate a table based on certain methods applied to image files.
 """
-import pandas as pd
 import os
-
+import pandas as pd
 
 
 def calculate_table(model_dict: dict, files_name: list, parametrs: dict):
@@ -21,7 +20,7 @@ def calculate_table(model_dict: dict, files_name: list, parametrs: dict):
     # Convert single file name string to a list
     if isinstance(files_name, str): 
         files_name = [files_name]
-    
+
     # Define column names for the table
     column_list = ["Nuclei", "Cells", "Alive"]
     columns = ['File name']
@@ -31,7 +30,7 @@ def calculate_table(model_dict: dict, files_name: list, parametrs: dict):
 
     # Create an empty DataFrame with the defined columns
     table = pd.DataFrame(columns=columns)
-    
+
     # Iterate through each file
     for file_path in files_name:
         # Initialize a dictionary for the row to add to the table
@@ -60,7 +59,7 @@ def calculate_table(model_dict: dict, files_name: list, parametrs: dict):
                 # If no result is returned, mark the row with "-"
                 for i in column_list:
                     row_toAdd[f"{model_name}/{i}"] = "-"
-            
+
             # Convert the row dictionary to a DataFrame and concatenate it with the main table
             row_to_add = pd.DataFrame([row_toAdd])
             table = pd.concat([table, row_to_add], ignore_index=True)

@@ -6,8 +6,6 @@ import os
 import shutil
 
 from model.sahi.auto_model import AutoDetectionModel
-from model.sahi.utils.cv import read_image
-from model.sahi.predict import get_prediction, get_sliced_prediction, predict
 
 class BaseModel():
     """
@@ -48,7 +46,7 @@ class BaseModel():
         self.model_x10 = AutoDetectionModel.from_pretrained(
             model_type='yolov8',
             model_path=path_to_model,
-            confidence_threshold=0.01,
+            confidence_threshold=0.005,
             device="cpu", # or 'cuda:0'
         )
 
