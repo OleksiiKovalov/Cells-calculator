@@ -119,6 +119,12 @@ class CellCounter(BaseModel):
             # perform square-based filtering of bboxes
             detections = pd.DataFrame(detections)
             self.detections = detections
+            csv_data = self.detections.copy()
+            csv_data['width'] = csv_data['box'].apply(lambda b: b[2] / length)
+            csv_data['height'] = csv_data['box'].apply(lambda b: b[3] / length)
+            csv_data['bbox_area'] = csv_data['width'] * csv_data['height'] / length**2
+            csv_data[['confidence', 'width', 'height',
+                      'bbox_area']].to_csv(self.out_dir / "cell_data.csv", sep=';', index=False)
             self.scale = scale
             # change object_size for detection
             self.object_size['signal']("set_size", detections['box'].copy())

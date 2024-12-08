@@ -3,9 +3,12 @@ Here we define for baseline class of all segmenting or detecting models used in 
 We define both the structure and the main functionality utils.
 """
 import os
+from pathlib import Path
 import shutil
 
 from model.sahi.auto_model import AutoDetectionModel
+
+OUT_DIR = Path("cellprocesser_output")
 
 class BaseModel():
     """
@@ -25,6 +28,8 @@ class BaseModel():
         self.object_size = object_size
         self.original_image = None
         self.detections = None
+        self.out_dir = OUT_DIR
+        os.makedirs(OUT_DIR, exist_ok=True)
 
     def init_models(self, path_to_model: str):
         """

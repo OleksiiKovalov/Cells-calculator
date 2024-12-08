@@ -14,6 +14,7 @@ from model.sahi.predict import get_sliced_prediction
 from model.BaseModel import BaseModel
 from model.utils import *
 
+
 class Segmenter(BaseModel):
     def init_x20_model(self, path_to_model: str):
         self.model = YOLO(path_to_model, task="segment")
@@ -59,6 +60,9 @@ class Segmenter(BaseModel):
 
             if tracking is False:
                 self.object_size['signal']("set_size", self.detections['box'].copy())
+                self.detections[['id_label', 'confidence', 'diameter', 'area',
+                                 'volume']].to_csv(self.out_dir / "cell_data.csv",
+                                                   sep=';', index=False)
 
         detections = self.detections[self.detections['confidence'] >= min_score]
         if tracking is False:
