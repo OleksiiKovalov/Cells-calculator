@@ -54,7 +54,6 @@ class Tracker():
 
         self.results = {
             "frame_num": [],
-            "t": [],
             "id_label": [],
             "old_label": [],
             "box": [],
@@ -96,7 +95,6 @@ class Tracker():
                         _, morphology = plot_mask(zero_frame_results['mask'].iloc[c])
 
                         self.results["frame_num"].append(i)
-                        self.results["t"].append(i * time_period)
                         self.results["id_label"].append(c)
                         self.results["old_label"].append(c)
                         self.results["box"].append(zero_frame_results['box'].iloc[c])
@@ -149,7 +147,6 @@ class Tracker():
                     row["id_label"] = id_indices[k]
                     record = pd.DataFrame({
                         "frame_num": [i],
-                        "t": [i * time_period],
                         "id_label": [row['id_label']],
                         "old_label": [k],
                         "box": [row['box']],
@@ -163,7 +160,7 @@ class Tracker():
                     self.results = pd.concat((self.results, record), ignore_index=True)
                 filtered_results = self.results[(self.results['frame_num'] == i)
                                                 & (self.results['id_label'] != -1)]
-                columns_of_interest = ["frame_num", "t", "old_label", "box", "mask",
+                columns_of_interest = ["frame_num", "old_label", "box", "mask",
                                        "confidence", "diameter", "area", "volume"]
                 current_results = pd.merge(filtered_results[columns_of_interest],
                                            output[['id_label', 'bin_mask']],
@@ -184,10 +181,10 @@ class Tracker():
         unique_spheroids = self.results['id_label'].unique().tolist()
         for spheroid in unique_spheroids:
             spheroid_records = self.results[self.results['id_label'] == spheroid]
-            columns_of_interest = ["frame_num", "t", "confidence", "diameter", "area", "volume"]
+            columns_of_interest = ["frame_num", "confidence", "diameter", "area", "volume"]
             filename = str(self.table_dir / ("spheroid_" + str(spheroid).zfill(2) + ".csv"))
             spheroid_records[columns_of_interest].to_csv(filename, sep=';', index=False)
-        columns_of_interest = ["frame_num", "t", "id_label",
+        columns_of_interest = ["frame_num", "id_label",
                                "confidence", "diameter", "area", "volume"]
         general_t_series_data = self.results[columns_of_interest]
         filename = str(self.table_dir / ("general_t_series_data.csv"))

@@ -49,7 +49,8 @@ class Segmenter(BaseModel):
 
         colormap = self.object_size['color_map']
         if self.detections is None:
-            outputs = self.model(input_image, conf=0.3, iou=0.6, retina_masks=True, **kwargs)[0]
+            outputs = self.model(input_image, conf=0.3, iou=0.6,
+                                max_det = 2000, retina_masks=True, **kwargs)[0]
             self.original_image = outputs.orig_img
             if outputs.masks is None:
                 return None
