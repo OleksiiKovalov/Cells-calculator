@@ -141,7 +141,7 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 
 ### Spheroid tracker YOLO11x-680 model
 
-|  | Precision | Recall | AP@50 | AP@50-95 | Images |
+| - | Precision | Recall | AP@50 | AP@50-95 | Images |
 |---|---|---|---|---|---|---|---|
 | Box | 94.4 | 91.9 | 95.1 | 87.1 | 451 |
 | Mask | 95.7 | 93.2 | 96.1 | 97.1 | 451 |
@@ -149,7 +149,7 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 ### Stained Cell Nuclei counter
 | MAPE | MAE | RMSE | Images | Nuclei |
 |---|---|---|---|---|
-| 0.059 | 1.0 | 1.629 | 23 | 325 |
+| 0.059 | 1.0 | 1.629 | 23 / 25 | 325 |
 
 ## Run the code
 
