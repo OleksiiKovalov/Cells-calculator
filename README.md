@@ -30,7 +30,7 @@ Summarizing, our achievements can be generally concluded as:
 ![[Releases]](images/Achievements.jpg)
 
 On behalf of application architecture, starting from V2.0 **CellsCalculator** has plugin-based architecture, so that each independent tool is implemented within a dedicated plugin. As for now, there are 2 available plugins:
-![[Releases]](images/plugins.jpg)
+![[Releases]](images/plugins.png)
 
 Visit [this](#discover-what-our-product-is-capable-of) section to see demo examples of the mentioned features.
 
@@ -94,7 +94,7 @@ As a result, it was decided to search for third-party datasets of cell microimag
 ![[LIVECell_images]](images/livecell_data_smaller.png)
 
 The test dataset for evaluating our cell segmentation models consists of 94 carefully chosen target images divided into 7 subsets so that images of different images could be analyzed in more details. The images were labelled manually using CVAT web-tool.
-![[L929_images]](images/Screenshot_41.jpg)
+![[L929_barchart]](images/barchart.png)
 
 ### Microimages containing cell stained nuclei
 
