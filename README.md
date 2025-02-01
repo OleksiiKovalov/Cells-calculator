@@ -1,5 +1,18 @@
 # Cells Calculator
 
+![[Header]](images/header.png)
+
+## Quick references:
+* [Brief description](#brief-description)
+* [What's new?](#cellscalculatorv2-whats-new)
+* [Get the CellsCalculator app](#get-the-cellscalculator-app)
+* [Discover what our product is capable of](#discover-what-our-product-is-capable-of)
+* [Available models](#available-models)
+* [Data](#data)
+* [Model quality metrics](#model-quality-metrics)
+* [Run the code](#run-the-code)
+* [Contributors](#contributors)
+
 ## Brief description
 
 **CellsCalculator** is an innovative application developed by project team "B" for processing mouse fibroblast cells of L929 cell line as well as cells of any other lines which visually appear to be similar to L929 line. It enables processing contrast microscopic images in *lsm* format, as well as images in standard formats, such as *jpeg*, *png* etc.
@@ -168,7 +181,7 @@ python main.py
 ```
 4. Enjoy the application running!
 
-## About the developers
+## Contributors
 
 **CellsCalculator V2.0** has been developed by:
 * Ponomarov Y. - *team-lead, ML engineer*;
