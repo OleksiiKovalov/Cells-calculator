@@ -128,7 +128,7 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 
 ### YOLO11x-512 cell segmentation model
 
-| Subset # | Precision | Recall | AP@50 | AP@50-95 | Images |
+| Subset # | Precision | Recall | AP@50 | AP@50-95 | N Images |
 |---|---|---|---|---|---|
 | 0 | 85.7 / 87.5 | 88.5 / 90.4 | 87.5 / 89.7 | 43.1 / 45.2 | 12 |
 | 1 | 80.0 / 60.0 | 0.2 / 0.2 | 40.2 / 30.2 | 17.2 / 14.1 | 6 |
@@ -142,7 +142,7 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 
 ### YOLO11x-680 cell segmentation model
 
-| Subset # | Precision | Recall | AP@50 | AP@50-95 | Images |
+| Subset # | Precision | Recall | AP@50 | AP@50-95 | N Images |
 |---|---|---|---|---|---|
 | 0 | 82.9 / 83.5 | 69.3 / 69.7 | 77.6 / 78.4 | 41.8 / 42.9 | 12 |
 | 1 | 62.0 / 63.4 | 35.6 / 36.3 | 45.2 / 46.6 | 16.9 / 18.4 | 6 |
@@ -156,13 +156,13 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 
 ### Spheroid tracker YOLO11x-680 model
 
-| - | Precision | Recall | AP@50 | AP@50-95 | Images |
+| - | Precision | Recall | AP@50 | AP@50-95 | N Images |
 |---|---|---|---|---|---|
 | Box | 94.4 | 91.9 | 95.1 | 87.1 | 451 |
 | Mask | 95.7 | 93.2 | 96.1 | 97.1 | 451 |
 
 ### Stained Cell Nuclei counter
-| MAPE | MAE | RMSE | Images | Nuclei |
+| MAPE | MAE | RMSE | N Images | N Nuclei |
 |---|---|---|---|---|
 | 0.059 | 1.0 | 1.629 | 23 | 325 |
 
@@ -183,13 +183,20 @@ python main.py
 ```
 4. Enjoy the application running!
 
+## See also
+
+If you are interested to study the project details more thoroughly, follow the links below to get more information on:
+* [Model training guidelines](https://github.com/EugenTheMachine/YOLOcfg.git);
+* [Used model configs & training artifacts](https://github.com/EugenTheMachine/ResultingModels.git);
+* [Data labelling using SAM](https://github.com/EugenTheMachine/SpheroidSAMLabelling.git).
+
 ## Contributors
 
-**CellsCalculator V2.0** has been developed by:
-* Ponomarov Y. - *team-lead, ML engineer*;
-* Kuznesova I. - *ML engineer, data labelling*;
-* Batiuchenko O. - *software developer*;
-* Noskova K. - *ML engineer*;
-* Glushchenko D. - *lead of documentation editing assistance, lead of data labelling*;
-* Baluka A. - *documentation editing assistance, data labelling*;
-* Ipatko K. - *documentation editing assistance, data labelling*;
+**CellsCalculator V2.0** has been developed by the following students of NTU "KhPI":
+* **Ponomarov Y.** - *team-lead, ML engineer*;
+* **Kuznesova I.** - *ML engineer, data labelling*;
+* **Batiuchenko O.** - *software developer*;
+* **Noskova K.** - *ML engineer*;
+* **Glushchenko D.** - *lead of documentation editing assistance, lead of data labelling*;
+* **Baluka A.** - *documentation editing assistance, data labelling*;
+* **Ipatko K.** - *documentation editing assistance, data labelling*.
