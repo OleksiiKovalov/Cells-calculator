@@ -128,7 +128,7 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 ### YOLO11x-680 cell segmentation model
 
 | Subset # | Precision | Recall | AP@50 | AP@50-95 | Images |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|
 | Subset 0 | 82.9 / 83.5 | 69.3 / 69.7 | 77.6 / 78.4 | 41.8 / 42.9 | 12 |
 | Subset 1 | 62.0 / 63.4 | 35.6 / 36.3 | 45.2 / 46.6 | 16.9 / 18.4 | 6 |
 | Subset 2 | 90.4 / 92.8 | 1.4 / 1.4 | 45.9 / 47.1 | 20.6 / 22.1 | 14 |
@@ -142,14 +142,14 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 ### Spheroid tracker YOLO11x-680 model
 
 | - | Precision | Recall | AP@50 | AP@50-95 | Images |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|
 | Box | 94.4 | 91.9 | 95.1 | 87.1 | 451 |
 | Mask | 95.7 | 93.2 | 96.1 | 97.1 | 451 |
 
 ### Stained Cell Nuclei counter
 | MAPE | MAE | RMSE | Images | Nuclei |
 |---|---|---|---|---|
-| 0.059 | 1.0 | 1.629 | 23 / 25 | 325 |
+| 0.059 | 1.0 | 1.629 | 23 | 325 |
 
 ## Run the code
 
