@@ -105,7 +105,7 @@ It should be noted that many pictures have been filtered out due to different re
 ### Frame sequences containing spheroids
 
 The dataset originally consisted of 52 sequences of frames, each ~42 frames long on average. It was labelled in semi-automatic mode using SAM-2 model and point prompts:
-![[SAM_labelling]](images/SAM_labelling.jpg)
+![[SAM_labelling]](images/SAM_labelling.png)
 *(note: in some cases, bbox prompts had to be used instead to obtain better quality)*.
 
 Next, it was splitted sequence-wise into train/val/test subsets, and then finally it was modified in accordance with ultralytics dataset requirements. For more information on dataset labelling procedure, check out our [dedicated repository](https://github.com/EugenTheMachine/SpheroidSAMLabelling.git).
