@@ -38,13 +38,15 @@ Remember: it is forbidden to rename or change location of ANY elements within th
 ## Discover what our product is capable of
 
 **CellsCalculator** is a huge innovation indeed - just look at in what an awesome way it handles the job of calculating both cells and stained nuclei on given images, achieving nearly state-of-the-art performance on images of proper quality:
+
 *Segmentation of cell instances (left: input image, right: processed image)*
 ![[cells_segmented]](images/Screenshot_39.jpg)
+
 *Processing low-scale images (left: original model, right: SAHI+original model)*
 ![[cells_segmented_lowscale]](images/Screenshot_40.jpg)
+
 *Tracking of cellular spheroids through a sequence of frames (left: visualization of segentation results, right: plots representing time-series data of spheroids' morphology)*
 ![[spheroid_tracking]](images/spheroid_demo.gif)
-*Have a folder of images? Process it all at once - no need for image-wise processing! Note, that an error may occure in case of non-lsm images, in which case follow the instructions on your screen.*
 
 ## Available models
 The application includes several models for different use-cases. Those are:
@@ -112,7 +114,7 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 ### YOLO11x-512 cell segmentation model
 
 | Subset # | Precision | Recall | AP@50 | AP@50-95 | Images |
-|---|---|---|---|---|---|---|---|
+|---|---|---|---|---|---|
 | Subset 0 | 85.7 / 87.5 | 88.5 / 90.4 | 87.5 / 89.7 | 43.1 / 45.2 | 12 |
 | Subset 1 | 80.0 / 60.0 | 0.2 / 0.2 | 40.2 / 30.2 | 17.2 / 14.1 | 6 |
 | Subset 2 | 83.3 / 86.1 | 0.6 / 0.6 | 42.0 / 43.4 | 21.1 / 23.2 | 14 |
