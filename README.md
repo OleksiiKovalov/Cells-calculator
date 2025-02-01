@@ -58,7 +58,7 @@ Remember: it is forbidden to rename or change location of ANY elements within th
 *Processing low-scale images (left: original model, right: SAHI+original model)*
 ![[cells_segmented_lowscale]](images/Screenshot_40.jpg)
 
-*Tracking of cellular spheroids through a sequence of frames (left: visualization of segentation results, right: plots representing time-series data of spheroids' morphology)*
+*Tracking of cellular spheroids through a sequence of frames (left: visualization of segmentation results, right: plots representing time-series data of spheroids' morphology)*
 ![[spheroid_tracking]](images/spheroid_demo.gif)
 
 ## Available models
@@ -83,7 +83,7 @@ If you want to take a look at how to train the model from scratch, please visit 
 ### Microimages containing cells
 
 Original dataset which had been given to us was a set of unstandardized databases containing contrast images of L929 cells with some stained nuclei. Along with that, in response to our request we had been also given a set of images of cells only so that we could better analyze our model for cell counting.
-![[L929_images]](images/target_data.png)
+![[L929_images]](images/target_data_smaller.png)
 
 After performing EDA, it became clear that our data had several serious problems:
 - Large data diversity (visually images differed significantly);
@@ -91,7 +91,7 @@ After performing EDA, it became clear that our data had several serious problems
 - No labels (no ground truth had been given to us - only the images).
 
 As a result, it was decided to search for third-party datasets of cell microimages which would have visual appearance similar to ours. The dataset we found was [LIVECell](https://sartorius-research.github.io/LIVECell/) dataset, containing over 5,000 images (3,000+ training images), which was enough for us to train a deep model.
-![[LIVECell_images]](images/livecell_data.png)
+![[LIVECell_images]](images/livecell_data_smaller.png)
 
 The test dataset for evaluating our cell segmentation models consists of 94 carefully chosen target images divided into 7 subsets so that images of different images could be analyzed in more details. The images were labelled manually using CVAT web-tool.
 ![[L929_images]](images/Screenshot_41.jpg)
@@ -106,7 +106,9 @@ It should be noted that many pictures have been filtered out due to different re
 
 The dataset originally consisted of 52 sequences of frames, each ~42 frames long on average. It was labelled in semi-automatic mode using SAM-2 model and point prompts:
 ![[SAM_labelling]](images/SAM_labelling.jpg)
-*(note: in some cases, bbox prompts had to be used instead to obtain better quality)*. Next, it was splitted sequence-wise into train/val/test subsets, and then finally it was modified in accordance with ultralytics dataset requirements. For more information on dataset labelling procedure, check out our [dedicated repository](https://github.com/EugenTheMachine/SpheroidSAMLabelling.git).
+*(note: in some cases, bbox prompts had to be used instead to obtain better quality)*.
+
+Next, it was splitted sequence-wise into train/val/test subsets, and then finally it was modified in accordance with ultralytics dataset requirements. For more information on dataset labelling procedure, check out our [dedicated repository](https://github.com/EugenTheMachine/SpheroidSAMLabelling.git).
 
 ## Model quality metrics
 Below is a list of the main quality metrics of obtained models. We used the following metrics for evaluation of obtained cell segmentation models:
@@ -128,13 +130,13 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 
 | Subset # | Precision | Recall | AP@50 | AP@50-95 | Images |
 |---|---|---|---|---|---|
-| Subset 0 | 85.7 / 87.5 | 88.5 / 90.4 | 87.5 / 89.7 | 43.1 / 45.2 | 12 |
-| Subset 1 | 80.0 / 60.0 | 0.2 / 0.2 | 40.2 / 30.2 | 17.2 / 14.1 | 6 |
-| Subset 2 | 83.3 / 86.1 | 0.6 / 0.6 | 42.0 / 43.4 | 21.1 / 23.2 | 14 |
-| Subset 3 | 64.8 / 66.2 | 75.3 / 77.8 | 70.2 / 72.7 | 32.2 / 36.0 | 3 |
-| Subset 4 | 78.8 / 81.5 | 72.9 / 75.3 | 72.5 / 75.9 | 39.7 / 41.6 | 41 |
-| Subset 5 | 84.0 / 81.3 | 2.2 / 2.2 | 42.9 / 41.6 | 22.6 / 24.1 | 13 |
-| Subset 6 | 27.5 / 48.2 | 14.2 / 25.0 | 17.4 / 33.2 | 4.4 / 9.6 | 5 |
+| 0 | 85.7 / 87.5 | 88.5 / 90.4 | 87.5 / 89.7 | 43.1 / 45.2 | 12 |
+| 1 | 80.0 / 60.0 | 0.2 / 0.2 | 40.2 / 30.2 | 17.2 / 14.1 | 6 |
+| 2 | 83.3 / 86.1 | 0.6 / 0.6 | 42.0 / 43.4 | 21.1 / 23.2 | 14 |
+| 3 | 64.8 / 66.2 | 75.3 / 77.8 | 70.2 / 72.7 | 32.2 / 36.0 | 3 |
+| 4 | 78.8 / 81.5 | 72.9 / 75.3 | 72.5 / 75.9 | 39.7 / 41.6 | 41 |
+| 5 | 84.0 / 81.3 | 2.2 / 2.2 | 42.9 / 41.6 | 22.6 / 24.1 | 13 |
+| 6 | 27.5 / 48.2 | 14.2 / 25.0 | 17.4 / 33.2 | 4.4 / 9.6 | 5 |
 | Macro Avg / Sum | 72.0 / 73.0 | 36.3 / 38.8 | 53.2 / 55.2 | 25.8 / 27.7 | 94 |
 | Micro Avg / Sum | 78.0 / 79.3 | 46.7 / 48.6 | 60.7 / 62.7 | 31.4 / 33.3 | 94 |
 
@@ -142,13 +144,13 @@ For evaluating our algorithm for stained cell nuclei counting, we used:
 
 | Subset # | Precision | Recall | AP@50 | AP@50-95 | Images |
 |---|---|---|---|---|---|
-| Subset 0 | 82.9 / 83.5 | 69.3 / 69.7 | 77.6 / 78.4 | 41.8 / 42.9 | 12 |
-| Subset 1 | 62.0 / 63.4 | 35.6 / 36.3 | 45.2 / 46.6 | 16.9 / 18.4 | 6 |
-| Subset 2 | 90.4 / 92.8 | 1.4 / 1.4 | 45.9 / 47.1 | 20.6 / 22.1 | 14 |
-| Subset 3 | 64.8 / 66.2 | 2.2 / 2.2 | 36.8 / 36.8 | 10.6 / 11.7 | 3 |
-| Subset 4 | 71.4 / 71.4 | 10.4 / 10.5 | 45.7 / 46.1 | 28.4 / 29.5 | 41 |
-| Subset 5 | 85.7 / 91.4 | 1.1 / 1.1 | 43.3 / 46.3 | 22.8 / 29.5 | 13 |
-| Subset 6 | 22.2 / 22.2 | 0.2 / 0.2 | 11.2 / 11.2 | 5.1 / 5.0 | 5 |
+| 0 | 82.9 / 83.5 | 69.3 / 69.7 | 77.6 / 78.4 | 41.8 / 42.9 | 12 |
+| 1 | 62.0 / 63.4 | 35.6 / 36.3 | 45.2 / 46.6 | 16.9 / 18.4 | 6 |
+| 2 | 90.4 / 92.8 | 1.4 / 1.4 | 45.9 / 47.1 | 20.6 / 22.1 | 14 |
+| 3 | 64.8 / 66.2 | 2.2 / 2.2 | 36.8 / 36.8 | 10.6 / 11.7 | 3 |
+| 4 | 71.4 / 71.4 | 10.4 / 10.5 | 45.7 / 46.1 | 28.4 / 29.5 | 41 |
+| 5 | 85.7 / 91.4 | 1.1 / 1.1 | 43.3 / 46.3 | 22.8 / 29.5 | 13 |
+| 6 | 22.2 / 22.2 | 0.2 / 0.2 | 11.2 / 11.2 | 5.1 / 5.0 | 5 |
 | Macro Avg / Sum | 71.0 / 72.6 | 17.2 / 17.4 | 43.7 / 44.6 | 20.9 / 22.7 | 94 |
 | Micro Avg / Sum | 79.4 / 81.0 | 16.1 / 16.2 | 47.3 / 48.3 | 25.6 / 27.5 | 94 |
 
