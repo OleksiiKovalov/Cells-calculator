@@ -4,11 +4,13 @@ from PyQt5.QtWidgets import QCheckBox, QPushButton, QGraphicsView, QGraphicsView
     QGraphicsTextItem, QComboBox, QLabel
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
-
 from UI.Slider import Slider
 from UI.right_layout.plugins.BasePlagin import BasePlugin
 from model.Model import Model
-
+from errorhandling import app_logger
+import cv2
+import os
+from model.utils import create_image_grid
 
 class CellDetector(BasePlugin):
     def get_name(self):
@@ -16,12 +18,17 @@ class CellDetector(BasePlugin):
     def __init__(self, *arg):
 
         super().__init__(*arg)
+        self.checked_indices = None
         self.plugin_signal.emit("Open_lsm", True)
         self.plugin_signal.emit("Open_folder", False)
         self.plugin_signal.emit("Settings", False)
         self.plugin_signal.emit("Save_as", False)
-        self.model = Model(path=arg[-1][self.combo_box.currentText()]['path'],
-                           object_size=arg[-1][self.combo_box.currentText()]['object_size'])
+        currentModel = self.combo_box.currentText()
+        self.model = Model(path=arg[-1][currentModel]['path'],
+                           object_size=arg[-1][currentModel]['object_size'],
+                           model_type = arg[-1][currentModel]['model_type']
+                           )
+        self.lsm_path = None
 
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
         self.show_boundry = 0
@@ -56,12 +63,17 @@ class CellDetector(BasePlugin):
             self.reset_detection()
 
             self.right_scene.clear()
-            self.max_range_slider.set_default()
-            self.min_range_slider.set_default()
+            # self.max_range_slider.set_default()
+            # self.min_range_slider.set_default()
+            # workaround for some weird bug when app crashes after opening new image after prev recognition
+            self.max_range_slider.change_default(100,0)
+            self.min_range_slider.change_default(100,0)
+
             self.lsm_path = value
             self.lsm_filesList = None
             self.folder_path = None
             self.button.setEnabled(True)
+            self.batchProcessButton.setEnabled(True)
         elif action_name == "open_folder":
             self.reset_detection()
             self.right_scene.clear()
@@ -75,6 +87,7 @@ class CellDetector(BasePlugin):
                 self.lsm_path = None
                 self.draw_bounding = 0
                 self.button.setEnabled(True)
+                self.batchProcessButton.setEnabled(True)
             else:
                 self.folder_path = None
                 self.lsm_filesList = None
@@ -112,22 +125,25 @@ class CellDetector(BasePlugin):
             img_sq = img_size[0] * img_size[1]
             # Вычисляем произведения для каждого 
             values = [cell[2] * cell[3] for cell in detection] 
-
-            # Находим максимальное и минимальное произведение
-            min_size_from_detection = min(values) / img_sq
-            max_size_from_detection = max(values) / img_sq
-            if self.lsm_filesList or model != "All_models":
-                if min_size_from_detection >= min_size:
-                    min_size = None
+            if values:
+                # Находим максимальное и минимальное произведение
+                min_size_from_detection = min(values) / img_sq
+                max_size_from_detection = max(values) / img_sq
+                if self.lsm_filesList or model != "All_models":
+                    if min_size_from_detection >= min_size:
+                        min_size = None
+                    else:
+                        min_size = min_size_from_detection
+                    if max_size_from_detection <= max_size:
+                        max_size = None
+                    else:
+                        max_size = max_size_from_detection
                 else:
                     min_size = min_size_from_detection
-                if max_size_from_detection <= max_size:
-                    max_size = None
-                else:
                     max_size = max_size_from_detection
             else:
-                min_size = min_size_from_detection
-                max_size = max_size_from_detection
+                min_size = None
+                max_size = None
         if min_size is not None:
             self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
         if max_size is not None:
@@ -170,41 +186,65 @@ class CellDetector(BasePlugin):
             return 0
 
         # If a specific method is selected
-
+        button_enabled = self.button.isEnabled()        
         try:
-            # Attempt to calculate the result using the selected method
-            if self.models[model]['path'] == self.model.path:
-                # result = self.models[model].calculate(
-                #     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                #         nuclei_channel=self.parametrs['Nuclei'])
-                result = self.model.calculate(
-                    img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                        nuclei_channel=self.parametrs['Nuclei'])
-            else:
-                del self.model
-                self.model = Model(path=self.models[model]['path'],
-                                   object_size=self.models[model]['object_size'])
-                result = self.model.calculate(
-                    img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                        nuclei_channel=self.parametrs['Nuclei'])
-        except:
-            traceback.print_exc()
+            self.button.setText("Calculating.....")
+            self.button.setEnabled(False)
+            self.button.repaint()
             try:
-                # If an error occurs, try without channel information
-                if self.models[model]['path'] == self.model.path:
-                    # result = self.models[model].calculate(img_path=self.lsm_path)
-                    result = self.model.calculate(img_path=self.lsm_path)
+                # Attempt to calculate the result using the selected method
+                if self.model and (self.model == self.model.model_name):
+                    result = self.model.calculate(
+                        img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                            nuclei_channel=self.parametrs['Nuclei'])
                 else:
-                    del self.model
+                    if self.model:
+                        del self.model
+                        self.model = None
                     self.model = Model(path=self.models[model]['path'],
-                                       object_size=self.models[model]['object_size'])
-                    result = self.model.calculate(img_path=self.lsm_path)
-            except:
+                                    object_size=self.models[model]['object_size'],
+                                    model_type=self.models[model]['model_type'],
+                                    model_data=self.models[model],
+                                    model_name=model
+                                    )
+                    self.model.cell_counter.original_image_path = self.lsm_path
+                    result = self.model.calculate(
+                        img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                            nuclei_channel=self.parametrs['Nuclei'])
+            except  Exception as e:
                 traceback.print_exc()
-                # If still not successful, show an error dialog
-                self.plugin_signal.emit("show_warning", "Error during calculation \n\nChoose another model or change channels settings")
-                result = None
-                self.draw_bounding = 0
+                app_logger().exception(e)
+                try:
+                    # If an error occurs, try without channel information
+                    if self.models[model]['path'] == self.model.path:
+                        # result = self.models[model].calculate(img_path=self.lsm_path)
+                        result = self.model.calculate(img_path=self.lsm_path)
+                    else:
+                        del self.model
+                        self.model = None
+                        a_path = self.models[model]['path']
+                        self.model = Model(path=a_path,
+                                        object_size=self.models[model]['object_size'],
+                                        model_type=self.models[model]['model_type'],
+                                        model_data=self.models[model],
+                                        model_name=model)
+                        self.model.cell_counter.original_image_path = self.lsm_path
+                        result = self.model.calculate(img_path=self.lsm_path)
+                except  Exception as e:
+                    traceback.print_exc()
+                    app_logger().error(e)
+                    # If still not successful, show an error dialog
+                    self.plugin_signal.emit("show_warning", f"Error during calculation:{e} \n\nChoose another model or change channels settings")
+                    result = None
+                    if self.model:
+                        del self.model
+                        self.model = None
+                    # clear the model so it can be restarted 
+                    self.draw_bounding = 0
+        finally:
+            self.button.setText("Calculate")
+            self.button.setEnabled(button_enabled)
+            
 
         # If no result, return
         if not result:
@@ -220,6 +260,128 @@ class CellDetector(BasePlugin):
         # Draw bounding boxes
         self.draw_bounding_box()
 
+    def calculate_single_model(self, modeltype,modelpath,object_size, image_path,model_data = None, model_name = "<not set>"):
+        model = None
+        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model)
+        model.cell_counter.original_image_path = self.lsm_path
+        try:
+            model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
+        except  Exception as e:
+            traceback.print_exc()
+            app_logger().error(e)
+            try:
+                model.calculate(img_path=image_path)
+            except  Exception as e:
+                traceback.print_exc()
+                app_logger().error(e)
+                # If still not successful, show an error dialog
+                self.plugin_signal.emit("show_warning", f"Error during calculation:{e} \n\nChoose another model or change channels settings")
+                if model:
+                    del model
+                    model = None
+        if model:
+            return model.cell_counter.original_image, model.cell_counter.prediction_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
+        else:
+            return None, None, None, None
+
+    def batchProcessButton_click(self):
+        try:
+            savedEnabled = self.batchProcessButton.isEnabled()
+            self.batchProcessButton.setEnabled(False)
+            
+            items = list(self.models.keys())
+            if self.checked_indices is None:
+                self.checked_indices = list(range(0, len(self.models)))  # B and D checked
+            from UI.ModelsCheckList import ModelsCheckListDialog
+            dlg = ModelsCheckListDialog(items, self.checked_indices, parent=self.parent())
+            #set to resonable height to fit most of models
+            dlg.resize(300,383)
+            if dlg.Execute():
+                checked = dlg.get_checked_items()
+            else:
+                return
+           
+            processedImages = []
+            labels = []
+            i = 1
+            j = 1
+            model_list = [s for _, s in checked]
+            self.checked_indices = [i for i, _ in checked]
+            
+            for model_name in model_list:
+                self.batchProcessButton.setText(f"Processing {model_name} ({j}/{len(model_list)})")
+                self.batchProcessButton.repaint()
+                j = j + 1
+                model_data = self.models[model_name]
+                modepath = model_data['path']
+                model_type = model_data['model_type']
+                _, processedImage,duration,counted = self.calculate_single_model(model_type, modepath, self.object_size, self.lsm_path,model_data=model_data, model_name = model_name)
+                if counted is not None:
+                    processedImages.append( processedImage)
+                    labels.append(f"{i} {model_name}:{counted} cells in {duration:.2f} seconds")
+                    i = i + 1
+                    imageGrid = create_image_grid(processedImages,labels,total_images=len(self.models))
+                    cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+                    self.plugin_signal.emit("add_image", ".cache/image_grid_output.png" )
+            imageGrid = create_image_grid(processedImages,labels)
+            cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+            import matplotlib.pyplot as plt
+            plt.imshow(imageGrid)
+            plt.axis('off')  # Hide axes
+            plt.title("Image")
+            plt.show()            
+        finally:
+            self.batchProcessButton.setEnabled(savedEnabled)    
+            self.batchProcessButton.setText(f"All models on current image")
+
+    def batchProcessMultiImageButton_click(self):
+        try:
+            savedEnabled = self.batchProcessButtonMultiImage.isEnabled()
+            saved_lsm_path = self.lsm_path
+            self.batchProcessButtonMultiImage.setEnabled(False)
+            from PyQt5.QtWidgets import QFileDialog            
+            files, _ = QFileDialog.getOpenFileNames(
+                None,
+                "Select Images",
+                "",
+                "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All Files (*)"
+            )            
+            processedImages = []
+            labels = []
+            if files:
+                model = self.combo_box.currentText()
+                modepath = self.models[model]['path']
+                model_type = self.models[model]['model_type']
+                model_data = self.models[model]
+                i = 1
+                for file_path in files:
+                    try:
+                        image_name = os.path.basename(file_path)
+                        self.lsm_path = file_path
+                        self.batchProcessButtonMultiImage.setText(f"Processing {image_name} ({i}/{len(files)})")
+                        self.batchProcessButtonMultiImage.repaint()
+                        _, processedImage,duration,counted = self.calculate_single_model(model_type, modepath, self.object_size, file_path,model_data = model_data , model_name = model)
+                        processedImages.append( processedImage)
+                        labels.append(f"{i} {image_name}:{counted} cells in {duration:.2f} seconds")
+                        i = i + 1
+                        imageGrid = create_image_grid(processedImages,labels,total_images=len(files))
+                        cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+                        self.plugin_signal.emit("add_image", ".cache/image_grid_output.png" )
+                    except Exception as e:
+                        app_logger().critical("Unhandled exception caught:", e)
+                        
+                imageGrid = create_image_grid(processedImages,labels)
+                cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+                import matplotlib.pyplot as plt
+                plt.imshow(imageGrid)
+                plt.axis('off')  # Hide axes
+                plt.title("Image")
+                plt.show()            
+        finally:
+            self.lsm_path = saved_lsm_path
+            self.batchProcessButtonMultiImage.setEnabled(savedEnabled)    
+            self.batchProcessButtonMultiImage.setText(f"Current model on multiple images")
+        
     def print_result(self, result):
         model = self.combo_box.currentText()
         if model == "Detector":
@@ -308,9 +470,13 @@ class CellDetector(BasePlugin):
             avg_volume = "-"
         try:
             num_cells = spheroid_df.shape[0]
+            inference_duration = -1
+            if self.model:
+                inference_duration = self.model.inference_duration
             # Создание строк для вывода
             results = [
                 f"Objects detected: {num_cells}",
+                f"Duration        : {inference_duration:.2f} seconds",
                 f"Mean D: {round(avg_diameter*10000, 3)}‱",
                 f"Mean S: {round(avg_area*10000, 3)}‱",
                 f"Mean V: {round(avg_volume*10000, 3)}‱",
@@ -362,7 +528,7 @@ class CellDetector(BasePlugin):
             # Check if the show boundary flag is set
             if self.show_boundry:
                 # If set, add an image with bounding box detections to the scene
-                self.plugin_signal.emit("add_image", ".cache\cell_tmp_img_with_detections.png" )
+                self.plugin_signal.emit("add_image", ".cache\\cell_tmp_img_with_detections.png" )
             else:
                 # If not set, add the original image to the scene
                 self.plugin_signal.emit("add_image", self.lsm_path)
@@ -422,6 +588,14 @@ class CellDetector(BasePlugin):
         self.button = QPushButton("Calculate")
         self.button.setEnabled(False)
 
+        # Create a button for calculating
+        self.batchProcessButton = QPushButton("All models on current image")
+        self.batchProcessButton.setEnabled(False)
+
+        # Create a button for calculating
+        self.batchProcessButtonMultiImage = QPushButton("Current model on multiple images")
+        self.batchProcessButtonMultiImage.setEnabled(True)
+
         # Set font for the combo box
         self.combo_box.setFont(QFont("Arial", 24))
 
@@ -470,7 +644,9 @@ class CellDetector(BasePlugin):
 
         # Connect button click event to calculate_button function
         self.button.clicked.connect(self.calculate_button)
-
+        self.batchProcessButton.clicked.connect(self.batchProcessButton_click)
+        self.batchProcessButtonMultiImage.clicked.connect(self.batchProcessMultiImageButton_click)
+        
         range_lable = QLabel("Object Size:")
         font = QFont()
         font.setPointSize(16) 
@@ -508,30 +684,35 @@ class CellDetector(BasePlugin):
         # Add widgets to the right layout with spacing
         ###self.right_layout.addWidget(label)
         self.right_layout.addWidget(plugin_label)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         self.right_layout.addWidget(self.combo_box)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         self.right_layout.addWidget(self.right_view)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(colormap_label)
         self.right_layout.addWidget(self.colormap_combo)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         # self.right_layout.addLayout(LineWidth_layout)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(range_lable)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(self.min_range_slider)
         self.right_layout.addWidget(self.max_range_slider)
 
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(self.checkbox_scale)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(self.checkbox)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         self.right_layout.addWidget(self.button)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
+        
+        self.right_layout.addWidget(self.batchProcessButton)
+        self.right_layout.addSpacing(15)
+        self.right_layout.addWidget(self.batchProcessButtonMultiImage)
+        self.right_layout.addSpacing(15)

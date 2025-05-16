@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QMessageBox, QTableWidget, QTable
      QGraphicsView, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QWidget, QHBoxLayout
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
+from PyQt5.QtGui import QIcon
 import tifffile
 from UI.SettingsWindow import SettingsWindow
 from UI.table import calculate_table
@@ -18,6 +19,7 @@ from UI.menubar import menubar
 from UI.right_layout.plugins.CellDetector import CellDetector as CellDetector_plugin
 from UI.right_layout.plugins.tracker import Tracker as Tracker_plugin
 from model.utils import COLOR_NUMBER as color_number
+import json
 
 
 class MainWindow(QMainWindow):
@@ -35,6 +37,9 @@ class MainWindow(QMainWindow):
         This method sets up the initial state of the main window.
         """
         super().__init__()
+        
+        self.currentImageWidth = 0
+        self.currentImageHeight = 0
         # Add cache directory creation
         try:
             # Remove the existing cache directory if it exists
@@ -49,8 +54,7 @@ class MainWindow(QMainWindow):
         screen_geometry = desktop.availableGeometry()
 
         # Set the fixed size of the main window to match the screen width and height minus the height of the menu bar
-        self.setFixedSize(screen_geometry.width(),
-                          desktop.availableGeometry().height() - self.menuBar().height())
+        self.setFixedSize(screen_geometry.width(),desktop.availableGeometry().height() - self.menuBar().height())
 
         # Set the window title
         self.current_plugin_name = "Cell Processor"
@@ -86,6 +90,8 @@ class MainWindow(QMainWindow):
             self.open_folder(value)
         elif action_name == "open_settings":
             self.open_settings()
+        elif action_name == "open_normalize":
+            self.open_normalize()
 
         elif action_name == "show_warning":
             self.show_warning_dialog(value)
@@ -106,6 +112,16 @@ class MainWindow(QMainWindow):
         elif action_name == "add_image":
             self.add_image(value)
         pass
+    
+    def open_normalize(self):
+        from UI.ImageNormalizeDialog import ImageNormalizeDialog
+        from skimage.io import imread
+        image = imread(self.lsm_path)
+        from model.utils import safergb2gray
+        image = safergb2gray(image)
+        dlg = ImageNormalizeDialog(image)
+        dlg.exec_()        
+        pass
 
     def init_value(self):
         # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
@@ -122,17 +138,38 @@ class MainWindow(QMainWindow):
                    'line_width' : 100.00,
                    'scale' : 20
         }
+        
         self.default_object_size = self.object_size.copy()
 
         # Default parameters for cell and nuclei channels
         self.parametrs = {'Cell': 0,
                     'Nuclei': 1
         }
-        self.models_celldetector = {
-        'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size},
-        'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size},
-        'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size},
-        }
+        
+        self.models_celldetector = {}
+        # self.models_celldetector = {
+        # 'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size, "model_type":"cellcounter"},
+        # 'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size, "model_type":"segmenter"},
+        # 'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size, "model_type":"segmenter"},
+        # 'Cellpose': {"path": 'cellpose', "object_size": self.object_size, "model_type":"cellpose"},
+        # 'InstanSeg Flu_nc': {"path": 'fluorescence_nuclei_and_cells', "object_size": self.object_size, "model_type":"instanseg"},
+        # 'InstanSeg bright_nuc': {"path": 'brightfield_nuclei', "object_size": self.object_size, "model_type":"instanseg"},
+        # 'InstanSeg trained': {"path": 'model/instanseg_model_weights_best.pth.pt', "object_size": self.object_size, "model_type":"instanseg"},
+        # }
+
+        #loading detectors from config file
+        from collections import OrderedDict
+        with open('modelconfig.json', 'r') as f:
+            loaded_models = json.load(f, object_pairs_hook=OrderedDict)
+
+        for model_name, model_data in loaded_models.items():
+            # Set the 'object_size' parameter for each loaded model
+            model_data['object_size'] = self.object_size
+            self.models_celldetector[model_name] = model_data
+
+        print("Models loaded and updated successfully!")
+                    
+                    
         self.models_tracker = {
             'Baseline Segmenter' : {"path": 'model/YOLO11x-sphero-seg.pt', "size": self.object_size}
         }
@@ -368,6 +405,8 @@ class MainWindow(QMainWindow):
 
         # Convert the QImage to a QPixmap
         pixmap = QPixmap.fromImage(image)
+        self.currentImageWidth = image.width()
+        self.currentImageHeight = image.height()
 
         # Get the dimensions of the main view
         view_width = self.main_view.viewport().width()
@@ -391,6 +430,7 @@ class MainWindow(QMainWindow):
 
         # Add the scaled pixmap to the main scene
         pixmap_item = self.main_scene.addPixmap(pixmap)
+        
 
         # Calculate the position to center the image within the view
         x_pos = (view_width - pixmap.width()) / 2
@@ -398,7 +438,9 @@ class MainWindow(QMainWindow):
 
         # Set the position of the pixmap item within the scene
         pixmap_item.setPos(x_pos, y_pos)
-
+        self.main_view.repaint()
+        QApplication.processEvents()
+        
     def change_image(self):
         """
         Change displayed image. 
@@ -461,7 +503,7 @@ class MainWindow(QMainWindow):
                 # Try to add the image to the scene and set the window title
                 self.add_image(self.lsm_path)
                 self.setWindowTitle(
-                    f"Cells Calculator - {os.path.basename(lsm_path)}")
+                    f"Cells Calculator - {os.path.basename(lsm_path)} ({self.currentImageWidth} x {self.currentImageHeight})")
             except Exception as e:
                 traceback.print_exc()
                 # If an error occurs, show a warning dialog,
@@ -575,6 +617,7 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     # Create a QApplication instance
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon("ui/Cells-calculator-v3-icon2.png"))    
     try:
         # Attempt to create and show the main window
         window = MainWindow()

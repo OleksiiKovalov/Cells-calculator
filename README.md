@@ -138,6 +138,12 @@ If you are interested to study the project details more thoroughly, follow the l
 * [Used model configs & training artifacts](https://github.com/EugenTheMachine/ResultingModels.git);
 * [Data labelling using SAM](https://github.com/EugenTheMachine/SpheroidSAMLabelling.git).
 
+## CellsCalculatorV3: What's New?
+
+- **New models added**: Trained and integrated **StarDist** (https://github.com/stardist/stardist), **InstantSeg** (https://github.com/instanseg/instanseg), and **Cellpose** (https://github.com/mouseland/cellpose) for more accurate and robust instance segmentation.
+- **Shifted approach**: Moved from **exemplar-based** to **instance segmentation**, enabling better handling of overlapping and clustered cells.
+- **Performance comparison**: Evaluated new models against our previous **YOLO-based pipelines**, showing improved segmentation quality and boundary accuracy.
+
 ## Contributors
 
 **CellsCalculator V2.0** has been developed by the following students of NTU "KhPI":
@@ -148,3 +154,10 @@ If you are interested to study the project details more thoroughly, follow the l
 * **Glushchenko D.** - *lead of documentation editing assistance, lead of data labelling*;
 * **Baluka A.** - *documentation editing assistance, data labelling*;
 * **Ipatko K.** - *documentation editing assistance, data labelling*.
+
+**CellsCalculator V3.0** has been developed by the following students of NTU "KhPI":
+* **Cherkashyna I.** - *Team-lead, lead of documentary editing*
+* **Fesenko M.** - *ML-engineer*
+* **Lytvynenko S.** - *ML-engineer*
+* **Olijnyk V.** - *ML-engineer*
+* **Kovalov O.** - *tech-lead*

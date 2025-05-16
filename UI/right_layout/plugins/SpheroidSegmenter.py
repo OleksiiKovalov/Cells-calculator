@@ -270,7 +270,7 @@ class SpheroidSegmenter(BasePlugin):
             # Check if the show boundary flag is set
             if self.show_boundry:
                 # If set, add an image with bounding box detections to the scene
-                self.plugin_signal.emit("add_image", ".cache\cell_tmp_img_with_detections.png" )
+                self.plugin_signal.emit("add_image", ".cache\\cell_tmp_img_with_detections.png" )
             else:
                 # If not set, add the original image to the scene
                 self.plugin_signal.emit("add_image", self.lsm_path)

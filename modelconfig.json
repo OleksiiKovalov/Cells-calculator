@@ -1,0 +1,62 @@
+{
+	"Detector": {
+		"path": "trainedmodels/yolov8m-det.onnx",
+		"model_type": "cellcounter"
+	},
+	"YOLO-512 Segmenter": {
+		"path": "trainedmodels/YOLO11x-512-seg.pt",
+		"model_type": "segmenter"	
+	},
+	"YOLO-680 Segmenter": {
+		"path": "trainedmodels/YOLO11x-680-seg.pt",
+		"model_type": "segmenter"
+	},
+	"InstanSeg Flu_nc": {
+		"path": "fluorescence_nuclei_and_cells",
+		"model_type": "instanseg"
+	},
+	"InstanSeg bright_nuc": {
+		"path": "brightfield_nuclei",
+		"model_type": "instanseg"
+	},
+	"InstanSeg trained 0605": {
+		"path": "trainedmodels/instanseg_20250605.pt",
+		"model_type": "instanseg"
+	},
+	"Stardist 2D_versatile_he": {
+		"path": "2D_versatile_he",
+		"model_type": "stardist"
+	},
+	"Stardist trained 0602": {
+		"path": "trainedmodels/stardist0602",
+		"model_type": "stardist",
+		"image_preprocess": [
+			{
+				"rgb2gray": ""
+			},
+			{
+				"normalize": "1,99.8"
+			}
+		]
+	},
+	"Cellpose trained": {
+		"path": "trainedmodels/cpsam_finetuned.pth",
+		"model_type": "cellpose"
+	},
+	"Cellpose cyto": {
+		"path": "cyto",
+		"model_type": "cellpose"
+	},
+	"Cellpose nuclei": {
+		"path": "nuclei",
+		"model_type": "cellpose"
+	},
+	"Cellpose cyto2": {
+		"path": "cyto2",
+		"model_type": "cellpose"
+	},
+	"Cellpose cyto3": {
+		"path": "cyto3",
+		"model_type": "cellpose"
+	}
+}

@@ -7,10 +7,10 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-
+import math
 from ultralytics.engine.results import Results
-
 import tiffile
+from collections import OrderedDict
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
@@ -96,20 +96,7 @@ def calculate_lsm(cell_counter, nuclei_counter,
     percentage = (1 - nuclei_count/cell_count.shape[0]) * 100
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage,3)}
 
-def calculate_standard(cell_counter, img_path):
-    """
-    Calculates cells only on given standard image.
-    Input params are:
-    - cell_counter: CellCounter class instance;
-    - img_path: path to lsm/jpg/png/tif/bmp image.
 
-    Returns the result as a dictionary with the following fields:
-    - Nuclei: -100 (encoding for NaN);
-    - Cells: count for all the cells detected;
-    - %: -100 (encoding for NaN).
-    """
-    cell_count = cell_counter.count_cells(img_path)
-    return {'Nuclei': -100, 'Cells': cell_count, '%': -100}
 
 def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
     """
@@ -162,7 +149,7 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     # filtered_detections = filtered_detections[filtered_detections['box'].apply(lambda b: (min_size <= b[2] * b[3] / img_sq <= max_size).item())]
     return filtered_detections
 
-def results_to_pandas(outputs: Results, store_bin_mask=False) -> pd.DataFrame:
+def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
     if store_bin_mask is False:
         data = {
@@ -304,6 +291,8 @@ def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
     - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
     the foreground (the polygon for the given mask).
     """
+    if in_mask.max() > 1.0:
+        in_mask = in_mask /  np.array([image_size[1], image_size[0]])
     coords = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
     coords = coords.astype(np.int32)
     bin_mask = np.zeros(image_size, dtype=np.uint8)
@@ -380,6 +369,7 @@ def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_wit
         cv2.fillPoly(overlay, [coords], color)
     cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
     cv2.imwrite(filename, image)
+    return image
 
 def calculate_morphology(bin_mask: np.array) -> dict:
     """
@@ -397,3 +387,170 @@ def calculate_morphology(bin_mask: np.array) -> dict:
     radius = diameter / 2
     volume = (4/3) * np.pi * radius**3
     return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
+
+def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX, total_images = None) -> np.ndarray:
+    # if any(img is None for img in images):
+    #     raise ValueError("One or more images could not be loaded.")
+    
+    # Resize all images to the same dimensions
+    #height, width = [img is not None for img in images][0].shape[:2]
+    height, width =  (next((img for img in images if img is not None), None)).shape[:2]
+    images = [cv2.resize(img, (width, height)) for img in images]
+    
+    # Annotate each image with filename
+    labeled_images = []
+    for i, labeltext in enumerate(labels):
+        img_copy = images[i].copy()
+        if img_copy.ndim == 2:
+            from skimage.color import gray2rgb
+            img_copy = gray2rgb(img_copy)
+        
+        cv2.putText(img_copy, labeltext, (5, height - 10), font, label_font_scale, (255, 255, 255), label_thickness, cv2.LINE_AA)
+        cv2.rectangle(img_copy, (0, 0), (width, height), (255, 255, 255), 1)
+        labeled_images.append(img_copy)
+
+    # Determine grid size (nearly square)
+    n = len(labeled_images) if total_images is None else total_images
+    cols = math.ceil(math.sqrt(n))
+    rows = math.ceil(n / cols)
+
+    # Pad with black images if needed
+    black = np.zeros_like(labeled_images[0])
+    while len(labeled_images) < rows * cols:
+        labeled_images.append(black)
+
+    # Stack images into rows
+    grid_rows = []
+    for i in range(rows):
+        row_imgs = labeled_images[i*cols:(i+1)*cols]
+        row = np.hstack(row_imgs)
+        grid_rows.append(row)
+
+    # Stack all rows into final image
+    grid_image = np.vstack(grid_rows)
+    return grid_image            
+
+def resize_and_pad_cv(image, target_width, target_height):
+    """Resize image keeping aspect ratio and pad to target size."""
+    h, w = image.shape[:2]
+    scale = min(target_width / w, target_height / h)
+    new_w, new_h = int(w * scale), int(h * scale)
+
+    from skimage.transform import resize
+    resized = resize(image, (new_h, new_w), anti_aliasing=True, preserve_range=True)
+    #resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    resized = resized.astype(image.dtype)
+    
+    top = (target_height - new_h) // 2
+    bottom = target_height - new_h - top
+    left = (target_width - new_w) // 2
+    right = target_width - new_w - left
+
+#    padded = cv2.copyMakeBorder(resized, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
+    # Assuming image shape: (height, width, channels) or (height, width)
+    pad_width = (
+        (top, bottom),     # pad rows (height)
+        (left, right),     # pad columns (width)
+    )
+    # For grayscale
+    if resized.ndim == 2:
+        padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
+    # For color or multi-channel
+    elif resized.ndim == 3:
+        pad_width = pad_width + ((0, 0),)  # no padding on channels
+        padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
+        
+    return padded
+
+
+def process_loaded_image(image, settings:OrderedDict):
+    for step in settings:
+        key, value = next(iter(step.items()))
+        match key:
+            case "resize":
+                target_width, target_height = map(int, value.strip().split(":"))
+                orig_height, orig_width = image.shape[:2]
+                scale = min(target_width / orig_width, target_height / orig_height)
+                resized_width = int(orig_width * scale)
+                resized_height = int(orig_height * scale)
+                from skimage.transform import resize
+                image = resize(image, output_shape=(resized_height,resized_width), order=0, preserve_range=True, anti_aliasing=False).astype(image.dtype)
+            case "gray2rgb":
+                image = safegray2rgb(image)
+            case "rgb2gray":
+                image = safergb2gray(image)
+            case "normalize":
+                from csbdeep.utils import normalize            
+                p_min, p_max = map(float, value.strip().split(","))
+                image = normalize(image, pmin = p_min, pmax=p_max)
+            case "clip":
+                import numpy as np
+                a_min, a_max = map(int, value.strip().split(","))
+                image = np.clip(image, a_min=a_min, a_max=a_max)
+            case _:
+                raise RuntimeError(f"Unknow process_loaded_image instruction:{key}")
+    return image
+
+def safegray2rgb(image):
+    if image.ndim == 2:
+        from skimage.color import gray2rgb
+        return gray2rgb(image)
+    else:
+        return image
+
+def safergb2gray(image):
+    if image.ndim == 3:
+        from skimage.color import rgb2gray
+        image = rgb2gray(image)
+        return (image * 255).astype("uint8")
+    else:
+        return image
+
+def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.5):
+    tp = sum(1 for (_, _, iou) in matches if iou >= iou_threshold)
+    fp = num_candidate - tp
+    fn = num_ground - tp
+
+    precision = tp / (tp + fp) if (tp + fp) else 0
+    recall = tp / (tp + fn) if (tp + fn) else 0
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) else 0
+
+    return {
+        'TP': tp,
+        'FP': fp,
+        'FN': fn,
+        'Precision': precision,
+        'Recall': recall,
+        'F1': f1
+    }
+    
+def compute_iou(mask1, mask2):
+    """Compute Intersection over Union (IoU) between two binary masks."""
+    intersection = np.logical_and(mask1, mask2).sum()
+    union = np.logical_or(mask1, mask2).sum()
+    return intersection / union if union > 0 else 0.0
+
+def match_masks(masks_a, masks_b, iou_threshold=0.5):
+    """Match masks from List A to List B using IoU and Hungarian algorithm."""
+    n, m = len(masks_a), len(masks_b)
+    iou_matrix = np.zeros((n, m))
+
+    for i in range(n):
+        for j in range(m):
+            iou_matrix[i, j] = compute_iou(masks_a[i], masks_b[j])
+
+    from scipy.optimize import linear_sum_assignment
+    row_ind, col_ind = linear_sum_assignment(-iou_matrix)
+    matches = [(i, j, iou_matrix[i, j]) for i, j in zip(row_ind, col_ind) if iou_matrix[i, j] >= iou_threshold]
+    return matches, iou_matrix    
+    
+def safeimagesave(image,filename):
+    from skimage.io import imsave
+    if image.dtype == 'uint8':
+        #no denormalization needed
+        imsave(filename, image.astype('uint8'))
+    else:
+        #denormalization needed
+        imsave(filename, (image * 255).astype('uint8'))
+      
