@@ -9,7 +9,8 @@ import os
 from model.CellCounter import CellCounter
 from model.NucleiCounter import NucleiCounter
 from model.segmenter import Segmenter
-from model.utils import is_image_valid, calculate_lsm, calculate_standard
+from model.utils import is_image_valid, calculate_lsm
+from model.CellposeSegmenter import CellposeSegmenter
 
 class Model():
     """
@@ -45,7 +46,9 @@ class Model():
         Depending on the model file name, either CellCounter or Segmenter
         class is being called for initialization.
         """
-        if "det" in path:
+        if "cellpose" in path: 
+            self.cell_counter = CellposeSegmenter(path, object_size = object_size)
+        elif "det" in path:
             self.cell_counter = CellCounter(path_to_model=path, object_size = object_size)
         elif "seg" in path:
             self.cell_counter = Segmenter(path, object_size = object_size)
@@ -70,3 +73,18 @@ class Model():
                   img_path, cell_channel, nuclei_channel)
         elif is_image_valid(img_path):
             return calculate_standard(self.cell_counter, img_path)
+
+def calculate_standard(cell_counter : CellCounter, img_path : str):
+    """
+    Calculates cells only on given standard image.
+    Input params are:
+    - cell_counter: CellCounter class instance;
+    - img_path: path to lsm/jpg/png/tif/bmp image.
+
+    Returns the result as a dictionary with the following fields:
+    - Nuclei: -100 (encoding for NaN);
+    - Cells: count for all the cells detected;
+    - %: -100 (encoding for NaN).
+    """
+    cell_count = cell_counter.count_cells(img_path)
+    return {'Nuclei': -100, 'Cells': cell_count, '%': -100}

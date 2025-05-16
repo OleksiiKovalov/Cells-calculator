@@ -12,6 +12,9 @@ from ultralytics.engine.results import Results
 
 import tiffile
 
+
+
+
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
 COLORS = [(3,177,252)]
@@ -96,20 +99,7 @@ def calculate_lsm(cell_counter, nuclei_counter,
     percentage = (1 - nuclei_count/cell_count.shape[0]) * 100
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage,3)}
 
-def calculate_standard(cell_counter, img_path):
-    """
-    Calculates cells only on given standard image.
-    Input params are:
-    - cell_counter: CellCounter class instance;
-    - img_path: path to lsm/jpg/png/tif/bmp image.
 
-    Returns the result as a dictionary with the following fields:
-    - Nuclei: -100 (encoding for NaN);
-    - Cells: count for all the cells detected;
-    - %: -100 (encoding for NaN).
-    """
-    cell_count = cell_counter.count_cells(img_path)
-    return {'Nuclei': -100, 'Cells': cell_count, '%': -100}
 
 def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
     """
@@ -162,7 +152,7 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     # filtered_detections = filtered_detections[filtered_detections['box'].apply(lambda b: (min_size <= b[2] * b[3] / img_sq <= max_size).item())]
     return filtered_detections
 
-def results_to_pandas(outputs: Results, store_bin_mask=False) -> pd.DataFrame:
+def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
     if store_bin_mask is False:
         data = {

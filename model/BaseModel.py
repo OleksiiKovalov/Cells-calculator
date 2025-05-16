@@ -6,8 +6,6 @@ import os
 from pathlib import Path
 import shutil
 
-from model.sahi.auto_model import AutoDetectionModel
-
 OUT_DIR = Path("cellprocesser_output")
 
 class BaseModel():
@@ -48,12 +46,7 @@ class BaseModel():
         Input:
         - path_to_model: str - path to .pt YOLO model file.
         """
-        self.model_x10 = AutoDetectionModel.from_pretrained(
-            model_type='yolov8',
-            model_path=path_to_model,
-            confidence_threshold=0.005,
-            device="cpu", # or 'cuda:0'
-        )
+        pass
 
     def init_x20_model(self, path_to_model: str):
         """
@@ -62,7 +55,7 @@ class BaseModel():
         Input:
         - path_to_model: str - path to .pt YOLO model file.
         """
-        raise NotImplementedError
+        pass
 
     def count_cells(self, img_path):
         """

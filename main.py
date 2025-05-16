@@ -132,6 +132,7 @@ class MainWindow(QMainWindow):
         'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size},
         'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size},
         'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size},
+        'Cellpose': {"path": 'cellpose', "object_size": self.object_size},
         }
         self.models_tracker = {
             'Baseline Segmenter' : {"path": 'model/YOLO11x-sphero-seg.pt', "size": self.object_size}

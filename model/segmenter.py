@@ -10,6 +10,7 @@ import numpy as np
 from ultralytics import YOLO
 from model.sahi.utils.cv import read_image
 from model.sahi.predict import get_sliced_prediction
+from model.sahi.auto_model import AutoDetectionModel
 
 from model.BaseModel import BaseModel
 from model.utils import *
@@ -20,7 +21,12 @@ class Segmenter(BaseModel):
         self.model = YOLO(path_to_model, task="segment")
 
     def init_x10_model(self, path_to_model):
-        return super().init_x10_model(path_to_model)
+        self.model_x10 = AutoDetectionModel.from_pretrained(
+            model_type='yolov8',
+            model_path=path_to_model,
+            confidence_threshold=0.005,
+            device="cpu", # or 'cuda:0'
+        )
 
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,

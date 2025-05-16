@@ -56,8 +56,12 @@ class CellDetector(BasePlugin):
             self.reset_detection()
 
             self.right_scene.clear()
-            self.max_range_slider.set_default()
-            self.min_range_slider.set_default()
+            # self.max_range_slider.set_default()
+            # self.min_range_slider.set_default()
+            # workaround for some weird bug when app crashes after opening new image after prev recognition
+            self.max_range_slider.change_default(100,0)
+            self.min_range_slider.change_default(100,0)
+
             self.lsm_path = value
             self.lsm_filesList = None
             self.folder_path = None
@@ -173,7 +177,7 @@ class CellDetector(BasePlugin):
 
         try:
             # Attempt to calculate the result using the selected method
-            if self.models[model]['path'] == self.model.path:
+            if self.model and (self.models[model]['path'] == self.model.path):
                 # result = self.models[model].calculate(
                 #     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                 #         nuclei_channel=self.parametrs['Nuclei'])
