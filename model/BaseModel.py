@@ -5,8 +5,7 @@ We define both the structure and the main functionality utils.
 import os
 from pathlib import Path
 import shutil
-
-from model.sahi.auto_model import AutoDetectionModel
+import torch
 
 OUT_DIR = Path("cellprocesser_output")
 
@@ -15,7 +14,7 @@ class BaseModel():
     Base class for general YOLO instance models.
     Implements the neccessary high-level functional utils for using the model.
     """
-    def __init__(self, path_to_model: str, object_size):
+    def __init__(self, path_to_model: str, object_size,model_data = None):
         """
         Model constructor. Slightly differs for detectors and segmenters.
 
@@ -23,13 +22,28 @@ class BaseModel():
         - path_to_model: str - path to .pt YOLO model file;
         - object_size: UI util param 
         """
+        self.original_image_path = None
+        self.model_name = "<not specified>"
+        self.model_data = model_data
+        self.image_preprocess_settings_default = []
+        self.use_gpu = False
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
+        self.use_gpu = self.device.type == 'cuda'
+        
         self.init_models(path_to_model)
         self.path_to_model = path_to_model
         self.object_size = object_size
         self.original_image = None
+        self.prediction_image = None
         self.detections = None
         self.out_dir = OUT_DIR
         os.makedirs(OUT_DIR, exist_ok=True)
+        self.inference_duration = 0.0
+        self.detectionCount = -1
+        
 
     def init_models(self, path_to_model: str):
         """
@@ -48,12 +62,7 @@ class BaseModel():
         Input:
         - path_to_model: str - path to .pt YOLO model file.
         """
-        self.model_x10 = AutoDetectionModel.from_pretrained(
-            model_type='yolov8',
-            model_path=path_to_model,
-            confidence_threshold=0.005,
-            device="cpu", # or 'cuda:0'
-        )
+        pass
 
     def init_x20_model(self, path_to_model: str):
         """
@@ -62,7 +71,7 @@ class BaseModel():
         Input:
         - path_to_model: str - path to .pt YOLO model file.
         """
-        raise NotImplementedError
+        pass
 
     def count_cells(self, img_path):
         """
@@ -84,10 +93,18 @@ class BaseModel():
 
         scale = self.object_size["scale"]
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
+        import time
+        self.detectionCount = -1
+        start_time = time.time()
+        result = None
         if scale == 20:
-            return self.count_x20(input_image, filename=filename)
+            result =  self.count_x20(input_image, filename=filename)
         else:
-            return self.count_x10(input_image, filename=filename)
+            result =  self.count_x10(input_image, filename=filename)
+        end_time = time.time()
+        self.inference_duration = end_time - start_time
+        self.detectionCount = len(result)
+        return result
 
     def count_x10(self, input_image, filename):
         """Method for processing images of x10 scale by applying sliding window approach."""
@@ -100,3 +117,4 @@ class BaseModel():
     def clear_cached_detections(self):
         """Resets cached detections of needed."""
         self.detections = None
+       

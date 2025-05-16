@@ -37,6 +37,11 @@ class menubar(QMenuBar):
         self.settings_action.triggered.connect(self.open_settings)
         settings_menu.addAction(self.settings_action)
 
+        self.normalize_action = QAction("normalize", self)
+        self.normalize_action.setEnabled(False)
+        self.normalize_action.triggered.connect(self.open_normalize)
+        settings_menu.addAction(self.normalize_action)
+
         self.plugin_actions = {}
 
         # Добавляем плагины в меню
@@ -120,3 +125,6 @@ class menubar(QMenuBar):
 
     def save_as(self):
         self.menubar_signal.emit("save_as", None)
+
+    def open_normalize(self):
+        self.menubar_signal.emit("open_normalize", None)

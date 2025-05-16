@@ -10,6 +10,7 @@ import numpy as np
 from ultralytics import YOLO
 from model.sahi.utils.cv import read_image
 from model.sahi.predict import get_sliced_prediction
+from model.sahi.auto_model import AutoDetectionModel
 
 from model.BaseModel import BaseModel
 from model.utils import *
@@ -20,7 +21,12 @@ class Segmenter(BaseModel):
         self.model = YOLO(path_to_model, task="segment")
 
     def init_x10_model(self, path_to_model):
-        return super().init_x10_model(path_to_model)
+        self.model_x10 = AutoDetectionModel.from_pretrained(
+            model_type='yolov8',
+            model_path=path_to_model,
+            confidence_threshold=0.005,
+            device="cpu", # or 'cuda:0'
+        )
 
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
@@ -47,6 +53,9 @@ class Segmenter(BaseModel):
         except FileNotFoundError:
             pass
 
+        #every time detect from fresh
+        self.detections = None
+        
         colormap = self.object_size['color_map']
         if self.detections is None:
             outputs = self.model(input_image, conf=0.3, iou=0.6,
@@ -76,8 +85,9 @@ class Segmenter(BaseModel):
         else:
             filtered_detections = detections
 
+        self.prediction_image = None
         if plot is True:
-            plot_predictions(original_image, filtered_detections['mask'].tolist(),
+            self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                             filename=filename, colormap=colormap, alpha=alpha)
         return filtered_detections
 
@@ -110,6 +120,7 @@ class Segmenter(BaseModel):
         filtered_detections = filter_detections(detections,
                                                 min_size = self.object_size['min_size'],
                                                 max_size= self.object_size['max_size'])
-        plot_predictions(original_image, filtered_detections['mask'].tolist(),
+        self.prediction_image = None
+        self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                          filename=filename, colormap=colormap, alpha=alpha)
         return filtered_detections

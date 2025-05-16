@@ -35,6 +35,10 @@ class Slider(QWidget):
 
     def change_default(self, min_size, max_size):
         #TODO: some validation for min and max
+        if min_size is None:
+            min_size = 100
+        if max_size is None:
+            max_size = 0
         self.default_object_size['min_size'] = min_size - min_size / 100
         self.default_object_size['max_size'] = max_size + max_size / 100
         self.value_slider.setMinimum(int (self.default_object_size['min_size'] * self.round_parametr_slider))

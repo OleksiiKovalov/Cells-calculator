@@ -27,3 +27,6 @@ qwe.py
 /tracker_output
 /tracker_output/frames
 /tracker_output/tabular data
+/trainedmodels
+app.log
+/.cache
