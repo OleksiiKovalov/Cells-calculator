@@ -41,6 +41,7 @@ class Model():
         # self.cell_counter = CellCounter(path=path, object_size = object_size)
         # self.cell_counter = Segmenter("model/best_n.pt", object_size = object_size)
         self.init_counter(path, object_size,model_type)
+        self.inference_duration = 0
 
     def init_counter(self, path, object_size, model_type):
         """
@@ -75,10 +76,13 @@ class Model():
         - %: the target percentage for alive cells (given lsm image only).
         """
         if img_path.endswith('lsm'):
+            self.inference_duration = -1
             return calculate_lsm(self.cell_counter, self.nuclei_counter,
                   img_path, cell_channel, nuclei_channel)
         elif is_image_valid(img_path):
-            return calculate_standard(self.cell_counter, img_path)
+            result =calculate_standard(self.cell_counter, img_path)
+            self.inference_duration = self.cell_counter.inference_duration
+            return result
 
 def calculate_standard(cell_counter : CellCounter, img_path : str):
     """

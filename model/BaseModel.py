@@ -28,6 +28,7 @@ class BaseModel():
         self.detections = None
         self.out_dir = OUT_DIR
         os.makedirs(OUT_DIR, exist_ok=True)
+        self.inference_duration = 0
 
     def init_models(self, path_to_model: str):
         """
@@ -77,10 +78,16 @@ class BaseModel():
 
         scale = self.object_size["scale"]
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
+        import time
+        start_time = time.time()
+        result = None
         if scale == 20:
-            return self.count_x20(input_image, filename=filename)
+            result =  self.count_x20(input_image, filename=filename)
         else:
-            return self.count_x10(input_image, filename=filename)
+            result =  self.count_x10(input_image, filename=filename)
+        end_time = time.time()
+        self.inference_duration = end_time - start_time
+        return result
 
     def count_x10(self, input_image, filename):
         """Method for processing images of x10 scale by applying sliding window approach."""

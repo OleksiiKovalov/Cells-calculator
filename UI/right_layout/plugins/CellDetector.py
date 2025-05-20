@@ -318,9 +318,13 @@ class CellDetector(BasePlugin):
             avg_volume = "-"
         try:
             num_cells = spheroid_df.shape[0]
+            inference_duration = -1
+            if self.model:
+                inference_duration = self.model.inference_duration
             # Создание строк для вывода
             results = [
                 f"Objects detected: {num_cells}",
+                f"Duration        : {inference_duration:.2f} seconds",
                 f"Mean D: {round(avg_diameter*10000, 3)}‱",
                 f"Mean S: {round(avg_area*10000, 3)}‱",
                 f"Mean V: {round(avg_volume*10000, 3)}‱",

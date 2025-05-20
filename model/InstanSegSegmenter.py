@@ -47,7 +47,8 @@ class InstansegSegmenter(BaseModel):
         try:
             
             image_array, pixel_size = self.model.read_image(input_image)
-            labeled_output = self.model.eval_medium_image(image = image_array, return_image_tensor=False, target= "cells")
+            #labeled_output = self.model.eval_medium_image(image = image_array, return_image_tensor=False, target= "cells")
+            labeled_output = self.model.eval_medium_image(image = img_rgb, return_image_tensor=False, target= "cells")
             
             # display = self.model.display(image_array, labeled_output)
             # from instanseg.utils.utils import show_images
