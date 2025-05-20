@@ -123,31 +123,36 @@ class MainWindow(QMainWindow):
                    'line_width' : 100.00,
                    'scale' : 20
         }
+        
         self.default_object_size = self.object_size.copy()
 
         # Default parameters for cell and nuclei channels
         self.parametrs = {'Cell': 0,
                     'Nuclei': 1
         }
-        self.models_celldetector = {
-        'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size, "model_type":"cellcounter"},
-        'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size, "model_type":"segmenter"},
-        'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size, "model_type":"segmenter"},
-        'Cellpose': {"path": 'cellpose', "object_size": self.object_size, "model_type":"cellpose"},
-        'InstanSeg Flu_nc': {"path": 'fluorescence_nuclei_and_cells', "object_size": self.object_size, "model_type":"instanseg"},
-        'InstanSeg bright_nuc': {"path": 'brightfield_nuclei', "object_size": self.object_size, "model_type":"instanseg"},
-        'InstanSeg trained': {"path": 'model/instanseg_model_weights_best.pth.pt', "object_size": self.object_size, "model_type":"instanseg"},
-        }
         
-        # json_file_path = "models.bak"
-        # try:
-        #     with open(json_file_path, 'w', encoding='utf-8') as f:
-        #         json.dump(self.models_celldetector, f, ensure_ascii=False, indent=4)
-        #     print(f"Successfully serialized model data to {json_file_path}")
-        # except IOError as e:
-        #     print(f"Error writing to JSON file {json_file_path}: {e}")
-        # except TypeError as e:
-        #     print(f"Error serializing data to JSON: {e}. Ensure all data types are JSON serializable.")
+        self.models_celldetector = {}
+        # self.models_celldetector = {
+        # 'Detector': {"path": 'model/yolov8m-det.onnx', "object_size": self.object_size, "model_type":"cellcounter"},
+        # 'YOLO-512 Segmenter': {"path": 'model/YOLO11x-512-seg.pt', "object_size": self.object_size, "model_type":"segmenter"},
+        # 'YOLO-680 Segmenter': {"path": 'model/YOLO11x-680-seg.pt', "object_size": self.object_size, "model_type":"segmenter"},
+        # 'Cellpose': {"path": 'cellpose', "object_size": self.object_size, "model_type":"cellpose"},
+        # 'InstanSeg Flu_nc': {"path": 'fluorescence_nuclei_and_cells', "object_size": self.object_size, "model_type":"instanseg"},
+        # 'InstanSeg bright_nuc': {"path": 'brightfield_nuclei', "object_size": self.object_size, "model_type":"instanseg"},
+        # 'InstanSeg trained': {"path": 'model/instanseg_model_weights_best.pth.pt', "object_size": self.object_size, "model_type":"instanseg"},
+        # }
+
+        #loading detectors from config file
+        with open('modelconfig.json', 'r') as f:
+            loaded_models = json.load(f)
+
+        for model_name, model_data in loaded_models.items():
+            # Set the 'object_size' parameter for each loaded model
+            model_data['object_size'] = self.object_size
+            self.models_celldetector[model_name] = model_data
+
+        print("Models loaded and updated successfully!")
+                    
                     
         self.models_tracker = {
             'Baseline Segmenter' : {"path": 'model/YOLO11x-sphero-seg.pt', "size": self.object_size}
