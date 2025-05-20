@@ -37,7 +37,7 @@ class CellposeSegmenter(BaseModel):
                 print(f"Попередження: Шлях/назва '{path_to_model}' не валідні для Cellpose. Використовується '{default_model}'.")
             else:
                 print(f"Попередження: Не вказано модель Cellpose. Використовується '{default_model}'.")
-            self.model = cp_models.Cellpose(gpu=use_gpu, model_type=default_model)
+            self.model = cp_models.Cellpose(model_type=default_model)
 
     def init_x10_model(self, path_to_model):
         pass

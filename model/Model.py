@@ -11,6 +11,7 @@ from model.NucleiCounter import NucleiCounter
 from model.segmenter import Segmenter
 from model.utils import is_image_valid, calculate_lsm
 from model.CellposeSegmenter import CellposeSegmenter
+from model.InstanSegSegmenter import InstansegSegmenter
 
 class Model():
     """
@@ -32,25 +33,30 @@ class Model():
     """
     def __init__(self, path=os.path.join('model', 'yolov8m-det.onnx'),
                  threshold=100, eps=5, min_samples=10,
-                 object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20}):
+                 object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
+                 model_type = ""):
         self.nuclei_counter = NucleiCounter(threshold=threshold,
                                             eps=eps, min_samples=min_samples)
         self.path = path
         # self.cell_counter = CellCounter(path=path, object_size = object_size)
         # self.cell_counter = Segmenter("model/best_n.pt", object_size = object_size)
-        self.init_counter(path, object_size)
+        self.init_counter(path, object_size,model_type)
 
-    def init_counter(self, path, object_size):
+    def init_counter(self, path, object_size, model_type):
         """
         Helper constructor method for initializing cell counter param.
         Depending on the model file name, either CellCounter or Segmenter
         class is being called for initialization.
         """
-        if "cellpose" in path: 
+        
+
+        if "instanseg" in model_type: 
+            self.cell_counter = InstansegSegmenter(path, object_size = object_size)
+        elif "cellpose" in model_type: 
             self.cell_counter = CellposeSegmenter(path, object_size = object_size)
-        elif "det" in path:
+        elif "cellcounter" in model_type:
             self.cell_counter = CellCounter(path_to_model=path, object_size = object_size)
-        elif "seg" in path:
+        elif "segmenter" in model_type:
             self.cell_counter = Segmenter(path, object_size = object_size)
         else:
             raise ValueError("Unknown model type given as input. Expected 'det' for detection model or 'seg' for segmenting model to be presented in the model filename.")

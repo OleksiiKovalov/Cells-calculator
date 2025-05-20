@@ -1,0 +1,7 @@
+{
+    "Detector": {
+        "path": "model/yolov8m-det.onnx",
+        "object_size": {
+            "min_size": 100,
+            "max_size": 0.0,
+            "signal": 

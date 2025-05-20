@@ -20,8 +20,11 @@ class CellDetector(BasePlugin):
         self.plugin_signal.emit("Open_folder", False)
         self.plugin_signal.emit("Settings", False)
         self.plugin_signal.emit("Save_as", False)
-        self.model = Model(path=arg[-1][self.combo_box.currentText()]['path'],
-                           object_size=arg[-1][self.combo_box.currentText()]['object_size'])
+        currentModel = self.combo_box.currentText()
+        self.model = Model(path=arg[-1][currentModel]['path'],
+                           object_size=arg[-1][currentModel]['object_size'],
+                           model_type = arg[-1][currentModel]['model_type']
+                           )
 
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
         self.show_boundry = 0
@@ -187,7 +190,9 @@ class CellDetector(BasePlugin):
             else:
                 del self.model
                 self.model = Model(path=self.models[model]['path'],
-                                   object_size=self.models[model]['object_size'])
+                                   object_size=self.models[model]['object_size'],
+                                   model_type=self.models[model]['model_type']
+                                   )
                 result = self.model.calculate(
                     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                         nuclei_channel=self.parametrs['Nuclei'])
@@ -201,7 +206,8 @@ class CellDetector(BasePlugin):
                 else:
                     del self.model
                     self.model = Model(path=self.models[model]['path'],
-                                       object_size=self.models[model]['object_size'])
+                                       object_size=self.models[model]['object_size'],
+                                       model_type=self.models[model]['model_type'])
                     result = self.model.calculate(img_path=self.lsm_path)
             except:
                 traceback.print_exc()
