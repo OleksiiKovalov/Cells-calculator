@@ -5,5 +5,8 @@
     "Cellpose": {"path": "cellpose", "model_type": "cellpose"},
     "InstanSeg Flu_nc": {"path": "fluorescence_nuclei_and_cells", "model_type": "instanseg"},
     "InstanSeg bright_nuc": {"path": "brightfield_nuclei", "model_type": "instanseg"},
-    "InstanSeg trained": {"path": "model/instanseg_model_weights_best.pth.pt", "model_type": "instanseg"}
+    "InstanSeg trained": {"path": "model/instanseg_model_weights_best.pth.pt", "model_type": "instanseg"},
+    "Stardist 2D_versatile_he": {"path": "2D_versatile_he", "model_type": "stardist"},
+    "Stardist 2D_versatile_fluo": {"path": "2D_versatile_fluo", "model_type": "stardist"},
+    "Stardist 2D_paper_dsb2018": {"path": "2D_paper_dsb2018", "model_type": "stardist"}
 }

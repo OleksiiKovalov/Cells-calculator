@@ -12,6 +12,7 @@ from model.segmenter import Segmenter
 from model.utils import is_image_valid, calculate_lsm
 from model.CellposeSegmenter import CellposeSegmenter
 from model.InstanSegSegmenter import InstansegSegmenter
+from model.StardistSegmenter import StardistSegmenter
 
 class Model():
     """
@@ -50,8 +51,9 @@ class Model():
         class is being called for initialization.
         """
         
-
-        if "instanseg" in model_type: 
+        if "stardist" in model_type: 
+            self.cell_counter = StardistSegmenter(path, object_size = object_size)
+        elif "instanseg" in model_type: 
             self.cell_counter = InstansegSegmenter(path, object_size = object_size)
         elif "cellpose" in model_type: 
             self.cell_counter = CellposeSegmenter(path, object_size = object_size)

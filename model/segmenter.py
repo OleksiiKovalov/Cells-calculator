@@ -53,6 +53,9 @@ class Segmenter(BaseModel):
         except FileNotFoundError:
             pass
 
+        #every time detect from fresh
+        self.detections = None
+        
         colormap = self.object_size['color_map']
         if self.detections is None:
             outputs = self.model(input_image, conf=0.3, iou=0.6,

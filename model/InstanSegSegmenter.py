@@ -26,14 +26,14 @@ class InstansegSegmenter(BaseModel):
             self.model = InstanSeg(model_module, verbosity=1)
         elif path_to_model in ['brightfield_nuclei', 'fluorescence_nuclei_and_cells']:
             print(f"Ініціалізація InstanSeg зі стандартною моделлю: {path_to_model}")
-            self.model = InstanSeg(path_to_model, image_reader= "tiffslide",verbosity=1)
+            self.model = InstanSeg(path_to_model, verbosity=1)
         else:
             default_model = 'fluorescence_nuclei_and_cells'
             if path_to_model:
                 print(f"Попередження: Шлях/назва '{path_to_model}' не валідні для InstanSeg. Використовується '{default_model}'.")
             else:
                 print(f"Попередження: Не вказано модель InstanSeg. Використовується '{default_model}'.")
-            self.model = InstanSeg(default_model, image_reader= "tiffslide",verbosity=1)
+            self.model = InstanSeg(default_model, verbosity=1)
 
     def init_x10_model(self, path_to_model):
         pass
@@ -76,8 +76,7 @@ class InstansegSegmenter(BaseModel):
                 plot_predictions(original_image, filtered_detections['mask'].tolist(), filename=filename, colormap=colormap, alpha=alpha)
             return filtered_detections
         except Exception as e:
-            print(f"Помилка інференсу InstanSeg: {e}", file=sys.stderr)
-            return None
+            raise RuntimeError(f"Error when inferrecing InstanSeg: {e}")
         
     def plot_bounding_boxes(results, image, filename,colormap):
         hex_colors = hex_to_bgr(colormap_to_hex(colormap))
@@ -106,8 +105,7 @@ class InstansegSegmenter(BaseModel):
     def load_image(self, image_path):
         img_bgr = cv2.imread(image_path, cv2.IMREAD_COLOR)
         if img_bgr is None:
-            print(f"Помилка: Не вдалося завантажити зображення {image_path}", file=sys.stderr)
-            return None
+            raise RuntimeError(f"Unable to load image {image_path}")
         if len(img_bgr.shape) == 2: img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_GRAY2BGR)
         elif img_bgr.shape[2] == 4: img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
         return img_bgr

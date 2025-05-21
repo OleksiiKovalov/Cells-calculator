@@ -8,7 +8,7 @@ from PyQt5.QtCore import Qt
 from UI.Slider import Slider
 from UI.right_layout.plugins.BasePlagin import BasePlugin
 from model.Model import Model
-
+from errorhandling import app_logger
 
 class CellDetector(BasePlugin):
     def get_name(self):
@@ -177,44 +177,60 @@ class CellDetector(BasePlugin):
             return 0
 
         # If a specific method is selected
-
+        button_enabled = self.button.isEnabled()        
         try:
-            # Attempt to calculate the result using the selected method
-            if self.model and (self.models[model]['path'] == self.model.path):
-                # result = self.models[model].calculate(
-                #     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                #         nuclei_channel=self.parametrs['Nuclei'])
-                result = self.model.calculate(
-                    img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                        nuclei_channel=self.parametrs['Nuclei'])
-            else:
-                del self.model
-                self.model = Model(path=self.models[model]['path'],
-                                   object_size=self.models[model]['object_size'],
-                                   model_type=self.models[model]['model_type']
-                                   )
-                result = self.model.calculate(
-                    img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                        nuclei_channel=self.parametrs['Nuclei'])
-        except:
-            traceback.print_exc()
+            self.button.setText("Calculating.....")
+            self.button.setEnabled(False)
+            self.button.repaint()
             try:
-                # If an error occurs, try without channel information
-                if self.models[model]['path'] == self.model.path:
-                    # result = self.models[model].calculate(img_path=self.lsm_path)
-                    result = self.model.calculate(img_path=self.lsm_path)
+                # Attempt to calculate the result using the selected method
+                if self.model and (self.models[model]['path'] == self.model.path):
+                    # result = self.models[model].calculate(
+                    #     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                    #         nuclei_channel=self.parametrs['Nuclei'])
+                    result = self.model.calculate(
+                        img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                            nuclei_channel=self.parametrs['Nuclei'])
                 else:
-                    del self.model
+                    if self.model:
+                        del self.model
+                        self.model = None
                     self.model = Model(path=self.models[model]['path'],
-                                       object_size=self.models[model]['object_size'],
-                                       model_type=self.models[model]['model_type'])
-                    result = self.model.calculate(img_path=self.lsm_path)
-            except:
+                                    object_size=self.models[model]['object_size'],
+                                    model_type=self.models[model]['model_type']
+                                    )
+                    result = self.model.calculate(
+                        img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
+                            nuclei_channel=self.parametrs['Nuclei'])
+            except  Exception as e:
                 traceback.print_exc()
-                # If still not successful, show an error dialog
-                self.plugin_signal.emit("show_warning", "Error during calculation \n\nChoose another model or change channels settings")
-                result = None
-                self.draw_bounding = 0
+                app_logger().error(e)
+                try:
+                    # If an error occurs, try without channel information
+                    if self.models[model]['path'] == self.model.path:
+                        # result = self.models[model].calculate(img_path=self.lsm_path)
+                        result = self.model.calculate(img_path=self.lsm_path)
+                    else:
+                        del self.model
+                        self.model = Model(path=self.models[model]['path'],
+                                        object_size=self.models[model]['object_size'],
+                                        model_type=self.models[model]['model_type'])
+                        result = self.model.calculate(img_path=self.lsm_path)
+                except  Exception as e:
+                    traceback.print_exc()
+                    app_logger().error(e)
+                    # If still not successful, show an error dialog
+                    self.plugin_signal.emit("show_warning", f"Error during calculation:{e} \n\nChoose another model or change channels settings")
+                    result = None
+                    if self.model:
+                        del self.model
+                        self.model = None
+                    # clear the model so it can be restarted 
+                    self.draw_bounding = 0
+        finally:
+            self.button.setText("Calculate")
+            self.button.setEnabled(button_enabled)
+            
 
         # If no result, return
         if not result:
