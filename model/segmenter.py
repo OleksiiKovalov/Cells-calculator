@@ -85,8 +85,9 @@ class Segmenter(BaseModel):
         else:
             filtered_detections = detections
 
+        self.prediction_image = None
         if plot is True:
-            plot_predictions(original_image, filtered_detections['mask'].tolist(),
+            self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                             filename=filename, colormap=colormap, alpha=alpha)
         return filtered_detections
 
@@ -119,6 +120,7 @@ class Segmenter(BaseModel):
         filtered_detections = filter_detections(detections,
                                                 min_size = self.object_size['min_size'],
                                                 max_size= self.object_size['max_size'])
-        plot_predictions(original_image, filtered_detections['mask'].tolist(),
+        self.prediction_image = None
+        self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                          filename=filename, colormap=colormap, alpha=alpha)
         return filtered_detections

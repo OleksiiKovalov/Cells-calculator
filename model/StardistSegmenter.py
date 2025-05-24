@@ -1,13 +1,10 @@
-import sys
 import numpy as np
-
 from model.BaseModel import BaseModel
 from model.utils import *
 
 import pandas as pd
 import cv2  # OpenCV for findContours
 from typing import  List, Dict, Any # For type hinting
-from stardist.data import test_image_he_2d
 from csbdeep.utils import normalize            
 
 class StardistSegmenter(BaseModel):
@@ -17,6 +14,7 @@ class StardistSegmenter(BaseModel):
     
     def init_x20_model(self, path_to_model: str):
         from stardist.models import StarDist2D
+        from stardist.data import test_image_he_2d
         self.model = StarDist2D.from_pretrained(path_to_model)
 
     def init_x10_model(self, path_to_model):
@@ -50,8 +48,9 @@ class StardistSegmenter(BaseModel):
             else:
                 filtered_detections = detections
 
+            self.prediction_image = None
             if plot is True:
-                plot_predictions(original_image, filtered_detections['mask'].tolist(),
+                self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                                 filename=filename, colormap=colormap, alpha=alpha)
             return filtered_detections
         except Exception as e:

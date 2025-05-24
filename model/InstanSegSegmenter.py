@@ -1,25 +1,19 @@
 import os
-import sys
-import numpy as np
-
 from model.BaseModel import BaseModel
 from model.utils import *
 import torch
-import torchvision
-import instanseg
-from instanseg import InstanSeg
-from skimage.color import rgb2gray
-
 import pandas as pd
+
 import cv2  # OpenCV for findContours
-from scipy.ndimage import find_objects  # For efficient bounding box calculation
-from typing import Optional, List, Tuple, Dict, Any # For type hinting
+#from scipy.ndimage import find_objects  # For efficient bounding box calculation
+#from typing import Optional, List, Tuple, Dict, Any # For type hinting
 
 class InstansegSegmenter(BaseModel):
     def __init__(self, path_to_model: str, object_size):
         super().__init__(path_to_model, object_size)
    
     def init_x20_model(self, path_to_model: str):
+        from instanseg import InstanSeg
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація InstanSeg з моделлю: {path_to_model}")
             model_module = torch.jit.load(path_to_model)
@@ -72,8 +66,9 @@ class InstansegSegmenter(BaseModel):
 
             filtered_detections = detections
 
+            self.prediction_image = None
             if plot is True:
-                plot_predictions(original_image, filtered_detections['mask'].tolist(), filename=filename, colormap=colormap, alpha=alpha)
+                self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(), filename=filename, colormap=colormap, alpha=alpha)
             return filtered_detections
         except Exception as e:
             raise RuntimeError(f"Error when inferrecing InstanSeg: {e}")

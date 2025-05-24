@@ -2,11 +2,15 @@
     "Detector": {"path": "model/yolov8m-det.onnx", "model_type": "cellcounter"},
     "YOLO-512 Segmenter": {"path": "model/YOLO11x-512-seg.pt", "model_type": "segmenter"},
     "YOLO-680 Segmenter": {"path": "model/YOLO11x-680-seg.pt", "model_type": "segmenter"},
-    "Cellpose": {"path": "cellpose", "model_type": "cellpose"},
     "InstanSeg Flu_nc": {"path": "fluorescence_nuclei_and_cells", "model_type": "instanseg"},
     "InstanSeg bright_nuc": {"path": "brightfield_nuclei", "model_type": "instanseg"},
     "InstanSeg trained": {"path": "model/instanseg_model_weights_best.pth.pt", "model_type": "instanseg"},
     "Stardist 2D_versatile_he": {"path": "2D_versatile_he", "model_type": "stardist"},
     "Stardist 2D_versatile_fluo": {"path": "2D_versatile_fluo", "model_type": "stardist"},
-    "Stardist 2D_paper_dsb2018": {"path": "2D_paper_dsb2018", "model_type": "stardist"}
+    "Stardist 2D_paper_dsb2018": {"path": "2D_paper_dsb2018", "model_type": "stardist"},
+    "Cellpose trained": {"path": "model/cpsam_finetuned.pth", "model_type": "cellpose"},
+    "Cellpose cyto": {"path": "cyto", "model_type": "cellpose"},
+    "Cellpose nuclei": {"path": "nuclei", "model_type": "cellpose"},
+    "Cellpose cyto2": {"path": "cyto2", "model_type": "cellpose"},
+    "Cellpose cyto3": {"path": "cyto3", "model_type": "cellpose"}
 }

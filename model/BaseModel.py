@@ -25,6 +25,7 @@ class BaseModel():
         self.path_to_model = path_to_model
         self.object_size = object_size
         self.original_image = None
+        self.prediction_image = None
         self.detections = None
         self.out_dir = OUT_DIR
         os.makedirs(OUT_DIR, exist_ok=True)

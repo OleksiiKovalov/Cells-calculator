@@ -370,6 +370,7 @@ def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_wit
         cv2.fillPoly(overlay, [coords], color)
     cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
     cv2.imwrite(filename, image)
+    return image
 
 def calculate_morphology(bin_mask: np.array) -> dict:
     """

@@ -212,7 +212,9 @@ class CellDetector(BasePlugin):
                         result = self.model.calculate(img_path=self.lsm_path)
                     else:
                         del self.model
-                        self.model = Model(path=self.models[model]['path'],
+                        self.model = None
+                        a_path = self.models[model]['path']
+                        self.model = Model(path=a_path,
                                         object_size=self.models[model]['object_size'],
                                         model_type=self.models[model]['model_type'])
                         result = self.model.calculate(img_path=self.lsm_path)
