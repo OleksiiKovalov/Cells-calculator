@@ -4,11 +4,13 @@ from PyQt5.QtWidgets import QCheckBox, QPushButton, QGraphicsView, QGraphicsView
     QGraphicsTextItem, QComboBox, QLabel
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
-
 from UI.Slider import Slider
 from UI.right_layout.plugins.BasePlagin import BasePlugin
 from model.Model import Model
 from errorhandling import app_logger
+import cv2
+import os
+from model.utils import create_image_grid
 
 class CellDetector(BasePlugin):
     def get_name(self):
@@ -69,6 +71,7 @@ class CellDetector(BasePlugin):
             self.lsm_filesList = None
             self.folder_path = None
             self.button.setEnabled(True)
+            self.batchProcessButton.setEnabled(True)
         elif action_name == "open_folder":
             self.reset_detection()
             self.right_scene.clear()
@@ -82,6 +85,7 @@ class CellDetector(BasePlugin):
                 self.lsm_path = None
                 self.draw_bounding = 0
                 self.button.setEnabled(True)
+                self.batchProcessButton.setEnabled(True)
             else:
                 self.folder_path = None
                 self.lsm_filesList = None
@@ -248,6 +252,63 @@ class CellDetector(BasePlugin):
         # Draw bounding boxes
         self.draw_bounding_box()
 
+    def calculate_single_mode(self, modeltype,modelpath,object_size, image_path):
+        model = None
+        model = Model(path=modelpath,object_size=object_size,model_type=modeltype)
+        try:
+            model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
+        except  Exception as e:
+            traceback.print_exc()
+            app_logger().error(e)
+            try:
+                model.calculate(img_path=image_path)
+            except  Exception as e:
+                traceback.print_exc()
+                app_logger().error(e)
+                # If still not successful, show an error dialog
+                self.plugin_signal.emit("show_warning", f"Error during calculation:{e} \n\nChoose another model or change channels settings")
+                if model:
+                    del model
+                    model = None
+        if model:
+            return model.cell_counter.original_image, model.cell_counter.prediction_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
+        else:
+            return None, None, None
+
+    def batchProcessButton_click(self):
+        try:
+            savedEnabled = self.batchProcessButton.isEnabled()
+            self.batchProcessButton.setEnabled(False)
+            processedImages = []
+            # models = []
+            # durations = []
+            # countedcells = []
+            labels = []
+            i = 1
+            for model_name, model_data in self.models.items():
+                self.batchProcessButton.setText(f"Processing {model_name}")
+                self.batchProcessButton.repaint()
+                modepath = model_data['path']
+                model_type = model_data['model_type']
+                _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, self.lsm_path)
+                processedImages.append( processedImage)
+                # models.append(model_name)
+                # durations.append(duration)
+                # countedcells.append(counted)
+                labels.append(f"{i} {model_name}:{counted} celss in {duration:.2f} seconds")
+                i = i + 1
+            imageGrid = create_image_grid(processedImages,labels)
+            cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+            import matplotlib.pyplot as plt
+            plt.imshow(imageGrid)
+            plt.axis('off')  # Hide axes
+            plt.title("Image")
+            plt.show()            
+        finally:
+            self.batchProcessButton.setEnabled(savedEnabled)    
+            self.batchProcessButton.setText(f"Batch process")
+            
+        
     def print_result(self, result):
         model = self.combo_box.currentText()
         if model == "Detector":
@@ -454,6 +515,10 @@ class CellDetector(BasePlugin):
         self.button = QPushButton("Calculate")
         self.button.setEnabled(False)
 
+        # Create a button for calculating
+        self.batchProcessButton = QPushButton("Batch process")
+        self.batchProcessButton.setEnabled(False)
+
         # Set font for the combo box
         self.combo_box.setFont(QFont("Arial", 24))
 
@@ -502,6 +567,7 @@ class CellDetector(BasePlugin):
 
         # Connect button click event to calculate_button function
         self.button.clicked.connect(self.calculate_button)
+        self.batchProcessButton.clicked.connect(self.batchProcessButton_click)
 
         range_lable = QLabel("Object Size:")
         font = QFont()
@@ -540,30 +606,32 @@ class CellDetector(BasePlugin):
         # Add widgets to the right layout with spacing
         ###self.right_layout.addWidget(label)
         self.right_layout.addWidget(plugin_label)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         self.right_layout.addWidget(self.combo_box)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         self.right_layout.addWidget(self.right_view)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(colormap_label)
         self.right_layout.addWidget(self.colormap_combo)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         # self.right_layout.addLayout(LineWidth_layout)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(range_lable)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(self.min_range_slider)
         self.right_layout.addWidget(self.max_range_slider)
 
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(self.checkbox_scale)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
 
         self.right_layout.addWidget(self.checkbox)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
         self.right_layout.addWidget(self.button)
-        self.right_layout.addSpacing(20)
+        self.right_layout.addSpacing(15)
+        self.right_layout.addWidget(self.batchProcessButton)
+        self.right_layout.addSpacing(15)

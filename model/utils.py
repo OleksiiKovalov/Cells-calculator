@@ -7,6 +7,7 @@ import torch
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import math
 
 from ultralytics.engine.results import Results
 
@@ -388,3 +389,41 @@ def calculate_morphology(bin_mask: np.array) -> dict:
     radius = diameter / 2
     volume = (4/3) * np.pi * radius**3
     return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
+
+def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX) -> np.ndarray:
+    # if any(img is None for img in images):
+    #     raise ValueError("One or more images could not be loaded.")
+    
+    # Resize all images to the same dimensions
+    #height, width = [img is not None for img in images][0].shape[:2]
+    height, width =  (next((img for img in images if img is not None), None)).shape[:2]
+    images = [cv2.resize(img, (width, height)) for img in images]
+
+    # Annotate each image with filename
+    labeled_images = []
+    for i, labeltext in enumerate(labels):
+        img_copy = images[i].copy()
+        cv2.putText(img_copy, labeltext, (5, height - 10), font, label_font_scale, (0, 0, 255), label_thickness, cv2.LINE_AA)
+        cv2.rectangle(img_copy, (0, 0), (width, height), (255, 255, 255), 1)
+        labeled_images.append(img_copy)
+
+    # Determine grid size (nearly square)
+    n = len(labeled_images)
+    cols = math.ceil(math.sqrt(n))
+    rows = math.ceil(n / cols)
+
+    # Pad with black images if needed
+    black = np.zeros_like(labeled_images[0])
+    while len(labeled_images) < rows * cols:
+        labeled_images.append(black)
+
+    # Stack images into rows
+    grid_rows = []
+    for i in range(rows):
+        row_imgs = labeled_images[i*cols:(i+1)*cols]
+        row = np.hstack(row_imgs)
+        grid_rows.append(row)
+
+    # Stack all rows into final image
+    grid_image = np.vstack(grid_rows)
+    return grid_image            

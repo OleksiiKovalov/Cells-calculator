@@ -1,12 +1,13 @@
 import logging
 import sys
 import traceback # For more detailed traceback formatting if needed
+from PyQt5.QtWidgets import QApplication, QMessageBox
 
 # Configure your logger (do this once, typically at the start of your app)
 def setup_logging():
     # Create a logger
     logger = logging.getLogger() # Get the root logger
-    logger.setLevel(logging.DEBUG) # Set the minimum logging level for the logger
+    logger.setLevel(logging.WARNING) # Set the minimum logging level for the logger
 
     # Create console handler and set level to debug
     ch = logging.StreamHandler()
@@ -15,7 +16,7 @@ def setup_logging():
     # Create file handler and set level to debug
     # Use 'a' for append mode, 'w' for overwrite mode
     fh = logging.FileHandler('app.log', mode='a', encoding='utf-8')
-    fh.setLevel(logging.DEBUG) # Log DEBUG and above to file
+    fh.setLevel(logging.WARNING) # Log DEBUG and above to file
 
     # Create formatter
     formatter = logging.Formatter(
@@ -50,7 +51,14 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     # logger.error() or logger.critical() can be used.
     # logger.exception() is convenient as it automatically includes exception info.
     app_logger().critical("Unhandled exception caught:", exc_info=(exc_type, exc_value, exc_traceback))
-
+    error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    msgbox = QMessageBox()
+    msgbox.setIcon(QMessageBox.Critical)
+    msgbox.setWindowTitle("Unhandled Exception")
+    msgbox.setText("An error occurred:")
+    msgbox.setDetailedText(error_msg)
+    msgbox.exec_()
+    
 def app_logger():
     return app_logger_int
 

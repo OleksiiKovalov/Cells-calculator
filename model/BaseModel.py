@@ -5,6 +5,7 @@ We define both the structure and the main functionality utils.
 import os
 from pathlib import Path
 import shutil
+import torch
 
 OUT_DIR = Path("cellprocesser_output")
 
@@ -21,6 +22,13 @@ class BaseModel():
         - path_to_model: str - path to .pt YOLO model file;
         - object_size: UI util param 
         """
+        self.use_gpu = False
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
+        else:
+            self.device = torch.device("cpu")
+        self.use_gpu = self.device.type == 'cuda'
+        
         self.init_models(path_to_model)
         self.path_to_model = path_to_model
         self.object_size = object_size
@@ -29,7 +37,9 @@ class BaseModel():
         self.detections = None
         self.out_dir = OUT_DIR
         os.makedirs(OUT_DIR, exist_ok=True)
-        self.inference_duration = 0
+        self.inference_duration = 0.0
+        self.detectionCount = -1
+        
 
     def init_models(self, path_to_model: str):
         """
@@ -80,6 +90,7 @@ class BaseModel():
         scale = self.object_size["scale"]
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
         import time
+        self.detectionCount = -1
         start_time = time.time()
         result = None
         if scale == 20:
@@ -88,6 +99,7 @@ class BaseModel():
             result =  self.count_x10(input_image, filename=filename)
         end_time = time.time()
         self.inference_duration = end_time - start_time
+        self.detectionCount = len(result)
         return result
 
     def count_x10(self, input_image, filename):

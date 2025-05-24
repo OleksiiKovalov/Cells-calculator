@@ -152,6 +152,9 @@ class CellCounter(BaseModel):
                 round((filtered_detections.iloc[i,-2][0] + filtered_detections.iloc[i,-2][2]) * filtered_detections.iloc[i,-1]),
                 round((filtered_detections.iloc[i,-2][1] + filtered_detections.iloc[i,-2][3]) * filtered_detections.iloc[i,-1]),
             )
+            
+        self.prediction_image = original_image
+        self.detectionCount = filtered_detections.shape[0]
         try:
             os.remove(filename)
         except:

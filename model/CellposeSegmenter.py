@@ -15,25 +15,19 @@ class CellposeSegmenter(BaseModel):
     
     def init_x20_model(self, path_to_model: str):
         from cellpose import models as cp_models # Для Cellpose
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-            print(f"Використовується пристрій: GPU ({torch.cuda.get_device_name(0)})")
-        else:
-            self.device = torch.device("cpu")
-        use_gpu = self.device.type == 'cuda'
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація Cellpose з моделлю: {path_to_model}")
-            self.model = cp_models.CellposeModel(gpu=use_gpu, pretrained_model=path_to_model)
+            self.model = cp_models.CellposeModel(gpu=self.use_gpu, pretrained_model=path_to_model)
         elif path_to_model in ['cyto', 'nuclei', 'cyto2', 'cyto3']:
             print(f"Ініціалізація Cellpose зі стандартною моделлю: {path_to_model}")
-            self.model = cp_models.CellposeModel(gpu=use_gpu, model_type=path_to_model)
+            self.model = cp_models.CellposeModel(gpu=self.use_gpu, model_type=path_to_model)
         else:
             default_model = 'cyto'
             if path_to_model:
                 print(f"Попередження: Шлях/назва '{path_to_model}' не валідні для Cellpose. Використовується '{default_model}'.")
             else:
                 print(f"Попередження: Не вказано модель Cellpose. Використовується '{default_model}'.")
-            self.model = cp_models.CellposeModel(model_type=default_model, gpu=use_gpu)
+            self.model = cp_models.CellposeModel(model_type=default_model, gpu=self.use_gpu)
 
     def init_x10_model(self, path_to_model):
         pass
