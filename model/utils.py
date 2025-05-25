@@ -403,7 +403,7 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
     labeled_images = []
     for i, labeltext in enumerate(labels):
         img_copy = images[i].copy()
-        cv2.putText(img_copy, labeltext, (5, height - 10), font, label_font_scale, (0, 0, 255), label_thickness, cv2.LINE_AA)
+        cv2.putText(img_copy, labeltext, (5, height - 10), font, label_font_scale, (255, 255, 255), label_thickness, cv2.LINE_AA)
         cv2.rectangle(img_copy, (0, 0), (width, height), (255, 255, 255), 1)
         labeled_images.append(img_copy)
 
