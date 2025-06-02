@@ -291,6 +291,8 @@ def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
     - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
     the foreground (the polygon for the given mask).
     """
+    if in_mask.max() > 1.0:
+        in_mask = in_mask /  np.array([image_size[1], image_size[0]])
     coords = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
     coords = coords.astype(np.int32)
     bin_mask = np.zeros(image_size, dtype=np.uint8)

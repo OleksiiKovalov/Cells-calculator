@@ -149,8 +149,10 @@ class StardistSegmenter(BaseModel):
             data["box"].append(box)
             data["mask"].append(pts)
             data["confidence"].append(confidence)
-            data["diameter"].append(diameter)
-            data["area"].append(area)
-            data["volume"].append(volume)
+            
+            bin_mask, morphology = plot_mask(np.array(pts), image_size=instances.shape)
+            data['diameter'].append(morphology['diameter'])
+            data['area'].append(morphology['area'])
+            data['volume'].append(morphology['volume'])
 
         return pd.DataFrame(data)

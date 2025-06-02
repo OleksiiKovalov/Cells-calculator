@@ -143,14 +143,11 @@ class InstansegSegmenter(BaseModel):
             data['mask'].append(p_mask)
             #todo restore confidence
             data['confidence'].append(1 #outputs.boxes.conf[i].cpu().detach().numpy()
-                                    )
-            #todo restore morphology
-            morphology = None
-            data['diameter'].append(None #morphology['diameter']
-                                    )
-            data['area'].append(None #morphology['area']
-                                )
-            data['volume'].append(None #morphology['volume']
-                                    )
+            )
+            bin_mask, morphology = plot_mask(np.array(p_mask), image_size=(labeled_output.shape[2],labeled_output.shape[3]))
+            data['diameter'].append(morphology['diameter'])
+            data['area'].append(morphology['area'])
+            data['volume'].append(morphology['volume'])
+            
         return pd.DataFrame(data)
            

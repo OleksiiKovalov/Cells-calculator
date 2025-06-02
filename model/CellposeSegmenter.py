@@ -174,8 +174,8 @@ class CellposeSegmenter(BaseModel):
                 continue
 
             data['id_label'].append(int(object_id))
-            data['area'].append(area)
-            data['volume'].append(area) 
+            #data['area'].append(area)
+            #data['volume'].append(area) 
             
             if store_bin_mask:
                 data['bin_mask'].append(current_bin_mask)
@@ -189,9 +189,9 @@ class CellposeSegmenter(BaseModel):
                 data['box'].append([np.nan, np.nan, np.nan, np.nan])
                 data['mask'].append([])
                 data['confidence'].append(np.nan if cellprob_map is not None else 1.0)
-                data['diameter'].append(np.nan)
+                #data['diameter'].append(np.nan)
                 # Remove the last added id_label, area, volume if we skip
-                for key in ["id_label", "area", "volume"]: data[key].pop()
+                for key in ["id_label"]: data[key].pop()
                 if store_bin_mask: data["bin_mask"].pop()
                 continue
 
@@ -247,10 +247,13 @@ class CellposeSegmenter(BaseModel):
                         f"for object_id {object_id}. Confidence set to NaN.")
             else:
                 confidence = 1.0 # Default if no cell probability map is provided
+                
             data['confidence'].append(confidence)
-
-            # Diameter (equivalent diameter of a circle with the same area)
-            diameter = float(np.sqrt((4 * area) / np.pi))
-            data['diameter'].append(diameter)
+           
+            bin_mask, morphology = plot_mask(np.array(normalized_contour_list), image_size=image_shape_for_norm)
+            
+            data['diameter'].append(morphology['diameter'])
+            data['area'].append(morphology['area'])
+            data['volume'].append(morphology['volume'])
             
         return pd.DataFrame(data)    
