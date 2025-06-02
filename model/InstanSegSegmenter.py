@@ -28,7 +28,11 @@ class InstansegSegmenter(BaseModel):
             else:
                 print(f"Попередження: Не вказано модель InstanSeg. Використовується '{default_model}'.")
             self.model = InstanSeg(default_model, verbosity=1)
-
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            from errorhandling import app_logger
+            app_logger().warning(f"InstansegSegmenter: Device used:{device}")        
+            self.model = self.model.to(device)
+            
     def init_x10_model(self, path_to_model):
         pass
 

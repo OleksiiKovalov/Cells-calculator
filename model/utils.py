@@ -386,7 +386,7 @@ def calculate_morphology(bin_mask: np.array) -> dict:
     volume = (4/3) * np.pi * radius**3
     return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
 
-def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX) -> np.ndarray:
+def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX, total_images = None) -> np.ndarray:
     # if any(img is None for img in images):
     #     raise ValueError("One or more images could not be loaded.")
     
@@ -404,7 +404,7 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
         labeled_images.append(img_copy)
 
     # Determine grid size (nearly square)
-    n = len(labeled_images)
+    n = len(labeled_images) if total_images is None else total_images
     cols = math.ceil(math.sqrt(n))
     rows = math.ceil(n / cols)
 

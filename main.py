@@ -412,6 +412,7 @@ class MainWindow(QMainWindow):
 
         # Add the scaled pixmap to the main scene
         pixmap_item = self.main_scene.addPixmap(pixmap)
+        
 
         # Calculate the position to center the image within the view
         x_pos = (view_width - pixmap.width()) / 2
@@ -419,7 +420,9 @@ class MainWindow(QMainWindow):
 
         # Set the position of the pixmap item within the scene
         pixmap_item.setPos(x_pos, y_pos)
-
+        self.main_view.repaint()
+        QApplication.processEvents()
+        
     def change_image(self):
         """
         Change displayed image. 

@@ -28,6 +28,8 @@ class CellposeSegmenter(BaseModel):
             else:
                 print(f"Попередження: Не вказано модель Cellpose. Використовується '{default_model}'.")
             self.model = cp_models.CellposeModel(model_type=default_model, gpu=self.use_gpu)
+            from errorhandling import app_logger
+            app_logger().warning(f"CellposeSegmenter: GPU Used:{self.use_gpu}")        
 
     def init_x10_model(self, path_to_model):
         pass

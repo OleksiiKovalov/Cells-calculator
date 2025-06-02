@@ -280,9 +280,6 @@ class CellDetector(BasePlugin):
             savedEnabled = self.batchProcessButton.isEnabled()
             self.batchProcessButton.setEnabled(False)
             processedImages = []
-            # models = []
-            # durations = []
-            # countedcells = []
             labels = []
             i = 1
             for model_name, model_data in self.models.items():
@@ -292,11 +289,11 @@ class CellDetector(BasePlugin):
                 model_type = model_data['model_type']
                 _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, self.lsm_path)
                 processedImages.append( processedImage)
-                # models.append(model_name)
-                # durations.append(duration)
-                # countedcells.append(counted)
-                labels.append(f"{i} {model_name}:{counted} celss in {duration:.2f} seconds")
+                labels.append(f"{i} {model_name}:{counted} cells in {duration:.2f} seconds")
                 i = i + 1
+                imageGrid = create_image_grid(processedImages,labels,total_images=len(self.models))
+                cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+                self.plugin_signal.emit("add_image", ".cache/image_grid_output.png" )
             imageGrid = create_image_grid(processedImages,labels)
             cv2.imwrite(".cache/image_grid_output.png", imageGrid)
             import matplotlib.pyplot as plt
@@ -306,7 +303,51 @@ class CellDetector(BasePlugin):
             plt.show()            
         finally:
             self.batchProcessButton.setEnabled(savedEnabled)    
-            self.batchProcessButton.setText(f"Batch process")
+            self.batchProcessButton.setText(f"All models on current image")
+
+    def batchProcessMultiImageButton_click(self):
+        try:
+            savedEnabled = self.batchProcessButtonMultiImage.isEnabled()
+            self.batchProcessButtonMultiImage.setEnabled(False)
+            from PyQt5.QtWidgets import QFileDialog            
+            files, _ = QFileDialog.getOpenFileNames(
+                None,
+                "Select Images",
+                "",
+                "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All Files (*)"
+            )            
+            processedImages = []
+            labels = []
+            if files:
+                model = self.combo_box.currentText()
+                modepath = self.models[model]['path']
+                model_type = self.models[model]['model_type']
+                i = 1
+                for file_path in files:
+                    try:
+                        image_name = os.path.basename(file_path)
+                        self.batchProcessButtonMultiImage.setText(f"Processing {image_name} ({i}/{len(files)})")
+                        self.batchProcessButtonMultiImage.repaint()
+                        _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, file_path)
+                        processedImages.append( processedImage)
+                        labels.append(f"{i} {image_name}:{counted} cells in {duration:.2f} seconds")
+                        i = i + 1
+                        imageGrid = create_image_grid(processedImages,labels,total_images=len(files))
+                        cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+                        self.plugin_signal.emit("add_image", ".cache/image_grid_output.png" )
+                    except Exception as e:
+                        app_logger().critical("Unhandled exception caught:", e)
+                        
+                imageGrid = create_image_grid(processedImages,labels)
+                cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+                import matplotlib.pyplot as plt
+                plt.imshow(imageGrid)
+                plt.axis('off')  # Hide axes
+                plt.title("Image")
+                plt.show()            
+        finally:
+            self.batchProcessButtonMultiImage.setEnabled(savedEnabled)    
+            self.batchProcessButtonMultiImage.setText(f"Current model on multiple images")
             
         
     def print_result(self, result):
@@ -516,8 +557,12 @@ class CellDetector(BasePlugin):
         self.button.setEnabled(False)
 
         # Create a button for calculating
-        self.batchProcessButton = QPushButton("Batch process")
+        self.batchProcessButton = QPushButton("All models on current image")
         self.batchProcessButton.setEnabled(False)
+
+        # Create a button for calculating
+        self.batchProcessButtonMultiImage = QPushButton("Current model on multiple images")
+        self.batchProcessButtonMultiImage.setEnabled(True)
 
         # Set font for the combo box
         self.combo_box.setFont(QFont("Arial", 24))
@@ -568,7 +613,8 @@ class CellDetector(BasePlugin):
         # Connect button click event to calculate_button function
         self.button.clicked.connect(self.calculate_button)
         self.batchProcessButton.clicked.connect(self.batchProcessButton_click)
-
+        self.batchProcessButtonMultiImage.clicked.connect(self.batchProcessMultiImageButton_click)
+        
         range_lable = QLabel("Object Size:")
         font = QFont()
         font.setPointSize(16) 
@@ -633,5 +679,8 @@ class CellDetector(BasePlugin):
         self.right_layout.addSpacing(15)
         self.right_layout.addWidget(self.button)
         self.right_layout.addSpacing(15)
+        
         self.right_layout.addWidget(self.batchProcessButton)
+        self.right_layout.addSpacing(15)
+        self.right_layout.addWidget(self.batchProcessButtonMultiImage)
         self.right_layout.addSpacing(15)

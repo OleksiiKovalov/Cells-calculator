@@ -15,6 +15,9 @@ class StardistSegmenter(BaseModel):
     
     def init_x20_model(self, path_to_model: str):
         from stardist.models import StarDist2D
+        import tensorflow as tf
+        from errorhandling import app_logger
+        app_logger().warning(f"Stardist: Num GPUs Available:{len(tf.config.list_physical_devices('GPU'))}")        
         if(path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018")):
             self.is_custom_model = False
             self.model = StarDist2D.from_pretrained(path_to_model)
