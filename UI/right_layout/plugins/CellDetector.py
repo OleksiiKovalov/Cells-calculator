@@ -273,7 +273,7 @@ class CellDetector(BasePlugin):
         if model:
             return model.cell_counter.original_image, model.cell_counter.prediction_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
         else:
-            return None, None, None
+            return None, None, None, None
 
     def batchProcessButton_click(self):
         try:
@@ -288,12 +288,13 @@ class CellDetector(BasePlugin):
                 modepath = model_data['path']
                 model_type = model_data['model_type']
                 _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, self.lsm_path)
-                processedImages.append( processedImage)
-                labels.append(f"{i} {model_name}:{counted} cells in {duration:.2f} seconds")
-                i = i + 1
-                imageGrid = create_image_grid(processedImages,labels,total_images=len(self.models))
-                cv2.imwrite(".cache/image_grid_output.png", imageGrid)
-                self.plugin_signal.emit("add_image", ".cache/image_grid_output.png" )
+                if counted is not None:
+                    processedImages.append( processedImage)
+                    labels.append(f"{i} {model_name}:{counted} cells in {duration:.2f} seconds")
+                    i = i + 1
+                    imageGrid = create_image_grid(processedImages,labels,total_images=len(self.models))
+                    cv2.imwrite(".cache/image_grid_output.png", imageGrid)
+                    self.plugin_signal.emit("add_image", ".cache/image_grid_output.png" )
             imageGrid = create_image_grid(processedImages,labels)
             cv2.imwrite(".cache/image_grid_output.png", imageGrid)
             import matplotlib.pyplot as plt
