@@ -32,7 +32,7 @@ class Model():
     - 'Cells': the number of cells detected;
     - '%': the target percentage value obtained.
     """
-    def __init__(self, path=os.path.join('model', 'yolov8m-det.onnx'),
+    def __init__(self, path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
                  threshold=100, eps=5, min_samples=10,
                  object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
                  model_type = ""):

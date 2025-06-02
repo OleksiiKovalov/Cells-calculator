@@ -1,6 +1,7 @@
 import numpy as np
 from model.BaseModel import BaseModel
 from model.utils import *
+import os
 
 import pandas as pd
 import cv2  # OpenCV for findContours
@@ -9,13 +10,19 @@ from csbdeep.utils import normalize
 
 class StardistSegmenter(BaseModel):
     def __init__(self, path_to_model: str, object_size):
+        self.is_custom_model = False
         super().__init__(path_to_model, object_size)
-        self.cellpose_diam = 0
     
     def init_x20_model(self, path_to_model: str):
         from stardist.models import StarDist2D
-        from stardist.data import test_image_he_2d
-        self.model = StarDist2D.from_pretrained(path_to_model)
+        if(path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018")):
+            self.is_custom_model = False
+            self.model = StarDist2D.from_pretrained(path_to_model)
+        else:
+            self.is_custom_model = True
+            path =os.path.dirname(path_to_model)
+            name =os.path.basename(path_to_model)
+            self.model = StarDist2D(None, name=name, basedir=path)
 
     def init_x10_model(self, path_to_model):
         pass
@@ -23,17 +30,28 @@ class StardistSegmenter(BaseModel):
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
-        image = self.load_image(input_image)
-        img_rgb = self.image_preprocess(image)
-        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        self.original_image = img_rgb
-        
-        img_normalized = normalize(img_rgb, 1, 98.8, axis=(0, 1)) # Нормалізуємо інтенсивності
-        img_clipped = np.clip(img_normalized, 0, 1)
-        img_normalized = img_clipped
+        if self.is_custom_model:
+            from skimage.io import imread
+            image = imread(input_image)
+            img_normalized = normalize(image, 1, 99.8)
+            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            self.original_image = img_rgb
+        else:
+            image = self.load_image(input_image)
+            img_rgb = self.image_preprocess(image)
+            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            self.original_image = img_rgb
+            
+            img_normalized = normalize(img_rgb, 1, 98.8, axis=(0, 1)) # Нормалізуємо інтенсивності
+            img_clipped = np.clip(img_normalized, 0, 1)
+            img_normalized = img_clipped
         
         try:
-            labels, details = self.model.predict_instances(img_normalized,axes = "YXC", n_tiles=None)
+            labels, details = None, None
+            if self.is_custom_model:
+                labels, details = self.model.predict_instances(img_normalized)
+            else:
+                labels, details = self.model.predict_instances(img_normalized,axes = "YXC", n_tiles=None)
             
             self.detections = self.stardist_results_to_pandas(labels, scores=details["prob"])
             
