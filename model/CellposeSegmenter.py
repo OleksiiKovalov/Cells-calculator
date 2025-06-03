@@ -9,8 +9,8 @@ from scipy.ndimage import find_objects  # For efficient bounding box calculation
 from typing import Optional, List, Tuple, Dict, Any # For type hinting
 
 class CellposeSegmenter(BaseModel):
-    def __init__(self, path_to_model: str, object_size):
-        super().__init__(path_to_model, object_size)
+    def __init__(self, path_to_model: str, object_size,model_data = None):
+        super().__init__(path_to_model, object_size,model_data)
         self.cellpose_diam = None
     
     def init_x20_model(self, path_to_model: str):
@@ -37,12 +37,23 @@ class CellposeSegmenter(BaseModel):
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
-        image = self.load_image(input_image)
-        img_rgb = self.image_preprocess(image)
+        # image = self.load_image(input_image)
+        # img_rgb = self.image_preprocess(image)
+        # self.original_image = img_rgb
+        
+        from skimage.io import imread
+        image = imread(input_image)
+        image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
+        img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
+        if image.ndim == 2:
+            from skimage.color import gray2rgb
+            img_rgb = gray2rgb(image)
+        else:
+            img_rgb = image
         self.original_image = img_rgb
         channels_to_use=[0,0] # АДАПТУЙТЕ!
         try:
-            masks, flows, styles = self.model.eval(img_rgb, diameter=self.cellpose_diam, channels=channels_to_use)
+            masks, flows, styles = self.model.eval(img_inference, diameter=self.cellpose_diam, channels=channels_to_use)
             print(f"Cellpose знайшов {np.max(masks)} об'єктів.")
             cellprob = flows[2] # Cell probability map
             self.detections = self.cellpose_results_to_pandas(
@@ -64,7 +75,7 @@ class CellposeSegmenter(BaseModel):
                 
             self.prediction_image = None
             if plot is True:
-                self.prediction_image = plot_predictions(image, filtered_detections['mask'].tolist(),
+                self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                                 filename=filename, colormap=colormap, alpha=alpha)
             return filtered_detections
         except Exception as e:
@@ -77,10 +88,6 @@ class CellposeSegmenter(BaseModel):
         raise NotImplementedError
     
     def image_preprocess(self,image):
-        # if len(image.shape) == 2:
-        #         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        # img_rgb = image
-        # return img_rgb
         if image.ndim == 3 and image.shape[-1] == 3: # Check if likely RGB
             print("Converting RGB image to grayscale...")
             img_gray = rgb2gray(image)

@@ -9,8 +9,8 @@ import cv2  # OpenCV for findContours
 #from typing import Optional, List, Tuple, Dict, Any # For type hinting
 
 class InstansegSegmenter(BaseModel):
-    def __init__(self, path_to_model: str, object_size):
-        super().__init__(path_to_model, object_size)
+    def __init__(self, path_to_model: str, object_size,model_data = None):
+        super().__init__(path_to_model, object_size,model_data)
    
     def init_x20_model(self, path_to_model: str):
         from instanseg import InstanSeg

@@ -35,16 +35,17 @@ class Model():
     def __init__(self, path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
                  threshold=100, eps=5, min_samples=10,
                  object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
-                 model_type = ""):
+                 model_type = "",
+                 model_data = None):
         self.nuclei_counter = NucleiCounter(threshold=threshold,
                                             eps=eps, min_samples=min_samples)
         self.path = path
         # self.cell_counter = CellCounter(path=path, object_size = object_size)
         # self.cell_counter = Segmenter("model/best_n.pt", object_size = object_size)
-        self.init_counter(path, object_size,model_type)
+        self.init_counter(path, object_size,model_type,model_data)
         self.inference_duration = 0
 
-    def init_counter(self, path, object_size, model_type):
+    def init_counter(self, path, object_size, model_type,model_data = None):
         """
         Helper constructor method for initializing cell counter param.
         Depending on the model file name, either CellCounter or Segmenter
@@ -52,15 +53,15 @@ class Model():
         """
         
         if "stardist" in model_type: 
-            self.cell_counter = StardistSegmenter(path, object_size = object_size)
+            self.cell_counter = StardistSegmenter(path, object_size = object_size,model_data = model_data)
         elif "instanseg" in model_type: 
-            self.cell_counter = InstansegSegmenter(path, object_size = object_size)
+            self.cell_counter = InstansegSegmenter(path, object_size = object_size,model_data = model_data)
         elif "cellpose" in model_type: 
-            self.cell_counter = CellposeSegmenter(path, object_size = object_size)
+            self.cell_counter = CellposeSegmenter(path, object_size = object_size,model_data = model_data)
         elif "cellcounter" in model_type:
-            self.cell_counter = CellCounter(path_to_model=path, object_size = object_size)
+            self.cell_counter = CellCounter(path_to_model=path, object_size = object_size,model_data = model_data)
         elif "segmenter" in model_type:
-            self.cell_counter = Segmenter(path, object_size = object_size)
+            self.cell_counter = Segmenter(path, object_size = object_size,model_data = model_data)
         else:
             raise ValueError("Unknown model type given as input. Expected 'det' for detection model or 'seg' for segmenting model to be presented in the model filename.")
 

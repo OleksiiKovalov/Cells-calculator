@@ -9,9 +9,9 @@ from typing import  List, Dict, Any # For type hinting
 from csbdeep.utils import normalize            
 
 class StardistSegmenter(BaseModel):
-    def __init__(self, path_to_model: str, object_size):
+    def __init__(self, path_to_model: str, object_size,model_data = None):
         self.is_custom_model = False
-        super().__init__(path_to_model, object_size)
+        super().__init__(path_to_model, object_size,model_data)
     
     def init_x20_model(self, path_to_model: str):
         from stardist.models import StarDist2D
@@ -21,11 +21,13 @@ class StardistSegmenter(BaseModel):
         if(path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018")):
             self.is_custom_model = False
             self.model = StarDist2D.from_pretrained(path_to_model)
+            self.image_preprocess_settings_default = [{"gray2rgb": ""},{"normalize": "1,99.8"},{"clip": "0,1"}]
         else:
             self.is_custom_model = True
             path =os.path.dirname(path_to_model)
             name =os.path.basename(path_to_model)
             self.model = StarDist2D(None, name=name, basedir=path)
+            self.image_preprocess_settings_default = [{"rgb2gray": ""},{"normalize": "1,99.8"},{"clip": "0,1"}]
 
     def init_x10_model(self, path_to_model):
         pass
@@ -33,31 +35,18 @@ class StardistSegmenter(BaseModel):
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
-        if self.is_custom_model:
-            from skimage.io import imread
-            image = imread(input_image)
-            img_normalized = normalize(image, 1, 99.8)
-            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            self.original_image = img_rgb
-        else:
-            image = self.load_image(input_image)
-            img_rgb = self.image_preprocess(image)
-            img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            self.original_image = img_rgb
-            
-            img_normalized = normalize(img_rgb, 1, 98.8, axis=(0, 1)) # Нормалізуємо інтенсивності
-            img_clipped = np.clip(img_normalized, 0, 1)
-            img_normalized = img_clipped
-        
+
+        from skimage.io import imread
+        image = imread(input_image)
+        image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
+        img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
+        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        self.original_image = img_rgb
         try:
             labels, details = None, None
-            if self.is_custom_model:
-                labels, details = self.model.predict_instances(img_normalized)
-            else:
-                labels, details = self.model.predict_instances(img_normalized,axes = "YXC", n_tiles=None)
-            
+            labels, details = self.model.predict_instances(img_inference)
+
             self.detections = self.stardist_results_to_pandas(labels, scores=details["prob"])
-            
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
                 self.object_size['signal']("set_size", self.detections['box'].copy())
@@ -75,6 +64,10 @@ class StardistSegmenter(BaseModel):
                                 filename=filename, colormap=colormap, alpha=alpha)
             return filtered_detections
         except Exception as e:
+            import traceback
+            from errorhandling import app_logger
+            traceback.print_exc()
+            app_logger().exception(e)
             raise RuntimeError(f"Error when inferrecing StardistSegmenter: {e}")
         
 

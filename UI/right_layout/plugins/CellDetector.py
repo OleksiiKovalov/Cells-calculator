@@ -123,22 +123,25 @@ class CellDetector(BasePlugin):
             img_sq = img_size[0] * img_size[1]
             # Вычисляем произведения для каждого 
             values = [cell[2] * cell[3] for cell in detection] 
-
-            # Находим максимальное и минимальное произведение
-            min_size_from_detection = min(values) / img_sq
-            max_size_from_detection = max(values) / img_sq
-            if self.lsm_filesList or model != "All_models":
-                if min_size_from_detection >= min_size:
-                    min_size = None
+            if values:
+                # Находим максимальное и минимальное произведение
+                min_size_from_detection = min(values) / img_sq
+                max_size_from_detection = max(values) / img_sq
+                if self.lsm_filesList or model != "All_models":
+                    if min_size_from_detection >= min_size:
+                        min_size = None
+                    else:
+                        min_size = min_size_from_detection
+                    if max_size_from_detection <= max_size:
+                        max_size = None
+                    else:
+                        max_size = max_size_from_detection
                 else:
                     min_size = min_size_from_detection
-                if max_size_from_detection <= max_size:
-                    max_size = None
-                else:
                     max_size = max_size_from_detection
             else:
-                min_size = min_size_from_detection
-                max_size = max_size_from_detection
+                min_size = None
+                max_size = None
         if min_size is not None:
             self.min_range_slider.change_default(min_size = min_size, max_size = max_size)
         if max_size is not None:
@@ -201,14 +204,15 @@ class CellDetector(BasePlugin):
                         self.model = None
                     self.model = Model(path=self.models[model]['path'],
                                     object_size=self.models[model]['object_size'],
-                                    model_type=self.models[model]['model_type']
+                                    model_type=self.models[model]['model_type'],
+                                    model_data=self.models[model]
                                     )
                     result = self.model.calculate(
                         img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                             nuclei_channel=self.parametrs['Nuclei'])
             except  Exception as e:
                 traceback.print_exc()
-                app_logger().error(e)
+                app_logger().exception(e)
                 try:
                     # If an error occurs, try without channel information
                     if self.models[model]['path'] == self.model.path:
@@ -220,7 +224,8 @@ class CellDetector(BasePlugin):
                         a_path = self.models[model]['path']
                         self.model = Model(path=a_path,
                                         object_size=self.models[model]['object_size'],
-                                        model_type=self.models[model]['model_type'])
+                                        model_type=self.models[model]['model_type'],
+                                        model_data=self.models[model])
                         result = self.model.calculate(img_path=self.lsm_path)
                 except  Exception as e:
                     traceback.print_exc()
@@ -252,9 +257,9 @@ class CellDetector(BasePlugin):
         # Draw bounding boxes
         self.draw_bounding_box()
 
-    def calculate_single_mode(self, modeltype,modelpath,object_size, image_path):
+    def calculate_single_mode(self, modeltype,modelpath,object_size, image_path,model_data = None):
         model = None
-        model = Model(path=modelpath,object_size=object_size,model_type=modeltype)
+        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data)
         try:
             model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
         except  Exception as e:
@@ -287,7 +292,7 @@ class CellDetector(BasePlugin):
                 self.batchProcessButton.repaint()
                 modepath = model_data['path']
                 model_type = model_data['model_type']
-                _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, self.lsm_path)
+                _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, self.lsm_path,model_data=model_data)
                 if counted is not None:
                     processedImages.append( processedImage)
                     labels.append(f"{i} {model_name}:{counted} cells in {duration:.2f} seconds")
@@ -323,13 +328,14 @@ class CellDetector(BasePlugin):
                 model = self.combo_box.currentText()
                 modepath = self.models[model]['path']
                 model_type = self.models[model]['model_type']
+                model_data = self.models[model]
                 i = 1
                 for file_path in files:
                     try:
                         image_name = os.path.basename(file_path)
                         self.batchProcessButtonMultiImage.setText(f"Processing {image_name} ({i}/{len(files)})")
                         self.batchProcessButtonMultiImage.repaint()
-                        _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, file_path)
+                        _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, file_path,model_data = model_data )
                         processedImages.append( processedImage)
                         labels.append(f"{i} {image_name}:{counted} cells in {duration:.2f} seconds")
                         i = i + 1

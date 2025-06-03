@@ -143,8 +143,9 @@ class MainWindow(QMainWindow):
         # }
 
         #loading detectors from config file
+        from collections import OrderedDict
         with open('modelconfig.json', 'r') as f:
-            loaded_models = json.load(f)
+            loaded_models = json.load(f, object_pairs_hook=OrderedDict)
 
         for model_name, model_data in loaded_models.items():
             # Set the 'object_size' parameter for each loaded model

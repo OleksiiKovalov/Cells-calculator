@@ -14,7 +14,7 @@ class BaseModel():
     Base class for general YOLO instance models.
     Implements the neccessary high-level functional utils for using the model.
     """
-    def __init__(self, path_to_model: str, object_size):
+    def __init__(self, path_to_model: str, object_size,model_data = None):
         """
         Model constructor. Slightly differs for detectors and segmenters.
 
@@ -22,6 +22,8 @@ class BaseModel():
         - path_to_model: str - path to .pt YOLO model file;
         - object_size: UI util param 
         """
+        self.model_data = model_data
+        self.image_preprocess_settings_default = []
         self.use_gpu = False
         if torch.cuda.is_available():
             self.device = torch.device("cuda")
@@ -113,3 +115,4 @@ class BaseModel():
     def clear_cached_detections(self):
         """Resets cached detections of needed."""
         self.detections = None
+       

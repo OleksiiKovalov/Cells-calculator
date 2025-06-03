@@ -10,7 +10,7 @@ import matplotlib.colors as mcolors
 import math
 from ultralytics.engine.results import Results
 import tiffile
-
+from collections import OrderedDict
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
 CLASSES = ['Cell']
@@ -396,11 +396,15 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
     #height, width = [img is not None for img in images][0].shape[:2]
     height, width =  (next((img for img in images if img is not None), None)).shape[:2]
     images = [cv2.resize(img, (width, height)) for img in images]
-
+    
     # Annotate each image with filename
     labeled_images = []
     for i, labeltext in enumerate(labels):
         img_copy = images[i].copy()
+        if img_copy.ndim == 2:
+            from skimage.color import gray2rgb
+            img_copy = gray2rgb(img_copy)
+        
         cv2.putText(img_copy, labeltext, (5, height - 10), font, label_font_scale, (255, 255, 255), label_thickness, cv2.LINE_AA)
         cv2.rectangle(img_copy, (0, 0), (width, height), (255, 255, 255), 1)
         labeled_images.append(img_copy)
@@ -425,3 +429,67 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
     # Stack all rows into final image
     grid_image = np.vstack(grid_rows)
     return grid_image            
+
+def resize_and_pad_cv(image, target_width, target_height):
+    """Resize image keeping aspect ratio and pad to target size."""
+    h, w = image.shape[:2]
+    scale = min(target_width / w, target_height / h)
+    new_w, new_h = int(w * scale), int(h * scale)
+
+    from skimage.transform import resize
+    resized = resize(image, (new_h, new_w), anti_aliasing=True, preserve_range=True)
+    #resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    resized = resized.astype(image.dtype)
+    
+    top = (target_height - new_h) // 2
+    bottom = target_height - new_h - top
+    left = (target_width - new_w) // 2
+    right = target_width - new_w - left
+
+#    padded = cv2.copyMakeBorder(resized, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
+
+    # Assuming image shape: (height, width, channels) or (height, width)
+    pad_width = (
+        (top, bottom),     # pad rows (height)
+        (left, right),     # pad columns (width)
+    )
+    # For grayscale
+    if resized.ndim == 2:
+        padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
+    # For color or multi-channel
+    elif resized.ndim == 3:
+        pad_width = pad_width + ((0, 0),)  # no padding on channels
+        padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
+        
+    return padded
+
+
+def process_loaded_image(image, settings:OrderedDict):
+    for step in settings:
+        key, value = next(iter(step.items()))
+        match key:
+            case "resize":
+                new_width, new_height = map(int, value.strip().split(":"))
+                image = resize_and_pad_cv (image, new_width, new_height)
+            case "gray2rgb":
+                if image.ndim == 2:
+                    from skimage.color import gray2rgb
+                    image = gray2rgb(image)
+                pass
+            case "rgb2gray":
+                if image.ndim == 3:
+                    from skimage.color import rgb2gray
+                    image = rgb2gray(image)
+                    image = (image * 255).astype("uint8")
+            case "normalize":
+                from csbdeep.utils import normalize            
+                p_min, p_max = map(float, value.strip().split(","))
+                image = normalize(image, pmin = p_min, pmax=p_max)
+                pass
+            case "clip":
+                import numpy as np
+                a_min, a_max = map(int, value.strip().split(","))
+                image = np.clip(image, a_min=a_min, a_max=a_max)
+            case _:
+                raise RuntimeError(f"Unknow process_loaded_image instruction:{key}")
+    return image
