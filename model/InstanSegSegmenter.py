@@ -13,6 +13,7 @@ class InstansegSegmenter(BaseModel):
         super().__init__(path_to_model, object_size,model_data)
    
     def init_x20_model(self, path_to_model: str):
+        self.image_preprocess_settings_default = [{"gray2rgb": ""},{"normalize": "1,99.8"},{"clip": "0,1"}]
         from instanseg import InstanSeg
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація InstanSeg з моделлю: {path_to_model}")
@@ -39,14 +40,16 @@ class InstansegSegmenter(BaseModel):
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
-        image = self.load_image(input_image)
-        img_rgb = self.image_preprocess(image)
-        self.original_image = img_rgb
+        from skimage.io import imread
+        image = imread(input_image)
+        image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
+        img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
+        self.original_image = safegray2rgb(image)
         try:
             
             #image_array, pixel_size = self.model.read_image(input_image)
             #labeled_output = self.model.eval_medium_image(image = image_array, return_image_tensor=False, target= "cells")
-            labeled_output = self.model.eval_medium_image(image = img_rgb, return_image_tensor=False, target= "cells")
+            labeled_output = self.model.eval_medium_image(image = img_inference, return_image_tensor=False, target= "cells")
             
             # display = self.model.display(image_array, labeled_output)
             # from instanseg.utils.utils import show_images
@@ -59,7 +62,6 @@ class InstansegSegmenter(BaseModel):
             if tracking is False:
                 self.object_size['signal']("set_size", self.detections['box'].copy())
             original_image = self.original_image.copy()
-            
             #todo restore tracking feature
             # if tracking is False:
             #     filtered_detections = filter_detections(detections,

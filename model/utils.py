@@ -472,20 +472,13 @@ def process_loaded_image(image, settings:OrderedDict):
                 new_width, new_height = map(int, value.strip().split(":"))
                 image = resize_and_pad_cv (image, new_width, new_height)
             case "gray2rgb":
-                if image.ndim == 2:
-                    from skimage.color import gray2rgb
-                    image = gray2rgb(image)
-                pass
+                image = safegray2rgb(image)
             case "rgb2gray":
-                if image.ndim == 3:
-                    from skimage.color import rgb2gray
-                    image = rgb2gray(image)
-                    image = (image * 255).astype("uint8")
+                image = safergb2gray(image)
             case "normalize":
                 from csbdeep.utils import normalize            
                 p_min, p_max = map(float, value.strip().split(","))
                 image = normalize(image, pmin = p_min, pmax=p_max)
-                pass
             case "clip":
                 import numpy as np
                 a_min, a_max = map(int, value.strip().split(","))
@@ -493,3 +486,18 @@ def process_loaded_image(image, settings:OrderedDict):
             case _:
                 raise RuntimeError(f"Unknow process_loaded_image instruction:{key}")
     return image
+
+def safegray2rgb(image):
+    if image.ndim == 2:
+        from skimage.color import gray2rgb
+        return gray2rgb(image)
+    else:
+        return image
+
+def safergb2gray(image):
+    if image.ndim == 3:
+        from skimage.color import rgb2gray
+        image = rgb2gray(image)
+        return (image * 255).astype("uint8")
+    else:
+        return image

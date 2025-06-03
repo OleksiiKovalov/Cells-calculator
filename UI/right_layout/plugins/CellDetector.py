@@ -18,6 +18,7 @@ class CellDetector(BasePlugin):
     def __init__(self, *arg):
 
         super().__init__(*arg)
+        self.checked_indices = None
         self.plugin_signal.emit("Open_lsm", True)
         self.plugin_signal.emit("Open_folder", False)
         self.plugin_signal.emit("Settings", False)
@@ -205,7 +206,8 @@ class CellDetector(BasePlugin):
                     self.model = Model(path=self.models[model]['path'],
                                     object_size=self.models[model]['object_size'],
                                     model_type=self.models[model]['model_type'],
-                                    model_data=self.models[model]
+                                    model_data=self.models[model],
+                                    model_name=model
                                     )
                     result = self.model.calculate(
                         img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
@@ -225,7 +227,8 @@ class CellDetector(BasePlugin):
                         self.model = Model(path=a_path,
                                         object_size=self.models[model]['object_size'],
                                         model_type=self.models[model]['model_type'],
-                                        model_data=self.models[model])
+                                        model_data=self.models[model],
+                                        model_name=model)
                         result = self.model.calculate(img_path=self.lsm_path)
                 except  Exception as e:
                     traceback.print_exc()
@@ -257,9 +260,9 @@ class CellDetector(BasePlugin):
         # Draw bounding boxes
         self.draw_bounding_box()
 
-    def calculate_single_mode(self, modeltype,modelpath,object_size, image_path,model_data = None):
+    def calculate_single_model(self, modeltype,modelpath,object_size, image_path,model_data = None, model_name = "<not set>"):
         model = None
-        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data)
+        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model)
         try:
             model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
         except  Exception as e:
@@ -284,15 +287,32 @@ class CellDetector(BasePlugin):
         try:
             savedEnabled = self.batchProcessButton.isEnabled()
             self.batchProcessButton.setEnabled(False)
+            
+            items = list(self.models.keys())
+            if self.checked_indices is None:
+                self.checked_indices = list(range(0, len(self.models)))  # B and D checked
+            from UI.ModelsCheckList import ModelsCheckListDialog
+            dlg = ModelsCheckListDialog(items, self.checked_indices, parent=self.parent())
+            if dlg.Execute():
+                checked = dlg.get_checked_items()
+            else:
+                return
+           
             processedImages = []
             labels = []
             i = 1
-            for model_name, model_data in self.models.items():
-                self.batchProcessButton.setText(f"Processing {model_name}")
+            j = 1
+            model_list = [s for _, s in checked]
+            self.checked_indices = [i for i, _ in checked]
+            
+            for model_name in model_list:
+                self.batchProcessButton.setText(f"Processing {model_name} ({j}/{len(model_list)})")
                 self.batchProcessButton.repaint()
+                j = j + 1
+                model_data = self.models[model_name]
                 modepath = model_data['path']
                 model_type = model_data['model_type']
-                _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, self.lsm_path,model_data=model_data)
+                _, processedImage,duration,counted = self.calculate_single_model(model_type, modepath, self.object_size, self.lsm_path,model_data=model_data, model_name = model_name)
                 if counted is not None:
                     processedImages.append( processedImage)
                     labels.append(f"{i} {model_name}:{counted} cells in {duration:.2f} seconds")
@@ -335,7 +355,7 @@ class CellDetector(BasePlugin):
                         image_name = os.path.basename(file_path)
                         self.batchProcessButtonMultiImage.setText(f"Processing {image_name} ({i}/{len(files)})")
                         self.batchProcessButtonMultiImage.repaint()
-                        _, processedImage,duration,counted = self.calculate_single_mode(model_type, modepath, self.object_size, file_path,model_data = model_data )
+                        _, processedImage,duration,counted = self.calculate_single_model(model_type, modepath, self.object_size, file_path,model_data = model_data , model_name = model)
                         processedImages.append( processedImage)
                         labels.append(f"{i} {image_name}:{counted} cells in {duration:.2f} seconds")
                         i = i + 1

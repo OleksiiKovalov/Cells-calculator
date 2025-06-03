@@ -36,7 +36,8 @@ class Model():
                  threshold=100, eps=5, min_samples=10,
                  object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
                  model_type = "",
-                 model_data = None):
+                 model_data = None,
+                 model_name = None):
         self.nuclei_counter = NucleiCounter(threshold=threshold,
                                             eps=eps, min_samples=min_samples)
         self.path = path
@@ -44,6 +45,7 @@ class Model():
         # self.cell_counter = Segmenter("model/best_n.pt", object_size = object_size)
         self.init_counter(path, object_size,model_type,model_data)
         self.inference_duration = 0
+        self.cell_counter.model_name = model_name        
 
     def init_counter(self, path, object_size, model_type,model_data = None):
         """

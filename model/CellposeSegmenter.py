@@ -10,10 +10,12 @@ from typing import Optional, List, Tuple, Dict, Any # For type hinting
 
 class CellposeSegmenter(BaseModel):
     def __init__(self, path_to_model: str, object_size,model_data = None):
+       
         super().__init__(path_to_model, object_size,model_data)
         self.cellpose_diam = None
     
     def init_x20_model(self, path_to_model: str):
+        self.image_preprocess_settings_default = [{"gray2rgb": ""},{"normalize": "1,99.8"},{"clip": "0,1"}]
         from cellpose import models as cp_models # Для Cellpose
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація Cellpose з моделлю: {path_to_model}")
@@ -45,12 +47,7 @@ class CellposeSegmenter(BaseModel):
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
-        if image.ndim == 2:
-            from skimage.color import gray2rgb
-            img_rgb = gray2rgb(image)
-        else:
-            img_rgb = image
-        self.original_image = img_rgb
+        self.original_image = safegray2rgb(image)
         channels_to_use=[0,0] # АДАПТУЙТЕ!
         try:
             masks, flows, styles = self.model.eval(img_inference, diameter=self.cellpose_diam, channels=channels_to_use)

@@ -35,17 +35,14 @@ class StardistSegmenter(BaseModel):
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
-
         from skimage.io import imread
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
-        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        self.original_image = img_rgb
+        self.original_image = safegray2rgb(image)
         try:
             labels, details = None, None
             labels, details = self.model.predict_instances(img_inference)
-
             self.detections = self.stardist_results_to_pandas(labels, scores=details["prob"])
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
