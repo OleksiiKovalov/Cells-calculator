@@ -293,6 +293,8 @@ class CellDetector(BasePlugin):
                 self.checked_indices = list(range(0, len(self.models)))  # B and D checked
             from UI.ModelsCheckList import ModelsCheckListDialog
             dlg = ModelsCheckListDialog(items, self.checked_indices, parent=self.parent())
+            #set to resonable height to fit most of models
+            dlg.resize(300,383)
             if dlg.Execute():
                 checked = dlg.get_checked_items()
             else:
