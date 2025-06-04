@@ -39,6 +39,9 @@ class StardistSegmenter(BaseModel):
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
+        from model.utils import safeimagesave
+        safeimagesave(img_inference, ".cache/cell_tmp_img_inference.png")
+       
         self.original_image = safegray2rgb(image)
         try:
             labels, details = None, None
@@ -57,6 +60,12 @@ class StardistSegmenter(BaseModel):
 
             self.prediction_image = None
             if plot is True:
+                h, w = img_inference.shape[:2]
+                o_h, o_w = original_image.shape[:2]
+                #if image was scaled during preprocessing - scale the original image to show. it is a wrong way
+                #todo: redo it in the correct way - we need to scale box/mask, not image
+                if h!=o_h or w!=o_w:
+                    original_image = resize_and_pad_cv (original_image, w, h)
                 self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                                 filename=filename, colormap=colormap, alpha=alpha)
             return filtered_detections

@@ -540,3 +540,12 @@ def match_masks(masks_a, masks_b, iou_threshold=0.5):
     matches = [(i, j, iou_matrix[i, j]) for i, j in zip(row_ind, col_ind) if iou_matrix[i, j] >= iou_threshold]
     return matches, iou_matrix    
     
+def safeimagesave(image,filename):
+    from skimage.io import imsave
+    if image.max() > 1.0:
+        #no denormalization needed
+        imsave(filename, image.astype('uint8'))
+    else:
+        #denormalization needed
+        imsave(filename, (image * 255).astype('uint8'))
+      

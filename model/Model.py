@@ -45,7 +45,8 @@ class Model():
         # self.cell_counter = Segmenter("model/best_n.pt", object_size = object_size)
         self.init_counter(path, object_size,model_type,model_data)
         self.inference_duration = 0
-        self.cell_counter.model_name = model_name        
+        self.model_name = model_name       
+
 
     def init_counter(self, path, object_size, model_type,model_data = None):
         """

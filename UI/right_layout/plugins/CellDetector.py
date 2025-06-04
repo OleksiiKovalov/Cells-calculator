@@ -192,10 +192,7 @@ class CellDetector(BasePlugin):
             self.button.repaint()
             try:
                 # Attempt to calculate the result using the selected method
-                if self.model and (self.models[model]['path'] == self.model.path):
-                    # result = self.models[model].calculate(
-                    #     img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
-                    #         nuclei_channel=self.parametrs['Nuclei'])
+                if self.model and (self.model == self.model.model_name):
                     result = self.model.calculate(
                         img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                             nuclei_channel=self.parametrs['Nuclei'])
