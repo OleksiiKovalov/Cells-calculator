@@ -64,6 +64,9 @@ class CellposeSegmenter(BaseModel):
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
                 self.object_size['signal']("set_size", self.detections['box'].copy())
+                self.detections[['id_label', 'confidence', 'diameter', 'area',
+                                 'volume']].to_csv(self.out_dir / f"{os.path.basename(self.original_image_path)}_{self.model_name}_cell_data.csv",
+                                                   sep=';', index=False)
             original_image = self.original_image.copy()
             if tracking is False:
                 filtered_detections = filter_detections(detections,

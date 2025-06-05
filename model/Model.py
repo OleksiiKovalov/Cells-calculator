@@ -46,8 +46,8 @@ class Model():
         self.init_counter(path, object_size,model_type,model_data)
         self.inference_duration = 0
         self.model_name = model_name       
-
-
+        self.cell_counter.model_name = model_name
+        
     def init_counter(self, path, object_size, model_type,model_data = None):
         """
         Helper constructor method for initializing cell counter param.

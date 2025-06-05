@@ -46,10 +46,13 @@ class StardistSegmenter(BaseModel):
         try:
             labels, details = None, None
             labels, details = self.model.predict_instances(img_inference)
-            self.detections = self.stardist_results_to_pandas(labels, scores=details["prob"])
+            self.detections = self.stardist_results_to_pandas(labels, scores=details["prob"], original_shape = image.shape[:2], inference_shape = image.shape[:2])
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
                 self.object_size['signal']("set_size", self.detections['box'].copy())
+                self.detections[['id_label', 'confidence', 'diameter', 'area',
+                                 'volume']].to_csv(self.out_dir / f"{os.path.basename(self.original_image_path)}_{self.model_name}_cell_data.csv",
+                                                   sep=';', index=False)
             original_image = self.original_image.copy()
             if tracking is False:
                 filtered_detections = filter_detections(detections,
@@ -94,7 +97,7 @@ class StardistSegmenter(BaseModel):
         elif img_bgr.shape[2] == 4: img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
         return img_bgr
     
-    def stardist_results_to_pandas(self,instances, scores=None, labels=None) -> pd.DataFrame:
+    def stardist_results_to_pandas(self,instances, scores=None, labels=None, original_shape=None, inference_shape=None) -> pd.DataFrame:
         data: Dict[str, List[Any]] = {
             "id_label": [],
             "box": [],
@@ -107,6 +110,9 @@ class StardistSegmenter(BaseModel):
         from skimage.measure import regionprops
         props = regionprops(instances)
 
+        from model.utils import safeimagesave
+        safeimagesave(instances, f".cache/instances.jpg")
+
         for i, prop in enumerate(props):
             # Extract bounding box (min_row, min_col, max_row, max_col)
             minr, minc, maxr, maxc = prop.bbox
@@ -114,6 +120,13 @@ class StardistSegmenter(BaseModel):
 
             # Create binary mask for the object
             binary_mask = (instances == prop.label).astype(np.uint8)
+            #we need to resize shape
+            if original_shape[0] != inference_shape[0] or original_shape[1]!=inference_shape[1]:
+                from skimage.transform import resize
+                binary_mask = resize(binary_mask, output_shape=original_shape, order=0, preserve_range=True, anti_aliasing=False).astype(binary_mask.dtype)
+            from model.utils import safeimagesave
+            safeimagesave(binary_mask, f".cache/binary_mask{i}.jpg")
+            
             contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if contours:
                 contour = contours[0]

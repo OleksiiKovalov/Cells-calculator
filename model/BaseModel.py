@@ -22,6 +22,7 @@ class BaseModel():
         - path_to_model: str - path to .pt YOLO model file;
         - object_size: UI util param 
         """
+        self.original_image_path = None
         self.model_name = "<not specified>"
         self.model_data = model_data
         self.image_preprocess_settings_default = []

@@ -50,8 +50,7 @@ class MainWindow(QMainWindow):
         screen_geometry = desktop.availableGeometry()
 
         # Set the fixed size of the main window to match the screen width and height minus the height of the menu bar
-        self.setFixedSize(screen_geometry.width(),
-                          desktop.availableGeometry().height() - self.menuBar().height())
+        self.setFixedSize(screen_geometry.width(),desktop.availableGeometry().height() - self.menuBar().height())
 
         # Set the window title
         self.current_plugin_name = "Cell Processor"
@@ -87,6 +86,8 @@ class MainWindow(QMainWindow):
             self.open_folder(value)
         elif action_name == "open_settings":
             self.open_settings()
+        elif action_name == "open_normalize":
+            self.open_normalize()
 
         elif action_name == "show_warning":
             self.show_warning_dialog(value)
@@ -106,6 +107,16 @@ class MainWindow(QMainWindow):
             self.show_warning_dialog(value)
         elif action_name == "add_image":
             self.add_image(value)
+        pass
+    
+    def open_normalize(self):
+        from UI.ImageNormalizeDialog import ImageNormalizeDialog
+        from skimage.io import imread
+        image = imread(self.lsm_path)
+        from model.utils import safergb2gray
+        image = safergb2gray(image)
+        dlg = ImageNormalizeDialog(image)
+        dlg.exec_()        
         pass
 
     def init_value(self):

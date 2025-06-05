@@ -469,8 +469,13 @@ def process_loaded_image(image, settings:OrderedDict):
         key, value = next(iter(step.items()))
         match key:
             case "resize":
-                new_width, new_height = map(int, value.strip().split(":"))
-                image = resize_and_pad_cv (image, new_width, new_height)
+                target_width, target_height = map(int, value.strip().split(":"))
+                orig_height, orig_width = image.shape[:2]
+                scale = min(target_width / orig_width, target_height / orig_height)
+                resized_width = int(orig_width * scale)
+                resized_height = int(orig_height * scale)
+                from skimage.transform import resize
+                image = resize(image, output_shape=(resized_height,resized_width), order=0, preserve_range=True, anti_aliasing=False).astype(image.dtype)
             case "gray2rgb":
                 image = safegray2rgb(image)
             case "rgb2gray":
@@ -542,7 +547,7 @@ def match_masks(masks_a, masks_b, iou_threshold=0.5):
     
 def safeimagesave(image,filename):
     from skimage.io import imsave
-    if image.max() > 1.0:
+    if image.dtype == 'uint8':
         #no denormalization needed
         imsave(filename, image.astype('uint8'))
     else:

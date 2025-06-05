@@ -206,6 +206,7 @@ class CellDetector(BasePlugin):
                                     model_data=self.models[model],
                                     model_name=model
                                     )
+                    self.model.cell_counter.original_image_path = self.lsm_path
                     result = self.model.calculate(
                         img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                             nuclei_channel=self.parametrs['Nuclei'])
@@ -226,6 +227,7 @@ class CellDetector(BasePlugin):
                                         model_type=self.models[model]['model_type'],
                                         model_data=self.models[model],
                                         model_name=model)
+                        self.model.cell_counter.original_image_path = self.lsm_path
                         result = self.model.calculate(img_path=self.lsm_path)
                 except  Exception as e:
                     traceback.print_exc()
