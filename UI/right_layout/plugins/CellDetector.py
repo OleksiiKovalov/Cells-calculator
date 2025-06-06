@@ -28,6 +28,7 @@ class CellDetector(BasePlugin):
                            object_size=arg[-1][currentModel]['object_size'],
                            model_type = arg[-1][currentModel]['model_type']
                            )
+        self.lsm_path = None
 
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
         self.show_boundry = 0
@@ -262,6 +263,7 @@ class CellDetector(BasePlugin):
     def calculate_single_model(self, modeltype,modelpath,object_size, image_path,model_data = None, model_name = "<not set>"):
         model = None
         model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model)
+        model.cell_counter.original_image_path = self.lsm_path
         try:
             model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
         except  Exception as e:
@@ -335,6 +337,7 @@ class CellDetector(BasePlugin):
     def batchProcessMultiImageButton_click(self):
         try:
             savedEnabled = self.batchProcessButtonMultiImage.isEnabled()
+            saved_lsm_path = self.lsm_path
             self.batchProcessButtonMultiImage.setEnabled(False)
             from PyQt5.QtWidgets import QFileDialog            
             files, _ = QFileDialog.getOpenFileNames(
@@ -354,6 +357,7 @@ class CellDetector(BasePlugin):
                 for file_path in files:
                     try:
                         image_name = os.path.basename(file_path)
+                        self.lsm_path = file_path
                         self.batchProcessButtonMultiImage.setText(f"Processing {image_name} ({i}/{len(files)})")
                         self.batchProcessButtonMultiImage.repaint()
                         _, processedImage,duration,counted = self.calculate_single_model(model_type, modepath, self.object_size, file_path,model_data = model_data , model_name = model)
@@ -374,9 +378,9 @@ class CellDetector(BasePlugin):
                 plt.title("Image")
                 plt.show()            
         finally:
+            self.lsm_path = saved_lsm_path
             self.batchProcessButtonMultiImage.setEnabled(savedEnabled)    
             self.batchProcessButtonMultiImage.setText(f"Current model on multiple images")
-            
         
     def print_result(self, result):
         model = self.combo_box.currentText()

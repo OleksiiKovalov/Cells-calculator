@@ -38,7 +38,7 @@ class menubar(QMenuBar):
         settings_menu.addAction(self.settings_action)
 
         self.normalize_action = QAction("normalize", self)
-        self.normalize_action.setEnabled(True)
+        self.normalize_action.setEnabled(False)
         self.normalize_action.triggered.connect(self.open_normalize)
         settings_menu.addAction(self.normalize_action)
 
