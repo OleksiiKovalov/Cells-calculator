@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import QAbstractItemView, QMessageBox, QTableWidget, QTable
      QGraphicsView, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QWidget, QHBoxLayout
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
+from PyQt5.QtGui import QIcon
 import tifffile
 from UI.SettingsWindow import SettingsWindow
 from UI.table import calculate_table
@@ -611,6 +612,7 @@ class MainWindow(QMainWindow):
 if __name__ == '__main__':
     # Create a QApplication instance
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon("ui/Cells-calculator-v3-icon2.png"))    
     try:
         # Attempt to create and show the main window
         window = MainWindow()
