@@ -39,10 +39,6 @@ class CellposeSegmenter(BaseModel):
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
-        # image = self.load_image(input_image)
-        # img_rgb = self.image_preprocess(image)
-        # self.original_image = img_rgb
-        
         from skimage.io import imread
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
@@ -190,8 +186,6 @@ class CellposeSegmenter(BaseModel):
                 continue
 
             data['id_label'].append(int(object_id))
-            #data['area'].append(area)
-            #data['volume'].append(area) 
             
             if store_bin_mask:
                 data['bin_mask'].append(current_bin_mask)
@@ -205,7 +199,6 @@ class CellposeSegmenter(BaseModel):
                 data['box'].append([np.nan, np.nan, np.nan, np.nan])
                 data['mask'].append([])
                 data['confidence'].append(np.nan if cellprob_map is not None else 1.0)
-                #data['diameter'].append(np.nan)
                 # Remove the last added id_label, area, volume if we skip
                 for key in ["id_label"]: data[key].pop()
                 if store_bin_mask: data["bin_mask"].pop()
@@ -226,7 +219,6 @@ class CellposeSegmenter(BaseModel):
             data['box'].append([x_min_norm, y_min_norm, width_norm, height_norm])
 
             # Mask Contour (normalized polygon)
-            # cv2.findContours requires an 8-bit single-channel image.
             contours, _ = cv2.findContours(current_bin_mask.astype(np.uint8), 
                                         cv2.RETR_EXTERNAL,    # Retrieves only the extreme outer contours.
                                         cv2.CHAIN_APPROX_SIMPLE) # Compresses horizontal, vertical, and diagonal segments.

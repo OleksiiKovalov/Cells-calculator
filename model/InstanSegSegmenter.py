@@ -13,7 +13,6 @@ class InstansegSegmenter(BaseModel):
         super().__init__(path_to_model, object_size,model_data)
    
     def init_x20_model(self, path_to_model: str):
-        #self.image_preprocess_settings_default = [{"gray2rgb": ""},{"normalize": "1,99.8"},{"clip": "0,1"}]
         self.image_preprocess_settings_default = [{"gray2rgb": ""}]
         from instanseg import InstanSeg
         if path_to_model and os.path.exists(path_to_model):
@@ -50,15 +49,8 @@ class InstansegSegmenter(BaseModel):
         self.original_image = safegray2rgb(image)
         try:
             
-            #image_array, pixel_size = self.model.read_image(input_image)
-            #labeled_output = self.model.eval_medium_image(image = image_array, return_image_tensor=False, target= "cells")
             labeled_output = self.model.eval_medium_image(image = img_inference, return_image_tensor=False, target= "cells")
             
-            # display = self.model.display(image_array, labeled_output)
-            # from instanseg.utils.utils import show_images
-            # show_images(image_array,display, colorbar=False, titles = ["Original Image", "Image with segmentation"])            
-            
-#            labeled_output = self.model.eval(image = input_image, save_output = False, save_overlay=False)
             self.detections = self.instanseg_results_to_pandas(labeled_output)
             
             detections = self.detections[self.detections['confidence'] >= min_score]
