@@ -29,19 +29,12 @@
 	},
 	"Stardist trained 0602": {
 		"path": "trainedmodels/stardist0602",
-		"model_type": "stardist",
-		"image_preprocess": [
-			{
-				"rgb2gray": ""
-			},
-			{
-				"normalize": "1,99.8"
-			}
-		]
+		"model_type": "stardist"
 	},
 	"Cellpose trained": {
 		"path": "trainedmodels/cpsam_finetuned.pth",
-		"model_type": "cellpose"
+		"model_type": "cellpose",
+		"diameter":"40"
 	},
 	"Cellpose cyto": {
 		"path": "cyto",

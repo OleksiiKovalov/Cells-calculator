@@ -1,0 +1,5 @@
+0. copy the content of this folder to your working folder, eg "c:\Work\CellsDetectorV3"
+1. if needed(you do not have anaconda3 or miniconda3 installed) - install miniconda3 - run bat file  "scripts\installminiconda-allusers.bat"-  as administrator.
+2. configure conda environment - run file "scripts\conda-setup.bat", wait for installation, press space when it completes.
+3. run the application - run file "runme.bat" at your working folder.
+4. test application using "All models on current image" mode.

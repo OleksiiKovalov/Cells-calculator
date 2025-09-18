@@ -11,7 +11,7 @@ class InstansegSegmenter(BaseModel):
         super().__init__(path_to_model, object_size,model_data)
    
     def init_x20_model(self, path_to_model: str):
-        self.image_preprocess_settings_default = [{"gray2rgb": ""}]
+        self.image_preprocess_settings_default = OrderedDict([("gray2rgb", "")])        
         from instanseg import InstanSeg
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація InstanSeg з моделлю: {path_to_model}")

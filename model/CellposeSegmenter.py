@@ -15,7 +15,7 @@ class CellposeSegmenter(BaseModel):
         self.cellpose_diam = None
     
     def init_x20_model(self, path_to_model: str):
-        self.image_preprocess_settings_default = [{"gray2rgb": ""}]
+        self.image_preprocess_settings_default = OrderedDict([("gray2rgb", "")])
         from cellpose import models as cp_models # Для Cellpose
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація Cellpose з моделлю: {path_to_model}")

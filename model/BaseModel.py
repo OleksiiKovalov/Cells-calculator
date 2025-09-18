@@ -2,6 +2,7 @@
 Here we define for baseline class of all segmenting or detecting models used in the application.
 We define both the structure and the main functionality utils.
 """
+from collections import OrderedDict
 import os
 from pathlib import Path
 import shutil
@@ -25,7 +26,7 @@ class BaseModel():
         self.original_image_path = None
         self.model_name = "<not specified>"
         self.model_data = model_data
-        self.image_preprocess_settings_default = []
+        self.image_preprocess_settings_default = OrderedDict()
         self.use_gpu = False
         if torch.cuda.is_available():
             self.device = torch.device("cuda")

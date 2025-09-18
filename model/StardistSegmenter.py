@@ -21,13 +21,13 @@ class StardistSegmenter(BaseModel):
         if(path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018")):
             self.is_custom_model = False
             self.model = StarDist2D.from_pretrained(path_to_model)
-            self.image_preprocess_settings_default = [{"gray2rgb": ""},{"normalize": "1,99.8"}]
+            self.image_preprocess_settings_default = OrderedDict([("gray2rgb", ""), ("normalize", "1,99.8")])            
         else:
             self.is_custom_model = True
             path =os.path.dirname(path_to_model)
             name =os.path.basename(path_to_model)
             self.model = StarDist2D(None, name=name, basedir=path)
-            self.image_preprocess_settings_default = [{"rgb2gray": ""},{"normalize": "1,99.8"}]
+            self.image_preprocess_settings_default = OrderedDict([("rgb2gray", ""), ("normalize", "1,99.8")])            
 
     def init_x10_model(self, path_to_model):
         pass

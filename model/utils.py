@@ -430,14 +430,14 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
     grid_image = np.vstack(grid_rows)
     return grid_image            
 
-def resize_and_pad_cv(image, target_width, target_height):
+def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
     """Resize image keeping aspect ratio and pad to target size."""
     h, w = image.shape[:2]
     scale = min(target_width / w, target_height / h)
     new_w, new_h = int(w * scale), int(h * scale)
 
     from skimage.transform import resize
-    resized = resize(image, (new_h, new_w), anti_aliasing=True, preserve_range=True)
+    resized = resize(image, (new_h, new_w), anti_aliasing=anti_aliasing, preserve_range=True)
     #resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
     resized = resized.astype(image.dtype)
     
@@ -465,8 +465,11 @@ def resize_and_pad_cv(image, target_width, target_height):
 
 
 def process_loaded_image(image, settings:OrderedDict):
-    for step in settings:
-        key, value = next(iter(step.items()))
+    set = settings
+    for key in set:
+        value = set[key]
+    # for step in settings:
+    #     key, value = next(iter(step.items()))    
         match key:
             case "resize":
                 target_width, target_height = map(int, value.strip().split(":"))
@@ -476,6 +479,10 @@ def process_loaded_image(image, settings:OrderedDict):
                 resized_height = int(orig_height * scale)
                 from skimage.transform import resize
                 image = resize(image, output_shape=(resized_height,resized_width), order=0, preserve_range=True, anti_aliasing=False).astype(image.dtype)
+
+            case "resizeandpad":
+                target_width, target_height = map(int, value.strip().split(":"))
+                image = resize_and_pad_cv(image,target_width, target_height )
             case "gray2rgb":
                 image = safegray2rgb(image)
             case "rgb2gray":
