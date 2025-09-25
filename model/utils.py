@@ -466,10 +466,8 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
 
 def process_loaded_image(image, settings:OrderedDict):
     set = settings
-    for key in set:
-        value = set[key]
-    # for step in settings:
-    #     key, value = next(iter(step.items()))    
+    for step in settings:
+        key, value = next(iter(step.items()))    
         match key:
             case "resize":
                 target_width, target_height = map(int, value.strip().split(":"))
@@ -532,26 +530,6 @@ def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.
         'F1': f1
     }
     
-def compute_iou(mask1, mask2):
-    """Compute Intersection over Union (IoU) between two binary masks."""
-    intersection = np.logical_and(mask1, mask2).sum()
-    union = np.logical_or(mask1, mask2).sum()
-    return intersection / union if union > 0 else 0.0
-
-def match_masks(masks_a, masks_b, iou_threshold=0.5):
-    """Match masks from List A to List B using IoU and Hungarian algorithm."""
-    n, m = len(masks_a), len(masks_b)
-    iou_matrix = np.zeros((n, m))
-
-    for i in range(n):
-        for j in range(m):
-            iou_matrix[i, j] = compute_iou(masks_a[i], masks_b[j])
-
-    from scipy.optimize import linear_sum_assignment
-    row_ind, col_ind = linear_sum_assignment(-iou_matrix)
-    matches = [(i, j, iou_matrix[i, j]) for i, j in zip(row_ind, col_ind) if iou_matrix[i, j] >= iou_threshold]
-    return matches, iou_matrix    
-    
 def safeimagesave(image,filename):
     from skimage.io import imsave
     if image.dtype == 'uint8':
@@ -561,3 +539,9 @@ def safeimagesave(image,filename):
         #denormalization needed
         imsave(filename, (image * 255).astype('uint8'))
       
+def clear_cache():
+    import shutil
+    cache_dir = ".cache"
+    if os.path.exists(cache_dir):
+        shutil.rmtree(cache_dir,ignore_errors=True)
+    os.makedirs(cache_dir, exist_ok=True)

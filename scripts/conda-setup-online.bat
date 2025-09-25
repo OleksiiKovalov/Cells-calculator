@@ -8,6 +8,7 @@ echo found CONDA at %CONDA_ROOT%
 echo calling %CONDA_ROOT%\Scripts\activate.bat
 CALL "%CONDA_ROOT%\Scripts\activate.bat"
 rem online conda setup
+echo accepting TOS
 call conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
 call conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 call conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/msys2
