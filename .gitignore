@@ -31,5 +31,6 @@ qwe.py
 app.log
 /.cache
 /.vscode
+/.vs
 /packages
 
