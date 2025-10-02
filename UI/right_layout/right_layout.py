@@ -1,5 +1,6 @@
-from PyQt5.QtWidgets import QVBoxLayout
+# Third-party imports
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.QtWidgets import QVBoxLayout
 
 
 class right_layout(QVBoxLayout):

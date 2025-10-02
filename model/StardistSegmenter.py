@@ -1,13 +1,28 @@
+# Standard library imports
 import json
+import os
+import traceback
+from typing import List, Dict, Any
+
+# Third-party imports
+import cv2  # OpenCV for findContours
 import numpy as np
+import pandas as pd
+import tensorflow as tf
+from csbdeep.utils import normalize
+from skimage.io import imread
+from skimage.measure import regionprops
+from skimage.transform import resize
+from stardist.models import StarDist2D
+
+# Local application imports
+from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import *
-import os
+from model.utils import safeimagesave, safe_image_read
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_INSTANCES, IMAGE_FILE_NAME_TMP
 
-import pandas as pd
-import cv2  # OpenCV for findContours
-from typing import  List, Dict, Any # For type hinting
-from csbdeep.utils import normalize            
+
 
 class StardistSegmenter(BaseModel):
     def __init__(self, path_to_model: str, object_size,model_data = None):
@@ -15,9 +30,6 @@ class StardistSegmenter(BaseModel):
         super().__init__(path_to_model, object_size,model_data)
     
     def init_x20_model(self, path_to_model: str):
-        from stardist.models import StarDist2D
-        import tensorflow as tf
-        from UI.errorhandling import app_logger
         app_logger().warning(f"Stardist: Num GPUs Available:{len(tf.config.list_physical_devices('GPU'))}")        
         if(path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018")):
             self.is_custom_model = False
@@ -34,14 +46,12 @@ class StardistSegmenter(BaseModel):
         pass
 
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
-              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
+              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
-        from skimage.io import imread
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
-        from model.utils import safeimagesave
-        safeimagesave(img_inference, ".cache/cell_tmp_img_inference.png")
+        safeimagesave(img_inference, IMAGE_FILE_NAME_INGFERENCE)
        
         self.original_image = safegray2rgb(image)
         try:
@@ -55,13 +65,14 @@ class StardistSegmenter(BaseModel):
                                  'volume']].to_csv(self.out_dir / f"{os.path.basename(self.original_image_path)}_{self.model_name}_cell_data.csv",
                                                    sep=';', index=False)
             original_image = self.original_image.copy()
-            if tracking is False:
-                filtered_detections = filter_detections(detections,
-                                                        min_size = self.object_size['min_size'],
-                                                        max_size= self.object_size['max_size'])
-            else:
-                filtered_detections = detections
+            # if tracking is False:
+            #     filtered_detections = filter_detections(detections,
+            #                                             min_size = self.object_size['min_size'],
+            #                                             max_size= self.object_size['max_size'])
+            # else:
+            #     filtered_detections = detections
 
+            filtered_detections = detections
             self.prediction_image = None
             if plot is True:
                 h, w = img_inference.shape[:2]
@@ -71,18 +82,16 @@ class StardistSegmenter(BaseModel):
                 if h!=o_h or w!=o_w:
                     original_image = resize_and_pad_cv (original_image, w, h)
                 self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
-                                filename=filename, colormap=colormap, alpha=alpha)
+                                filename=filename, colormap=colormap, alpha=self.object_size.get("alpha", 0.75))
             return filtered_detections
         except Exception as e:
-            import traceback
-            from UI.errorhandling import app_logger
             traceback.print_exc()
             app_logger().exception(e)
             raise RuntimeError(f"Error when inferrecing StardistSegmenter: {e}")
         
 
     def count_x10(self, input_image: str, colormap="tab20",
-              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.01,
+              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.01,
               alpha=0.75, **kwargs):
         raise NotImplementedError
     
@@ -91,11 +100,13 @@ class StardistSegmenter(BaseModel):
         return img_rgb
 
     def load_image(self, image_path):
-        img_bgr = cv2.imread(image_path, cv2.IMREAD_COLOR)
+        img_bgr = safe_image_read(image_path, color_mode='color')
         if img_bgr is None:
             raise RuntimeError(f"Unable to load image {image_path}")
-        if len(img_bgr.shape) == 2: img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_GRAY2BGR)
-        elif img_bgr.shape[2] == 4: img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
+        if len(img_bgr.shape) == 2: 
+            img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_GRAY2BGR)
+        elif len(img_bgr.shape) == 3 and img_bgr.shape[2] == 4: 
+            img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
         return img_bgr
     
     def stardist_results_to_pandas(self,instances, scores=None, labels=None, original_shape=None, inference_shape=None) -> pd.DataFrame:
@@ -108,11 +119,8 @@ class StardistSegmenter(BaseModel):
             "area": [],
             "volume": []
         }
-        from skimage.measure import regionprops
         props = regionprops(instances)
-
-        from model.utils import safeimagesave
-        safeimagesave(instances, f".cache/instances.jpg")
+        safeimagesave(instances, IMAGE_FILE_NAME_INSTANCES)
 
         for i, prop in enumerate(props):
             # Extract bounding box (min_row, min_col, max_row, max_col)
@@ -123,10 +131,7 @@ class StardistSegmenter(BaseModel):
             binary_mask = (instances == prop.label).astype(np.uint8)
             #we need to resize shape
             if original_shape[0] != inference_shape[0] or original_shape[1]!=inference_shape[1]:
-                from skimage.transform import resize
                 binary_mask = resize(binary_mask, output_shape=original_shape, order=0, preserve_range=True, anti_aliasing=False).astype(binary_mask.dtype)
-            from model.utils import safeimagesave
-            #safeimagesave(binary_mask, f".cache/binary_mask{i}.jpg")
             
             contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             if contours:

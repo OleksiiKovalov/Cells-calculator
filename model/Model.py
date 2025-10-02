@@ -4,15 +4,15 @@ In this module the general Model class is defined which is used to calculate:
 - cells, nuclei and %, if given microimage in LSM format.
 """
 
+# Standard library imports
+import importlib
 import os
 
-from model.CellCounter import CellCounter
+
+# Local application imports
+from UI.app_globals import get_registered_model
 from model.NucleiCounter import NucleiCounter
-from model.segmenter import Segmenter
-from model.utils import is_image_valid, calculate_lsm
-from model.CellposeSegmenter import CellposeSegmenter
-from model.InstanSegSegmenter import InstansegSegmenter
-from model.StardistSegmenter import StardistSegmenter
+from model.utils import is_image_valid, calculate_lsm, show_error_message
 
 class Model():
     """
@@ -54,19 +54,14 @@ class Model():
         Depending on the model file name, either CellCounter or Segmenter
         class is being called for initialization.
         """
-        
-        if "stardist" in model_type: 
-            self.cell_counter = StardistSegmenter(path, object_size = object_size,model_data = model_data)
-        elif "instanseg" in model_type: 
-            self.cell_counter = InstansegSegmenter(path, object_size = object_size,model_data = model_data)
-        elif "cellpose" in model_type: 
-            self.cell_counter = CellposeSegmenter(path, object_size = object_size,model_data = model_data)
-        elif "cellcounter" in model_type:
-            self.cell_counter = CellCounter(path_to_model=path, object_size = object_size,model_data = model_data)
-        elif "segmenter" in model_type:
-            self.cell_counter = Segmenter(path, object_size = object_size,model_data = model_data)
-        else:
-            raise ValueError("Unknown model type given as input. Expected 'det' for detection model or 'seg' for segmenting model to be presented in the model filename.")
+        cell_counter_class_name = get_registered_model(model_type).get('model_class') if get_registered_model(model_type) else None
+        if cell_counter_class_name is None:
+            show_error_message("Model Initialization Error", f"Unknown model type '{model_type}' given as input. Please check configuration file and build settings.")
+            raise ValueError(f"Unknown model type '{model_type}' given as input. Please check confoguration file and build settings.")
+        module_name, class_name = cell_counter_class_name.rsplit(".", 1)
+        module = importlib.import_module(module_name)
+        cell_counter_class = getattr(module, class_name)
+        self.cell_counter =cell_counter_class(path, object_size = object_size,model_data = model_data)   
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """
@@ -90,7 +85,7 @@ class Model():
             self.inference_duration = self.cell_counter.inference_duration
             return result
 
-def calculate_standard(cell_counter : CellCounter, img_path : str):
+def calculate_standard(cell_counter, img_path : str):
     """
     Calculates cells only on given standard image.
     Input params are:

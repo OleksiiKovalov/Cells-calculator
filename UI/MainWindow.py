@@ -5,24 +5,37 @@ This module defines the MainWindow class that represents the main window of the 
 The MainWindow class handles the initialization of the UI, loading and processing images, 
 and interacting with various models to perform cell calculations.
 """
-from  UI.splashscreen import update_splash
-from datetime import datetime
+
+# Standard library imports
 import os
-import shutil
+import string
 import traceback
+from datetime import datetime
+
+# Third-party imports
+import numpy as np
 import tifffile
-import json
-from PyQt5.QtWidgets import (QAbstractItemView, QMessageBox, QTableWidget, QTableWidgetItem,
-    QGraphicsView, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QWidget, QHBoxLayout)
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont, QColor
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
-from UI.SettingsWindow import SettingsWindow
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QFont, QColor, QWheelEvent
+from PyQt5.QtWidgets import (
+    QAbstractItemView, QMessageBox, QTableWidget, QTableWidgetItem,
+    QGraphicsView, QApplication, QMainWindow, QGraphicsScene, 
+    QWidget, QHBoxLayout, QSplitter, QStatusBar, QLabel
+)
+from skimage.io import imread
+
+# Local application imports
+from UI.app_globals import get_global
+from UI.errorhandling import connect_to_log_events
+from UI.ImageNormalizeDialog import ImageNormalizeDialog
 from UI.menubar import menubar
-from UI.table import calculate_table
+from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin as CellDetector_plugin
+from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugin
 from UI.right_layout.right_layout import right_layout
-from UI.right_layout.plugins.CellDetector import CellDetector as CellDetector_plugin
-from UI.right_layout.plugins.tracker import Tracker as Tracker_plugin
-from model.utils import COLOR_NUMBER as color_number, clear_cache
+from UI.SettingsWindow import SettingsWindow
+from UI.table import calculate_table
+from model.utils import COLOR_NUMBER as color_number, clear_cache, safergb2gray
+
 
 class MainWindow(QMainWindow):
     """
@@ -56,7 +69,8 @@ class MainWindow(QMainWindow):
         screen_geometry = desktop.availableGeometry()
 
         # Set the fixed size of the main window to match the screen width and height minus the height of the menu bar
-        self.setFixedSize(screen_geometry.width(),desktop.availableGeometry().height() - self.menuBar().height())
+        #self.setFixedSize(screen_geometry.width(),desktop.availableGeometry().height() - self.menuBar().height())
+        self.setMinimumSize(850, 600)
 
         # Set the window title
         self.current_plugin_name = "Cell Processor"
@@ -87,6 +101,8 @@ class MainWindow(QMainWindow):
         self._update_progress(95, "Finalizing layout...")
         self.right_layout.init_rightLayout()
         self.init_mainScene()
+        self.init_status_bar()
+        connect_to_log_events(self.on_log_line_added)        
         
         self._update_progress(100, "Ready!")
     
@@ -126,13 +142,12 @@ class MainWindow(QMainWindow):
             self.show_warning_dialog(value)
         elif action_name == "add_image":
             self.add_image(value)
+        elif action_name == "filter_and_draw_predictions":
+            self.filter_and_draw_predictions(get_global('predictions'), get_global('image_inference'))
         pass
     
     def open_normalize(self):
-        from UI.ImageNormalizeDialog import ImageNormalizeDialog
-        from skimage.io import imread
         image = imread(self.lsm_path)
-        from model.utils import safergb2gray
         image = safergb2gray(image)
         dlg = ImageNormalizeDialog(image)
         dlg.exec_()        
@@ -175,19 +190,15 @@ class MainWindow(QMainWindow):
         # }
 
         #loading detectors from config file
-        from collections import OrderedDict
         
         self._update_progress(48, "Reading model configuration file...")
-        with open('modelconfig.json', 'r') as f:
-            loaded_models = json.load(f, object_pairs_hook=OrderedDict)
-
+        loaded_models = get_global('loaded_models')
+        
         self._update_progress(52, "Configuring models...")
         for model_name, model_data in loaded_models.items():
             # Set the 'object_size' parameter for each loaded model
             model_data['object_size'] = self.object_size
             self.models_celldetector[model_name] = model_data
-
-        print("Models loaded and updated successfully!")
                     
         self._update_progress(55, "Setting up tracker models...")            
         self.models_tracker = {
@@ -228,36 +239,130 @@ class MainWindow(QMainWindow):
 
         Notes:
         - Create a central widget.
-        - Create a horizontal layout for the main scene and other widgets.
+        - Create a horizontal splitter for the main scene and right layout widget.
         - Initialize the main scene and its view.
-        - Create a vertical layout for the widgets on the right side.
-        - Add the main view and right layout to the main layout.
-        - Set the main layout for the central widget.
+        - Create a widget container for the right layout.
+        - Add both widgets to the splitter.
+        - Set the splitter as the central widget's layout.
         - Set the scene rectangle to match the size of the main view.
         """
         # Create a central widget
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
 
-        # Create a horizontal layout for the main scene and other widgets
-        self.main_layout = QHBoxLayout()
+        # Create a horizontal splitter for the main scene and other widgets
+        self.main_splitter = QSplitter(Qt.Horizontal)
 
         # Initialize the main scene and its view
         self.main_scene = QGraphicsScene()
         self.main_view = QGraphicsView(self.main_scene)
         self.main_view.setAlignment(Qt.AlignLeft | Qt.AlignTop)
-        self.main_view.setFixedWidth(int(self.width() * 0.75))
+        
+        # Initialize zoom functionality
+        self.zoom_factor = 1.0
+        self.min_zoom = 0.1
+        self.max_zoom = 10.0
+        self.zoom_step = 1.15
+        
+        # Initialize drag functionality for panning
+        self.last_pan_point = None
+        self.is_panning = False
+        
+        # Enable zoom with Ctrl+Mouse wheel and pan with left mouse drag
+        self.main_view.wheelEvent = self._on_wheel_event
+        self.main_view.mousePressEvent = self._on_mouse_press
+        self.main_view.mouseMoveEvent = self._on_mouse_move
+        self.main_view.mouseReleaseEvent = self._on_mouse_release
+        
+        # Set drag mode to NoDrag since we're handling dragging manually
+        self.main_view.setDragMode(QGraphicsView.NoDrag)
 
-        # Add the main view and right layout to the main layout
-        self.main_layout.addWidget(self.main_view)
-        self.main_layout.addLayout(self.right_layout)
+        # Create a widget container for the right layout
+        self.right_layout_widget = QWidget()
+        self.right_layout_widget.setMaximumWidth(800)
+        self.right_layout_widget.setMinimumWidth(300)
+        self.right_layout_widget.setLayout(self.right_layout)
+
+        # Add the main view and right layout widget to the splitter
+        self.main_splitter.addWidget(self.main_view)
+        self.main_splitter.addWidget(self.right_layout_widget)
+
+        # Set stretch factors: main view can expand, right panel stays fixed-ish
+        self.main_splitter.setStretchFactor(0, 1)  # main_view can stretch
+        self.main_splitter.setStretchFactor(1, 0)  # right_layout_widget minimal stretch
+        
+        # Set initial splitter proportions (75% for main view, 25% for right panel)
+        self.main_splitter.setSizes([750, 400])
+        
+        # Set collapsible behavior - right panel cannot be collapsed completely
+        self.main_splitter.setCollapsible(0, False)   # main_view can be collapsed
+        self.main_splitter.setCollapsible(1, False)  # right panel cannot be collapsed
+        
+        # Create a layout for the central widget and add the splitter
+        self.main_layout = QHBoxLayout()
+        self.main_layout.setContentsMargins(0, 0, 0, 0)  # Remove margins for full space usage
+        self.main_layout.addWidget(self.main_splitter)
 
         # Set the main layout for the central widget
         self.central_widget.setLayout(self.main_layout)
 
         # Set the scene rectangle to match the size of the main view
-        self.main_scene.setSceneRect(
-            0, 0, self.main_view.width()-10, self.main_view.height())
+        self.main_scene.setSceneRect(0, 0, self.main_view.width()-10, self.main_view.height())
+        
+        # Connect resize event for automatic image scaling
+        self.main_view.resizeEvent = self._on_main_view_resize
+
+    def init_status_bar(self):
+        """
+        Initialize and configure the status bar.
+        
+        Creates a status bar with multiple sections:
+        - Main status message
+        - Current file information
+        - Processing status
+        - Application state
+        """
+        # Create the status bar
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+        
+        # Create status bar widgets
+        self.status_message = QLabel("Ready")
+        self.status_file = QLabel("No file loaded")
+        self.status_processing = QLabel("Idle")
+        
+        # Add main status message (left side)
+        self.status_bar.addWidget(self.status_message, 1)  # Stretch factor 1
+        
+        # Add separator and file info
+        self.status_bar.addPermanentWidget(QLabel(" | "))
+        self.status_bar.addPermanentWidget(self.status_file)
+        
+        # Add separator and processing status
+        self.status_bar.addPermanentWidget(QLabel(" | "))
+        self.status_bar.addPermanentWidget(self.status_processing)
+        
+        # Set initial status
+        self.update_status("Application started successfully")
+
+    def update_status(self, message, file_info=None, processing_status=None):
+        """
+        Update the status bar with new information.
+        
+        Args:
+            message (str): Main status message
+            file_info (str, optional): Current file information
+            processing_status (str, optional): Processing status
+        """
+        if hasattr(self, 'status_message'):
+            self.status_message.setText(self.remove_non_printable(message))
+        
+        if file_info is not None and hasattr(self, 'status_file'):
+            self.status_file.setText(file_info)
+            
+        if processing_status is not None and hasattr(self, 'status_processing'):
+            self.status_processing.setText(processing_status)
+        QApplication.processEvents()
 
     def show_warning_dialog(self, text):
         """
@@ -400,76 +505,445 @@ class MainWindow(QMainWindow):
             self.df = None
             self.show_warning_dialog("Error during creating table")
 
-    def add_image(self, lsm_file:str):
+    def add_image(self, lsm_file):
         """
-        Open an image file and display it.
+        Create and display an image in the main scene with automatic resizing.
         
         Args:
-        lsm_file (str or numpy.ndarray): Path to the image file or a numpy array representing an image.
-            If it's a string (file path), it opens the image file. If it's a numpy array, it assumes
-            it represents an image.
-
-        Notes:
-        If lsm_file is a string (file path), it creates a QImage from the file path.
-            If lsm_file is a numpy array, it creates a QImage from it with grayscale format.
-        """
-        self.main_scene.clear()
-        if isinstance(lsm_file, str) and not os.path.exists(lsm_file):
-            image = self.create_no_image_qimage()
-        elif isinstance(lsm_file, str) and not lsm_file.endswith(".lsm"):
-            image = QImage(lsm_file)
-        elif isinstance(lsm_file, str):
-            with tifffile.TiffFile(lsm_file) as tif:
-                # Read the first page of the LSM file as an array
-                lsm_file = tif.pages[0].asarray()
-            image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],
-                        lsm_file.shape[2], QImage.Format_Grayscale8)
-        else:
-            # If it's not a string, assume it's a numpy array representing an image
-            # and create a QImage from it with grayscale format
-            image = QImage(lsm_file[self.parametrs['Cell']], lsm_file.shape[1],
-                        lsm_file.shape[2], QImage.Format_Grayscale8)
-
-        # Convert the QImage to a QPixmap
-        pixmap = QPixmap.fromImage(image)
-        self.currentImageWidth = image.width()
-        self.currentImageHeight = image.height()
-
-        # Get the dimensions of the main view
-        view_width = self.main_view.viewport().width()
-        view_height = self.main_view.viewport().height()
-
-        # Calculate the aspect ratio of the image
-        if pixmap.height() > 0: 
-            pixmap_aspect_ratio = pixmap.width() / pixmap.height()
-            # Scale the image to fit within the view while maintaining aspect ratio
-            if view_width / view_height > pixmap_aspect_ratio:
-                pixmap_width = view_height * pixmap_aspect_ratio
-                pixmap_height = view_height
-            else:
-                pixmap_width = view_width
-                pixmap_height = view_width / pixmap_aspect_ratio
-        else:
-            pixmap_width = 0
-            pixmap_height = 0
-        pixmap_height = int(pixmap_height)
-        pixmap_width = int(pixmap_width)
-        # Scale the pixmap
-        pixmap = pixmap.scaled(pixmap_width, pixmap_height,
-                            aspectRatioMode=Qt.KeepAspectRatio)
-
-        # Add the scaled pixmap to the main scene
-        pixmap_item = self.main_scene.addPixmap(pixmap)
+            lsm_file (str or numpy.ndarray): Path to image file or numpy array representing image.
+                - str: File path to image (supports .png, .jpg, .bmp, .lsm, .tif)
+                - numpy.ndarray: Image data array (for LSM files or processed images)
         
-
-        # Calculate the position to center the image within the view
-        x_pos = (view_width - pixmap.width()) / 2
-        y_pos = (view_height - pixmap.height()) / 2
-
-        # Set the position of the pixmap item within the scene
-        pixmap_item.setPos(x_pos, y_pos)
+        Notes:
+            - Automatically handles different image formats and sources
+            - Scales image to fit main scene while maintaining aspect ratio
+            - Centers image in the scene
+            - Updates scene rect for proper resizing behavior
+        """
+        # Clear the current scene
+        self.main_scene.clear()
+        
+        # Step 1: Create QImage from various sources
+        image = self._create_qimage_from_source(lsm_file)
+        
+        # Step 2: Add image to scene with auto-resize functionality
+        self._add_image_to_scene(image)
+        
+        # Update the view
         self.main_view.repaint()
         QApplication.processEvents()
+    
+    def _create_qimage_from_source(self, lsm_file):
+        """
+        Create a QImage from various source types.
+        
+        Args:
+            lsm_file (str or numpy.ndarray): Image source
+            
+        Returns:
+            QImage: Created image object
+        """
+        try:
+            if isinstance(lsm_file, str):
+                # Handle file path input
+                if not os.path.exists(lsm_file):
+                    # File doesn't exist - create "NO IMAGE" placeholder
+                    return self.create_no_image_qimage()
+                
+                elif lsm_file.lower().endswith('.lsm'):
+                    # Handle LSM files
+                    with tifffile.TiffFile(lsm_file) as tif:
+                        lsm_array = tif.pages[0].asarray()
+                    
+                    # Check if we have enough channels
+                    if lsm_array.shape[0] <= self.parametrs['Cell']:
+                        return self.create_no_image_qimage()
+                    
+                    # Create QImage from selected channel
+                    channel_data = lsm_array[self.parametrs['Cell']]
+                    return QImage(channel_data.data, channel_data.shape[1], 
+                                channel_data.shape[0], channel_data.strides[0], 
+                                QImage.Format_Grayscale8)
+                
+                else:
+                    # Handle regular image files (png, jpg, bmp, tif)
+                    return QImage(lsm_file)
+            
+            else:
+                # Handle numpy array input
+                if isinstance(lsm_file, np.ndarray):
+                    if len(lsm_file.shape) >= 3:
+                        # Multi-channel array (LSM data)
+                        if lsm_file.shape[0] <= self.parametrs['Cell']:
+                            return self.create_no_image_qimage()
+                        
+                        channel_data = lsm_file[self.parametrs['Cell']]
+                        return QImage(channel_data.data, channel_data.shape[1], 
+                                    channel_data.shape[0], channel_data.strides[0], 
+                                    QImage.Format_Grayscale8)
+                    else:
+                        # Single channel 2D array
+                        return QImage(lsm_file.data, lsm_file.shape[1], 
+                                    lsm_file.shape[0], lsm_file.strides[0], 
+                                    QImage.Format_Grayscale8)
+                else:
+                    # Unknown type - return placeholder
+                    return self.create_no_image_qimage()
+                    
+        except Exception as e:
+            # If any error occurs during image creation, return placeholder
+            print(f"Error creating image: {e}")
+            return self.create_no_image_qimage()
+    
+    def _add_image_to_scene(self, image):
+        """
+        Add QImage to scene with automatic scaling and centering.
+        
+        Args:
+            image (QImage): Image to add to the scene
+        """
+        if image.isNull():
+            image = self.create_no_image_qimage()
+        
+        # Store original image dimensions
+        self.currentImageWidth = image.width()
+        self.currentImageHeight = image.height()
+        
+        # Convert to pixmap
+        original_pixmap = QPixmap.fromImage(image)
+        
+        # Get current view dimensions
+        view_rect = self.main_view.viewport().rect()
+        view_width = view_rect.width()
+        view_height = view_rect.height()
+        
+        # Calculate scaled size while maintaining aspect ratio
+        scaled_pixmap = self._scale_pixmap_to_fit(original_pixmap, view_width, view_height)
+        
+        # Add pixmap to scene
+        self.current_pixmap_item = self.main_scene.addPixmap(scaled_pixmap)
+        
+        # Center the image in the scene
+        self._center_image_in_scene(scaled_pixmap, view_width, view_height)
+        
+        # Update scene rect to match view size for proper resizing
+        self.main_scene.setSceneRect(0, 0, view_width, view_height)
+        
+        # Store original pixmap for resizing
+        self.original_image_pixmap = original_pixmap
+        
+        # Reset zoom when new image is loaded
+        self.zoom_factor = 1.0
+        self.main_view.resetTransform()
+        self._update_zoom_status()  
+
+    def _scale_pixmap_to_fit(self, pixmap, view_width, view_height):
+        """
+        Scale pixmap to fit within view while maintaining aspect ratio.
+        
+        Args:
+            pixmap (QPixmap): Original pixmap
+            view_width (int): Available width
+            view_height (int): Available height
+            
+        Returns:
+            QPixmap: Scaled pixmap
+        """
+        if pixmap.isNull() or view_width <= 0 or view_height <= 0:
+            return pixmap
+        
+        # Calculate aspect ratios
+        pixmap_ratio = pixmap.width() / pixmap.height() if pixmap.height() > 0 else 1
+        view_ratio = view_width / view_height if view_height > 0 else 1
+        
+        # Determine scaling dimensions
+        if pixmap_ratio > view_ratio:
+            # Image is wider - fit to width
+            new_width = min(view_width, pixmap.width())
+            new_height = int(new_width / pixmap_ratio)
+        else:
+            # Image is taller - fit to height
+            new_height = min(view_height, pixmap.height())
+            new_width = int(new_height * pixmap_ratio)
+        
+        # Scale the pixmap
+        return pixmap.scaled(new_width, new_height, 
+                           Qt.KeepAspectRatio, Qt.SmoothTransformation)
+    
+    def _center_image_in_scene(self, pixmap, view_width, view_height):
+        """
+        Center the image pixmap in the scene.
+        
+        Args:
+            pixmap (QPixmap): Pixmap to center
+            view_width (int): View width
+            view_height (int): View height
+        """
+        if hasattr(self, 'current_pixmap_item') and self.current_pixmap_item:
+            # Calculate center position
+            x_pos = max(0, (view_width - pixmap.width()) / 2)
+            y_pos = max(0, (view_height - pixmap.height()) / 2)
+            
+            # Set position
+            self.current_pixmap_item.setPos(x_pos, y_pos)
+    
+    def _on_main_view_resize(self, event):
+        """
+        Handle main view resize events to automatically rescale the image.
+        
+        Args:
+            event: QResizeEvent
+        """
+        # Call the original resize event first
+        QGraphicsView.resizeEvent(self.main_view, event)
+        
+        # If we have an image loaded, rescale it
+        if hasattr(self, 'original_image_pixmap') and hasattr(self, 'current_pixmap_item'):
+            if self.original_image_pixmap and self.current_pixmap_item:
+                # Get new view dimensions
+                view_rect = self.main_view.viewport().rect()
+                view_width = view_rect.width()
+                view_height = view_rect.height()
+                
+                # Rescale the original image to fit new dimensions
+                scaled_pixmap = self._scale_pixmap_to_fit(
+                    self.original_image_pixmap, view_width, view_height)
+                
+                # Update the pixmap item
+                self.current_pixmap_item.setPixmap(scaled_pixmap)
+                
+                # Recenter the image
+                self._center_image_in_scene(scaled_pixmap, view_width, view_height)
+                
+                # Update scene rect
+                self.main_scene.setSceneRect(0, 0, view_width, view_height)
+    
+    def _on_wheel_event(self, event):
+        """
+        Handle mouse wheel events for zooming with Ctrl key.
+        
+        Args:
+            event (QWheelEvent): The wheel event
+        """
+        # Check if Ctrl key is pressed
+        if event.modifiers() & Qt.ControlModifier:
+            # Get the wheel delta (positive for zoom in, negative for zoom out)
+            delta = event.angleDelta().y()
+            
+            if delta > 0:
+                self.zoom_in()
+            else:
+                self.zoom_out()
+                
+            # Accept the event to prevent scrolling
+            event.accept()
+        else:
+            # Call the default wheel event handler for normal scrolling
+            QGraphicsView.wheelEvent(self.main_view, event)
+    
+    def zoom_in(self):
+        """
+        Zoom in the image view.
+        """
+        if self.zoom_factor < self.max_zoom:
+            self.zoom_factor *= self.zoom_step
+            self._apply_zoom()
+    
+    def zoom_out(self):
+        """
+        Zoom out the image view.
+        """
+        if self.zoom_factor > self.min_zoom:
+            self.zoom_factor /= self.zoom_step
+            self._apply_zoom()
+    
+    def zoom_to_fit(self):
+        """
+        Reset zoom to fit the image in the view.
+        """
+        self.zoom_factor = 1.0
+        self.main_view.resetTransform()
+        self._update_zoom_status()  
+
+        # If we have an image, rescale it to fit
+        if hasattr(self, 'original_image_pixmap') and self.original_image_pixmap:
+            view_rect = self.main_view.viewport().rect()
+            view_width = view_rect.width()
+            view_height = view_rect.height()
+            
+            scaled_pixmap = self._scale_pixmap_to_fit(
+                self.original_image_pixmap, view_width, view_height)
+            
+            if hasattr(self, 'current_pixmap_item') and self.current_pixmap_item:
+                self.current_pixmap_item.setPixmap(scaled_pixmap)
+                self._center_image_in_scene(scaled_pixmap, view_width, view_height)
+
+    def _update_zoom_status(self):
+        # Update cursor based on zoom level - show hand cursor when image is larger than view
+        self._update_cursor_for_zoom()
+        # Update status bar with zoom level
+        zoom_percentage = int(self.zoom_factor * 100)
+        if hasattr(self, 'update_status'):
+            self.update_status(
+                message=f"Zoom: {zoom_percentage}%",
+                processing_status=f"Zoom: {zoom_percentage}%"
+            )
+
+
+    def _apply_zoom(self):
+        """
+        Apply the current zoom factor to the view.
+        """
+        # Reset transform and apply zoom
+        self.main_view.resetTransform()
+        self.main_view.scale(self.zoom_factor, self.zoom_factor)
+        self._update_zoom_status()
+    
+    def _on_wheel_event(self, event):
+        """
+        Handle mouse wheel events for zooming with Ctrl key.
+        
+        Args:
+            event (QWheelEvent): The wheel event
+        """
+        # Check if Ctrl key is pressed
+        if event.modifiers() & Qt.ControlModifier:
+            # Get the wheel delta (positive for zoom in, negative for zoom out)
+            delta = event.angleDelta().y()
+            
+            if delta > 0:
+                self.zoom_in()
+            else:
+                self.zoom_out()
+                
+            # Accept the event to prevent scrolling
+            event.accept()
+        else:
+            # Call the default wheel event handler for normal scrolling
+            QGraphicsView.wheelEvent(self.main_view, event)
+    
+    def zoom_in(self):
+        """
+        Zoom in the image view.
+        """
+        if self.zoom_factor < self.max_zoom:
+            self.zoom_factor *= self.zoom_step
+            self._apply_zoom()
+    
+    def zoom_out(self):
+        """
+        Zoom out the image view.
+        """
+        if self.zoom_factor > self.min_zoom:
+            self.zoom_factor /= self.zoom_step
+            self._apply_zoom()
+    
+    def zoom_to_fit(self):
+        """
+        Reset zoom to fit the image in the view.
+        """
+        self.zoom_factor = 1.0
+        self.main_view.resetTransform()
+        
+        # If we have an image, rescale it to fit
+        if hasattr(self, 'original_image_pixmap') and self.original_image_pixmap:
+            view_rect = self.main_view.viewport().rect()
+            view_width = view_rect.width()
+            view_height = view_rect.height()
+            
+            scaled_pixmap = self._scale_pixmap_to_fit(
+                self.original_image_pixmap, view_width, view_height)
+            
+            if hasattr(self, 'current_pixmap_item') and self.current_pixmap_item:
+                self.current_pixmap_item.setPixmap(scaled_pixmap)
+                self._center_image_in_scene(scaled_pixmap, view_width, view_height)
+    
+    def _apply_zoom(self):
+        """
+        Apply the current zoom factor to the view.
+        """
+        # Reset transform and apply zoom
+        self.main_view.resetTransform()
+        self.main_view.scale(self.zoom_factor, self.zoom_factor)
+        
+        # Update status bar with zoom level
+        zoom_percentage = int(self.zoom_factor * 100)
+        if hasattr(self, 'status_processing'):
+            self.update_status(
+                message=f"Zoom: {zoom_percentage}%",
+                processing_status=f"Zoom: {zoom_percentage}%"
+            )
+    
+    def _on_mouse_press(self, event):
+        """
+        Handle mouse press events for panning.
+        
+        Args:
+            event (QMouseEvent): The mouse press event
+        """
+        if event.button() == Qt.LeftButton:
+            # Start panning mode
+            self.is_panning = True
+            self.last_pan_point = event.pos()
+            self.main_view.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+        else:
+            # Call the default mouse press event handler
+            QGraphicsView.mousePressEvent(self.main_view, event)
+    
+    def _on_mouse_move(self, event):
+        """
+        Handle mouse move events for panning.
+        
+        Args:
+            event (QMouseEvent): The mouse move event
+        """
+        if self.is_panning and self.last_pan_point is not None:
+            # Calculate the delta movement
+            delta = event.pos() - self.last_pan_point
+            self.last_pan_point = event.pos()
+            
+            # Pan the view by adjusting the scrollbars
+            h_scroll = self.main_view.horizontalScrollBar()
+            v_scroll = self.main_view.verticalScrollBar()
+            
+            h_scroll.setValue(h_scroll.value() - delta.x())
+            v_scroll.setValue(v_scroll.value() - delta.y())
+            
+            event.accept()
+        else:
+            # Call the default mouse move event handler
+            QGraphicsView.mouseMoveEvent(self.main_view, event)
+    
+    def _on_mouse_release(self, event):
+        """
+        Handle mouse release events for panning.
+        
+        Args:
+            event (QMouseEvent): The mouse release event
+        """
+        if event.button() == Qt.LeftButton and self.is_panning:
+            # End panning mode
+            self.is_panning = False
+            self.last_pan_point = None
+            self.main_view.setCursor(Qt.ArrowCursor)
+            event.accept()
+        else:
+            # Call the default mouse release event handler
+            QGraphicsView.mouseReleaseEvent(self.main_view, event)
+    
+    def _update_cursor_for_zoom(self):
+        """
+        Update the cursor based on current zoom level.
+        Shows hand cursor when image is zoomed and can be panned.
+        """
+        if not self.is_panning:
+            if self.zoom_factor > 1.0 and hasattr(self, 'current_pixmap_item'):
+                # Image is zoomed in and might need panning - show open hand cursor
+                self.main_view.setCursor(Qt.OpenHandCursor)
+            else:
+                # Normal zoom level - show default cursor
+                self.main_view.setCursor(Qt.ArrowCursor)
         
     def change_image(self):
         """
@@ -516,6 +990,9 @@ class MainWindow(QMainWindow):
         """
 
         clear_cache()
+        
+        # Update status bar
+        self.update_status("Opening file...", processing_status="Loading")
 
         # If the selected file is an LSM file, call the open_lsm function
         if lsm_path.endswith(".lsm"):
@@ -536,6 +1013,12 @@ class MainWindow(QMainWindow):
                 self.add_image(self.lsm_path)
                 self.setWindowTitle(
                     f"Cells Calculator - {os.path.basename(lsm_path)} ({self.currentImageWidth} x {self.currentImageHeight})")
+                
+                # Update status bar with success
+                self.update_status("File loaded successfully", 
+                                 file_info=f"{os.path.basename(lsm_path)} ({self.currentImageWidth}x{self.currentImageHeight})",
+                                 processing_status="Ready")
+                                 
             except Exception as e:
                 traceback.print_exc()
                 # If an error occurs, show a warning dialog,
@@ -547,6 +1030,9 @@ class MainWindow(QMainWindow):
                 self.lsm_filesList = None
                 self.lsm_folder = None
                 self.main_scene.clear()
+                
+                # Update status bar with error
+                self.update_status("Error loading file", file_info="No file", processing_status="Error")
 
                 return 0
         self.image_mru[lsm_path] = datetime.min
@@ -690,3 +1176,63 @@ class MainWindow(QMainWindow):
             painter.end()
         
         return image
+    
+    def on_log_line_added(self, log_line):
+        # Shrink the log line to fit status bar
+        shortened_line = self.shrink_text(log_line, max_length=100)
+        self.update_status(shortened_line)
+    
+    def shrink_text(self, text, max_length=100, separator="..."):
+        """
+        Shrink text to maximum length by replacing middle portion with separator.
+        
+        Args:
+            text (str): Text to shrink
+            max_length (int): Maximum allowed length (default: 100)
+            separator (str): String to use as separator (default: "...")
+            
+        Returns:
+            str: Shortened text with middle portion replaced by separator
+            
+        Examples:
+            shrink_text("This is a very long text that needs to be shortened", 30)
+            # Returns: "This is a very...o be shortened"
+            
+            shrink_text("Short text", 100)
+            # Returns: "Short text" (unchanged if under limit)
+        """
+        if not isinstance(text, str):
+            text = str(text)
+            
+        # If text is already short enough, return as-is
+        if len(text) <= max_length:
+            return text
+        
+        # If max_length is too small to accommodate separator, just truncate
+        if max_length <= len(separator):
+            return text[:max_length]
+        
+        # Calculate how much space we have for actual text
+        available_space = max_length - len(separator)
+        
+        # Split available space between start and end
+        # Give preference to the start (useful for file paths, log messages, etc.)
+        start_length = (available_space + 1) // 2  # Add 1 to give start preference when odd
+        end_length = available_space - start_length
+        
+        # Extract start and end portions
+        start_part = text[:start_length]
+        end_part = text[-end_length:] if end_length > 0 else ""
+        
+        # Combine with separator
+        return start_part + separator + end_part
+
+    def remove_non_printable(self,text):
+        """Remove non-printable characters using string.printable"""
+        printable = set(string.printable)
+        return ''.join(char for char in text if char in printable)
+
+    def filter_and_draw_predictions(self, image, predictions):
+        mask_image = None
+        self.add_image(mask_image)
+        pass

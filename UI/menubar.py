@@ -1,15 +1,14 @@
-from pathlib import Path
-from PyQt5.QtWidgets import QAction, QFileDialog, QMenuBar
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.QtCore import QFileInfo, pyqtSignal
-from pyparsing import Optional
-from UI.CustomFileDialog import CustomFileDialog
-from pathlib import Path
+# Standard library imports
+from pathlib import Path, PureWindowsPath
 from typing import Optional
-from PyQt5.QtCore import QFileInfo, pyqtSignal
+
+# Third-party imports
+from PyQt5.QtCore import pyqtSignal, pyqtSlot, QFileInfo
 from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QDialog, QAction
-from pathlib import PureWindowsPath, PurePosixPath
+from PyQt5.QtWidgets import QAction, QFileDialog, QMenuBar, QDialog
+
+# Local application imports
+from UI.CustomFileDialog import CustomFileDialog
 from UI.settings_manager import get_setting, set_setting
 
 class menubar(QMenuBar):

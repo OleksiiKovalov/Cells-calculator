@@ -14,13 +14,15 @@ The SplashScreen class is located in splashscreen.py
 Usage:
     python main.py
 """
+from collections import OrderedDict
+import json
 import sys
-print("Importing modules...")
+from UI.app_globals import FILENAME_MODEL_CONFIG, get_global, register_model, set_global
 import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
 from PyQt5.QtCore import QTimer
 from PyQt5.QtGui import QIcon
-from UI.splashscreen import SplashScreen,init_splash,close_splash,update_splash, globalsplash
+from UI.splashscreen import init_splash,close_splash, show_splash_error,update_splash
 
 if __name__ == '__main__':
     from UI.errorhandling import app_logger
@@ -32,7 +34,27 @@ if __name__ == '__main__':
     # Create and show splash screen
     app_logger().info("Creating splash screen...")
     init_splash()
+
     app_logger().info("Loading modules...")
+
+    known_models = {
+        "cellcounter": 'model.CellCounter.CellCounter',
+        "cellpose": 'model.CellposeSegmenter.CellposeSegmenter',
+        "yolo": 'model.YOLOSegmenter.YoloSegmenter',
+        "instanseg": 'model.InstanSegSegmenter.InstansegSegmenter',
+        "stardist": 'model.StardistSegmenter.StardistSegmenter'
+    }
+
+    with open(FILENAME_MODEL_CONFIG, 'r') as f:
+        models = json.load(f, object_pairs_hook=OrderedDict)
+        models = OrderedDict((k, v) for k, v in models.items() if 'enabled' not in v or v.get('enabled','true').lower() == 'true')
+        set_global('loaded_models', models)
+
+    #register all models from config to make them available in UI/processing    
+    for model_name, model_data in get_global('loaded_models').items():
+        model_type = model_data.get('model_type')
+        register_model(model_type, known_models.get(model_type), model_data.get('preload', False))
+
     import UI.imports  # Ensure all UI imports are done before MainWindow
 
     try:
@@ -44,6 +66,7 @@ if __name__ == '__main__':
         app_logger().info("Initializing main window...")
         from UI.MainWindow import MainWindow
         window = MainWindow(progress_callback=progress_callback)
+        set_global('main_window_ref', window)
         
         # Show main window and close splash screen
         def show_main_window():
@@ -61,7 +84,7 @@ if __name__ == '__main__':
     except Exception as e:
         traceback.print_exc()
         # Show error on splash screen briefly before showing dialog
-        globalsplash.show_error(str(e))
+        show_splash_error(str(e))
         QTimer.singleShot(2000, close_splash)  # Close splash after 2 seconds
         
         # If an exception occurs, display a critical error message and exit the application

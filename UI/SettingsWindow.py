@@ -1,13 +1,19 @@
 """
 This module defines the dialog window for selecting channels in the Cells Calculator application.
 """
+
+# Standard library imports
 import os
 import traceback
+
+# Third-party imports
 import tifffile
-from PyQt5.QtWidgets import QGraphicsPixmapItem,\
-        QMessageBox, QPushButton, QGraphicsView, QMainWindow, QGraphicsView, QGraphicsScene, \
-                QVBoxLayout, QWidget, QGraphicsTextItem, QComboBox, QLabel, QHBoxLayout
 from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtWidgets import (
+    QGraphicsPixmapItem, QMessageBox, QPushButton, QGraphicsView, 
+    QMainWindow, QGraphicsScene, QVBoxLayout, QWidget, 
+    QGraphicsTextItem, QComboBox, QLabel, QHBoxLayout
+)
 
 
 def has_duplicates(lst):

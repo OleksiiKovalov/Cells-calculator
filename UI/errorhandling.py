@@ -1,12 +1,55 @@
-import logging
-import sys
-import traceback # For more detailed traceback formatting if needed
-from PyQt5.QtWidgets import QApplication, QMessageBox
-import io
-from contextlib import redirect_stdout, redirect_stderr
-import os
-from datetime import datetime
+# Standard library imports
 import glob
+import logging
+import os
+import sys
+import traceback  # For more detailed traceback formatting if needed
+from datetime import datetime
+
+# Third-party imports
+from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtWidgets import QMessageBox
+
+class LogEventEmitter(QObject):
+    """
+    Event emitter for log file events.
+    Emits signals when new lines are added to the log file.
+    """
+    log_line_added = pyqtSignal(str)  # Signal emitted when new log line is added
+    
+    def __init__(self):
+        super().__init__()
+
+# Global instance for log events
+log_event_emitter = LogEventEmitter()
+
+class EventFileHandler(logging.FileHandler):
+    """
+    Custom file handler that emits events when log lines are written.
+    """
+    def __init__(self, filename, mode='a', encoding='utf-8', delay=False):
+        super().__init__(filename, mode, encoding, delay)
+        
+    def emit(self, record):
+        """
+        Emit a log record and trigger the log line event.
+        
+        Args:
+            record: LogRecord instance
+        """
+        try:
+            # Format the log message
+            formatted_message = self.format(record)
+            
+            # Call parent emit to write to file
+            super().emit(record)
+            
+            # Emit the signal with the formatted log line
+            log_event_emitter.log_line_added.emit(formatted_message)
+            
+        except Exception as e:
+            # Handle errors in logging (avoid infinite recursion)
+            print(f"Error in log event emission: {e}")
 
 def cleanup_old_logs():
     """
@@ -57,10 +100,10 @@ def setup_logging():
     ch = logging.StreamHandler()
     ch.setLevel(logging.INFO) # Log INFO and above to console
 
-    # Create file handler with date-based filename
+    # Create file handler with date-based filename and event emission
     current_date = datetime.now().strftime("%Y%m%d")
     log_filename = os.path.join(logs_dir, f"{current_date}.log")
-    fh = logging.FileHandler(log_filename, mode='a', encoding='utf-8')
+    fh = EventFileHandler(log_filename, mode='a', encoding='utf-8')
     fh.setLevel(logging.INFO) # Log INFO and above to file
 
     # Create formatter
@@ -234,6 +277,44 @@ def log_print(*args, **kwargs):
     # Also log to file
     message = ' '.join(str(arg) for arg in args)
     app_logger_int.info(f"LOG_PRINT: {message}")
+
+def connect_to_log_events(callback):
+    """
+    Connect a callback function to log line events.
+    
+    Args:
+        callback (callable): Function to call when new log line is added.
+                           Should accept one string parameter (the log line).
+    
+    Example:
+        def on_new_log_line(log_line):
+            print(f"New log: {log_line}")
+        
+        connect_to_log_events(on_new_log_line)
+    """
+    log_event_emitter.log_line_added.connect(callback)
+
+def disconnect_from_log_events(callback):
+    """
+    Disconnect a callback function from log line events.
+    
+    Args:
+        callback (callable): Function to disconnect from log events.
+    """
+    try:
+        log_event_emitter.log_line_added.disconnect(callback)
+    except TypeError:
+        # Signal was not connected
+        pass
+
+def get_log_event_emitter():
+    """
+    Get the global log event emitter instance.
+    
+    Returns:
+        LogEventEmitter: The global log event emitter
+    """
+    return log_event_emitter
 
 # Set the custom excepthook
 

@@ -2,11 +2,19 @@
 Here we define for baseline class of all segmenting or detecting models used in the application.
 We define both the structure and the main functionality utils.
 """
-from collections import OrderedDict
+
+# Standard library imports
 import os
-from pathlib import Path
 import shutil
+import time
+from collections import OrderedDict
+from pathlib import Path
+
+# Third-party imports
 import torch
+
+# Local application imports
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
 
 OUT_DIR = Path("cellprocesser_output")
 
@@ -81,7 +89,7 @@ class BaseModel():
         The input param is the path to RGB image of cells.
         The output param is optimized count of cells.
         """
-        dst = os.path.join('.cache', 'cell_tmp_img.png')
+        dst = IMAGE_FILE_NAME_TMP
         shutil.copy2(img_path, dst)
         detections = self.count(dst)
         if detections is None:
@@ -89,12 +97,11 @@ class BaseModel():
         return detections
 
     def count(self, input_image, scale: int = 20,
-              filename=".cache/cell_tmp_img_with_detections.png"):
+              filename=IMAGE_FILE_NAME_DETECTION):
         """General method for processing microimages of cells."""
 
         scale = self.object_size["scale"]
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
-        import time
         self.detectionCount = -1
         start_time = time.time()
         result = None
@@ -104,7 +111,8 @@ class BaseModel():
             result =  self.count_x10(input_image, filename=filename)
         end_time = time.time()
         self.inference_duration = end_time - start_time
-        self.detectionCount = len(result)
+        self.detectionCount = len(result) if result is not None else 0
+
         return result
 
     def count_x10(self, input_image, filename):

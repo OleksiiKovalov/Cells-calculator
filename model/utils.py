@@ -1,20 +1,155 @@
 """Some useful functions used by the model or its submodels."""
 
+# Standard library imports
+import math
 import os
+import shutil
+import sys
+
+# Third-party imports
 import cv2
 import numpy as np
-import torch
 import pandas as pd
+import torch
+import tiffile
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-import math
-from ultralytics.engine.results import Results
-import tiffile
-from collections import OrderedDict
 
-VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'bmp']
+# Scientific computing imports
+from collections import OrderedDict
+from csbdeep.utils import normalize
+from skimage.color import gray2rgb, rgb2gray
+from skimage.io import imsave
+from skimage.transform import resize
+from ultralytics.engine.results import Results
+
+# Third-party imports
+from PyQt5.QtWidgets import QMessageBox
+
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP, CASH_DIRECTORY
+
+
+
+VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'bmp', 'lsm']
 CLASSES = ['Cell']
 COLORS = [(3,177,252)]
+
+
+def safe_image_read(img_path, color_mode='color', channel=None):
+    """
+    Standardized image reading function that handles various formats and edge cases.
+    
+    Args:
+        img_path (str): Path to the image file
+        color_mode (str): 'color', 'grayscale', 'unchanged' - how to read the image
+        channel (int): Specific channel to extract (for multi-channel images like LSM)
+    
+    Returns:
+        np.ndarray: Image array or None if reading failed
+    """
+    try:
+        if not os.path.exists(img_path):
+            print(f"Image file not found: {img_path}")
+            return None
+            
+        extension = img_path.split('.')[-1].lower()
+        
+        if extension == 'lsm':
+            # Handle LSM files with tifffile
+            import tifffile
+            with tifffile.TiffFile(img_path) as tif:
+                image = tif.pages[0].asarray()
+                if channel is not None and len(image.shape) > 2:
+                    if channel < image.shape[0]:
+                        return image[channel]
+                    else:
+                        print(f"Channel {channel} not available in LSM file")
+                        return None
+                return image
+        else:
+            # Handle standard image formats
+            if color_mode == 'unchanged':
+                cv_flag = cv2.IMREAD_UNCHANGED
+            elif color_mode == 'grayscale':
+                cv_flag = cv2.IMREAD_GRAYSCALE
+            else:  # color
+                cv_flag = cv2.IMREAD_COLOR
+            
+            # Use cv2.imdecode for Unicode path support
+            img_array = np.fromfile(img_path, dtype=np.uint8)
+            image = cv2.imdecode(img_array, cv_flag)
+            
+            if image is None:
+                print(f"Failed to read image: {img_path}")
+                return None
+                
+            return image
+            
+    except Exception as e:
+        print(f"Error reading image {img_path}: {str(e)}")
+        return None
+
+
+def safe_image_write(image, filename, quality=95, preserve_dtype=True):
+    """
+    Standardized image writing function that handles various formats and data types.
+    
+    Args:
+        image (np.ndarray): Image array to save
+        filename (str): Output file path
+        quality (int): JPEG quality (for JPEG files)
+        preserve_dtype (bool): Whether to preserve original data type or convert to uint8
+    
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        if image is None:
+            print("Cannot save None image")
+            return False
+            
+        # Ensure output directory exists
+        output_dir = os.path.dirname(filename)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+        
+        extension = filename.split('.')[-1].lower()
+        
+        # Handle data type conversion
+        if not preserve_dtype or image.dtype != np.uint8:
+            if image.dtype in [np.float32, np.float64]:
+                # Normalize float images to 0-255 range
+                if image.max() <= 1.0:
+                    image_to_save = (image * 255).astype(np.uint8)
+                else:
+                    image_to_save = np.clip(image, 0, 255).astype(np.uint8)
+            else:
+                image_to_save = image.astype(np.uint8)
+        else:
+            image_to_save = image
+        
+        # Save based on file extension
+        if extension in ['jpg', 'jpeg']:
+            # JPEG with quality control
+            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        elif extension == 'png':
+            # PNG with compression
+            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+        elif extension in ['tif', 'tiff']:
+            # Use skimage for better TIFF support
+            if len(image_to_save.shape) == 3 and image_to_save.shape[2] == 3:
+                # Convert BGR to RGB for skimage
+                image_to_save = cv2.cvtColor(image_to_save, cv2.COLOR_BGR2RGB)
+            imsave(filename, image_to_save)
+        else:
+            # Default to OpenCV for other formats
+            cv2.imwrite(filename, image_to_save)
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error saving image {filename}: {str(e)}")
+        return False
 
 COLOR_NUMBER = {
         "gist_rainbow": 20,
@@ -50,9 +185,16 @@ def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
 
 def read_standard_img(img_path):
     """Reads image in grayscale jpg/png/tif/bmp which contains cells only."""
-    img = cv2.imdecode(np.fromfile(img_path, dtype=np.uint8), cv2.IMREAD_UNCHANGED)
-    return cv2.cvtColor(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY,
-                                     cv2.COLOR_GRAY2RGB))
+    img = safe_image_read(img_path, color_mode='unchanged')
+    if img is None:
+        return None
+    
+    # Convert to grayscale and then to RGB for consistency
+    if len(img.shape) == 3:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = img
+    return cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
 
 def is_image_valid(img_path: str):
     """Checks if provided image is in correct format."""
@@ -85,8 +227,8 @@ def calculate_lsm(cell_counter, nuclei_counter,
     img = read_lsm_img(img_path)
 
     cell_img = cv2.cvtColor(img[:,:,cell_channel], cv2.COLOR_GRAY2BGR)
-    tmp_path = 'cell_tmp_img.png'
-    cv2.imwrite(tmp_path, cell_img)
+    tmp_path = IMAGE_FILE_NAME_TMP
+    safe_image_write(cell_img, tmp_path)
     cell_count = cell_counter.count_cells(tmp_path)
     try:
         os.remove(tmp_path)
@@ -352,7 +494,7 @@ def denormalize_coordinates(coords, image_shape):
     """Converts normalized coords to given image coordinates."""
     return coords * np.array([image_shape[1], image_shape[0]])
 
-def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_with_detections.png",
+def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
                      alpha=.75, colormap="tab20"):
     """Draws predicted masks on the image."""
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
@@ -368,7 +510,7 @@ def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_wit
         coords = coords.astype(int)
         cv2.fillPoly(overlay, [coords], color)
     cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
-    cv2.imwrite(filename, image)
+    safe_image_write(image, filename)
     return image
 
 def calculate_morphology(bin_mask: np.array) -> dict:
@@ -402,7 +544,6 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
     for i, labeltext in enumerate(labels):
         img_copy = images[i].copy()
         if img_copy.ndim == 2:
-            from skimage.color import gray2rgb
             img_copy = gray2rgb(img_copy)
         
         cv2.putText(img_copy, labeltext, (5, height - 10), font, label_font_scale, (255, 255, 255), label_thickness, cv2.LINE_AA)
@@ -436,7 +577,6 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
     scale = min(target_width / w, target_height / h)
     new_w, new_h = int(w * scale), int(h * scale)
 
-    from skimage.transform import resize
     resized = resize(image, (new_h, new_w), anti_aliasing=anti_aliasing, preserve_range=True)
     #resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
     resized = resized.astype(image.dtype)
@@ -475,7 +615,6 @@ def process_loaded_image(image, settings:OrderedDict):
                 scale = min(target_width / orig_width, target_height / orig_height)
                 resized_width = int(orig_width * scale)
                 resized_height = int(orig_height * scale)
-                from skimage.transform import resize
                 image = resize(image, output_shape=(resized_height,resized_width), order=0, preserve_range=True, anti_aliasing=False).astype(image.dtype)
 
             case "resizeandpad":
@@ -486,11 +625,9 @@ def process_loaded_image(image, settings:OrderedDict):
             case "rgb2gray":
                 image = safergb2gray(image)
             case "normalize":
-                from csbdeep.utils import normalize            
                 p_min, p_max = map(float, value.strip().split(","))
                 image = normalize(image, pmin = p_min, pmax=p_max)
             case "clip":
-                import numpy as np
                 a_min, a_max = map(int, value.strip().split(","))
                 image = np.clip(image, a_min=a_min, a_max=a_max)
             case _:
@@ -499,14 +636,12 @@ def process_loaded_image(image, settings:OrderedDict):
 
 def safegray2rgb(image):
     if image.ndim == 2:
-        from skimage.color import gray2rgb
         return gray2rgb(image)
     else:
         return image
 
 def safergb2gray(image):
     if image.ndim == 3:
-        from skimage.color import rgb2gray
         image = rgb2gray(image)
         return (image * 255).astype("uint8")
     else:
@@ -530,18 +665,97 @@ def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.
         'F1': f1
     }
     
-def safeimagesave(image,filename):
-    from skimage.io import imsave
-    if image.dtype == 'uint8':
-        #no denormalization needed
-        imsave(filename, image.astype('uint8'))
-    else:
-        #denormalization needed
-        imsave(filename, (image * 255).astype('uint8'))
+def safeimagesave(image, filename):
+    """Legacy wrapper for backward compatibility - use safe_image_write instead."""
+    return safe_image_write(image, filename, preserve_dtype=False)
       
 def clear_cache():
-    import shutil
-    cache_dir = ".cache"
+    cache_dir = CASH_DIRECTORY
     if os.path.exists(cache_dir):
         shutil.rmtree(cache_dir,ignore_errors=True)
     os.makedirs(cache_dir, exist_ok=True)
+
+
+# ============================================================================
+# BEEP UTILITY FUNCTIONS
+# ============================================================================
+
+def beep_simple():
+    """Simple system beep (cross-platform)"""
+    try:
+        print('\a')  # ASCII bell character - works on most systems
+    except:
+        pass
+
+def beep_windows(sound_type="default"):
+    """Windows-specific beep sounds"""
+    try:
+        if sys.platform == "win32":
+            import winsound  # For Windows beep sounds
+            if sound_type == "error":
+                winsound.MessageBeep(winsound.MB_ICONHAND)
+            elif sound_type == "warning":
+                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+            elif sound_type == "info":
+                winsound.MessageBeep(winsound.MB_ICONASTERISK)
+            elif sound_type == "question":
+                winsound.MessageBeep(winsound.MB_ICONQUESTION)
+            elif sound_type == "frequency":
+                # Custom frequency beep (frequency, duration_ms)
+                winsound.Beep(1000, 500)  # 1000Hz for 500ms
+            else:
+                winsound.MessageBeep()  # Default system beep
+        else:
+            beep_simple()  # Fallback for non-Windows
+    except ImportError:
+        print("winsound not available - using simple beep")
+        beep_simple()
+    except Exception as e:
+        print(f"Beep failed: {e}")
+        beep_simple()
+
+def beep_success():
+    """Success beep - pleasant sound"""
+    beep_windows("info")
+
+def beep_error():
+    """Error beep - attention-getting sound"""
+    beep_windows("error")
+
+def beep_warning():
+    """Warning beep - cautionary sound"""
+    beep_windows("warning")
+
+def beep_custom(frequency=800, duration=300):
+    """Custom frequency beep (Windows only)"""
+    try:
+        if sys.platform == "win32":
+            import winsound
+            winsound.Beep(frequency, duration)
+        else:
+            beep_simple()
+    except:
+        beep_simple()
+
+def beep_sequence(frequencies, duration=200, gap=100):
+    """Play a sequence of beeps with specified frequencies"""
+    try:
+        if sys.platform == "win32":
+            import time
+            import winsound
+            for freq in frequencies:
+                winsound.Beep(freq, duration)
+                if gap > 0:
+                    time.sleep(gap / 1000.0)  # Convert ms to seconds
+        else:
+            beep_simple()
+    except:
+        beep_simple()
+
+def show_error_message(title, message):
+    """Show error message box to user"""
+    msg_box = QMessageBox()
+    msg_box.setIcon(QMessageBox.Critical)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(message)
+    msg_box.exec_()

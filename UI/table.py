@@ -1,7 +1,11 @@
 """
 This module defines the function to calculate a table based on certain methods applied to image files.
 """
+
+# Standard library imports
 import os
+
+# Third-party imports
 import pandas as pd
 
 

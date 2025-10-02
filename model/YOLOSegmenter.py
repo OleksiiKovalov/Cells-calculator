@@ -5,18 +5,25 @@ These are the models for:
 - segmenting spherical MSCs;
 - segmenting spheroids.
 """
+
+# Standard library imports
 import os
+
+# Third-party imports
 import numpy as np
 from ultralytics import YOLO
-from model.sahi.utils.cv import read_image
-from model.sahi.predict import get_sliced_prediction
-from model.sahi.auto_model import AutoDetectionModel
 
+# Local application imports
+from UI.app_globals import register_model
 from model.BaseModel import BaseModel
+from model.sahi.auto_model import AutoDetectionModel
+from model.sahi.predict import get_sliced_prediction
+from model.sahi.utils.cv import read_image
 from model.utils import *
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
 
 
-class Segmenter(BaseModel):
+class YoloSegmenter(BaseModel):
     def init_x20_model(self, path_to_model: str):
         self.model = YOLO(path_to_model, task="segment")
 
@@ -29,7 +36,7 @@ class Segmenter(BaseModel):
         )
 
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
-              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
+              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
         """
         This function performs inference on a given image using a pre-trained given model.
@@ -78,21 +85,23 @@ class Segmenter(BaseModel):
         if tracking is False:
             self.object_size['signal']("set_size", self.detections['box'].copy())
         original_image = self.original_image.copy()
-        if tracking is False:
-            filtered_detections = filter_detections(detections,
-                                                    min_size = self.object_size['min_size'],
-                                                    max_size= self.object_size['max_size'])
-        else:
-            filtered_detections = detections
+        # if tracking is False:
+        #     filtered_detections = filter_detections(detections,
+        #                                             min_size = self.object_size['min_size'],
+        #                                             max_size= self.object_size['max_size'])
+        # else:
+        #     filtered_detections = detections
+
+        filtered_detections = detections
 
         self.prediction_image = None
         if plot is True:
             self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
-                            filename=filename, colormap=colormap, alpha=alpha)
+                            filename=filename, colormap=colormap, alpha=self.object_size.get("alpha", 0.75))
         return filtered_detections
 
     def count_x10(self, input_image: str, colormap="tab20",
-              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.01,
+              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.01,
               alpha=0.75, **kwargs):
         try:
             os.remove(filename)
@@ -117,9 +126,11 @@ class Segmenter(BaseModel):
 
         original_image = self.original_image.copy()
 
-        filtered_detections = filter_detections(detections,
-                                                min_size = self.object_size['min_size'],
-                                                max_size= self.object_size['max_size'])
+        # filtered_detections = filter_detections(detections,
+        #                                         min_size = self.object_size['min_size'],
+        #                                         max_size= self.object_size['max_size'])
+        filtered_detections = detections
+        
         self.prediction_image = None
         self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                          filename=filename, colormap=colormap, alpha=alpha)

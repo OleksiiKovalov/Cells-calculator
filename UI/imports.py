@@ -1,146 +1,254 @@
+from UI.app_globals import get_registered_model
 from  UI.splashscreen import update_splash
 curpc = 25
 
-update_splash(curpc, "Loading system modules...")
+update_splash(curpc, "Loading System and OS...")
 curpc += 1
-from datetime import datetime
 import os
+import sys
 import shutil
+import tempfile
+import threading
 import traceback
-import tifffile
-import json
-import cv2
+import io
+import glob
+import logging
+import math
+import string
+import time
+import re
+from datetime import datetime
 
-update_splash(curpc, "Loading system modules...")
+update_splash(curpc, "Loading Path and File Handling...")
 curpc += 1
-from pathlib import Path,PureWindowsPath, PurePosixPath
+from pathlib import Path, PureWindowsPath, PurePosixPath
+from contextlib import redirect_stdout, redirect_stderr
+
+update_splash(curpc, "Loading Collections and Data Structures...")
+curpc += 1
+from collections import OrderedDict
+import json
+from typing import Optional, List, Tuple, Dict, Any, Union, Callable
 from pyparsing import Optional
-from typing import Optional
+
+# Windows-specific imports (conditional for cross-platform compatibility)
+try:
+    import win32api
+except ImportError:
+    win32api = None
+    
+try:
+    import winsound
+except ImportError:
+    winsound = None
+
+## Third-Party Scientific Libraries
+
+update_splash(curpc, "Loading NumPy and Data Processing...")
+curpc += 1
+import numpy as np
+import pandas as pd
+import cv2  # OpenCV for image processing
+
+update_splash(curpc, "Loading Image Processing...")
+curpc += 1
+
+import tifffile
+import tiffile  # Alternative tiff library used in some modules
+from skimage.io import imread, imsave
+from skimage.color import rgb2gray, gray2rgb
+from skimage.measure import regionprops
+from skimage.transform import resize
+
+update_splash(curpc, "Loading Scientific Computing...")
+curpc += 1
+
+from scipy.ndimage import find_objects
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+
+update_splash(curpc, "Loading Machine Learning and Deep Learning...")
+curpc += 1
+
+update_splash(curpc, "Loading torch...")
+curpc += 1
 import torch
 
-update_splash(curpc, "Loading system modules...")
+
+# Machine Learning Libraries
+try:
+    from sklearn.cluster import DBSCAN
+except ImportError:
+    DBSCAN = None
+
+update_splash(curpc, "Loading YOLO Models...")
 curpc += 1
-import os
-import numpy as np
+
+r = get_registered_model('yolo')
+if r is not None and r['preload'] is True:
+    from ultralytics import YOLO
+    from ultralytics.engine.results import Results, Masks
+    update_splash(curpc, "Loading SAHI Models...")
+    curpc += 1
+    from model.sahi.utils.cv import read_image
+    from model.sahi.predict import get_sliced_prediction
+    from model.sahi.auto_model import AutoDetectionModel
+
+# Additional deep learning frameworks (optional)
+try:
+    import onnxruntime
+except ImportError:
+    onnxruntime = None
+
+# Optional evaluation tools
+try:
+    from pycocotools.coco import COCO
+    from pycocotools.cocoeval import COCOeval
+except ImportError:
+    COCO = None
+    COCOeval = None
+
+# Optional advanced packages
+try:
+    import importlib_metadata
+except ImportError:
+    try:
+        import importlib.metadata as importlib_metadata
+    except ImportError:
+        importlib_metadata = None
+
+try:
+    import IPython
+except ImportError:
+    IPython = None
+
+try:
+    import fiftyone as fo
+except ImportError:
+    fo = None
+
+try:
+    import imantics
+except ImportError:
+    imantics = None
+
+try:
+    import skimage.io
+except ImportError:
+    pass  # Already imported individual modules above
+
+### Specialized AI Libraries
+update_splash(curpc, "Loading Cellpose Models...")
+curpc += 1
+r = get_registered_model('cellpose')
+if r is not None and r['preload'] is True:
+    from cellpose import models as cp_models
+
+update_splash(curpc, "Loading InstanSeg Models...")
+curpc += 1
+r = get_registered_model('instanseg')
+if r is not None and r['preload'] is True:
+    from instanseg import InstanSeg
+    from instanseg.utils.utils import labels_to_features
+
+r = get_registered_model('stardist')
+if r is not None and r['preload'] is True:
+    update_splash(curpc, "Loading tensorflow...")
+    curpc += 1
+    import tensorflow as tf
+    update_splash(curpc, "Loading Stardist Models...")
+    curpc += 1
+    from stardist.models import StarDist2D
+    from csbdeep.utils import normalize
+
+
+update_splash(curpc, "Loading Geometry Processing...")
+curpc += 1
+
+from shapely.geometry import shape
+
+## PyQt5 GUI Framework
+
+update_splash(curpc, "Loading GUI Framework...")
+curpc += 1
+
+### Core PyQt5 Modules
+from PyQt5.QtCore import (
+    Qt, QObject, QTimer, QDir, QFileInfo, 
+    QAbstractTableModel, QModelIndex, QEvent, QDateTime,
+    pyqtSignal, pyqtSlot
+)
+
+### PyQt5 GUI Components
+from PyQt5.QtGui import (
+    QPixmap, QImage, QPainter, QFont, QColor, QPen, 
+    QLinearGradient, QBrush, QIcon, QKeyEvent
+)
+
+
+update_splash(curpc, "Loading PyQt5 Widgets...")
+curpc += 1
+
+from PyQt5.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QDialog, QMessageBox,
+    QVBoxLayout, QHBoxLayout, 
+    QLabel, QPushButton, QCheckBox, QRadioButton, QButtonGroup,
+    QComboBox, QLineEdit, QSlider, QProgressBar,
+    QTableWidget, QTableWidgetItem, QAbstractItemView,
+    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsTextItem,
+    QMenuBar, QAction, QFileDialog,
+    QListWidget, QListWidgetItem, QDialogButtonBox,
+    QSplashScreen, QTabWidget, QGroupBox, QScrollArea,
+    QSpinBox, QDoubleSpinBox, QTextEdit, QPlainTextEdit,
+    QSplitter
+)
+
+## Project-Specific Local Imports
+
+update_splash(curpc, "Loading UI Components...")
+curpc += 1
+
+from UI.splashscreen import *
+from UI.errorhandling import *
+from UI.app_globals import *
+from UI.settings_manager import *
+from UI.SettingsWindow import *
+from UI.menubar import *
+from UI.table import *
+from UI.Slider import *
+from UI.rangeslider import *
+from UI.CustomFileDialog import *
+from UI.ModelsCheckList import *
+from UI.ImageNormalizeDialog import *
+from UI.WaitWindow import *
+
+update_splash(curpc, "Loading UI Layout Components...")
+curpc += 1
+
+from UI.right_layout.right_layout import *
+from UI.right_layout.plugins.BasePlugin import *
+from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin as CellDetector_plugin
+from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugin
+from UI.right_layout.plugins.SpheroidSegmenterPlugin import *
+
+update_splash(curpc, "Loading Model Components...")
+curpc += 1
 from model.BaseModel import BaseModel
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from model.utils import *
-from skimage.color import rgb2gray
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-import pandas as pd
-import cv2  # OpenCV for findContours
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from scipy.ndimage import find_objects  # For efficient bounding box calculation
-from typing import Optional, List, Tuple, Dict, Any # For type hinting
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-import numpy as np
-import pandas as pd
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from PyQt5.QtWidgets import (QAbstractItemView, QMessageBox, QTableWidget, QTableWidgetItem,
-    QGraphicsView, QApplication, QMainWindow, QGraphicsView, QGraphicsScene, QWidget, QHBoxLayout)
-from PyQt5.QtGui import QPixmap, QImage
-from PyQt5.QtCore import pyqtSignal, pyqtSlot, Qt
-from PyQt5.QtWidgets import QCheckBox, QPushButton, QGraphicsView, QGraphicsView, QGraphicsScene,\
-    QGraphicsTextItem, QComboBox, QLabel
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QAction, QFileDialog, QMenuBar
-from PyQt5.QtCore import pyqtSignal, pyqtSlot
-from PyQt5.QtCore import QFileInfo, pyqtSignal
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import QDialog, QAction
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from UI.SettingsWindow import SettingsWindow
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from UI.menubar import menubar
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from UI.table import calculate_table
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from UI.right_layout.right_layout import right_layout
-
-update_splash(curpc, "Loading CellCounter modules..")
-curpc += 1
-from model.CellCounter import CellCounter
-
-update_splash(curpc, "Loading NucleiCounter modules..")
-curpc += 1
-from model.NucleiCounter import NucleiCounter
-
-update_splash(curpc, "Loading Segmenter modules..")
-curpc += 1
-from model.segmenter import Segmenter
-
-update_splash(curpc, "Loading system modules..")
-curpc += 1
-from model.utils import is_image_valid, calculate_lsm
-
-update_splash(curpc, "Loading CellposeSegmenter modules..")
-curpc += 1
-from model.CellposeSegmenter import CellposeSegmenter
-
-update_splash(curpc, "Loading InstansegSegmenter modules..")
-curpc += 1
-from model.InstanSegSegmenter import InstansegSegmenter
-
-update_splash(curpc, "Loading StardistSegmenter modules..")
-curpc += 1
-from model.StardistSegmenter import StardistSegmenter
-
-update_splash(curpc, "Loading CellDetector modules..")
-curpc += 1
-from UI.right_layout.plugins.CellDetector import CellDetector as CellDetector_plugin
-
-update_splash(curpc, "Loading Model modules..")
-curpc += 1
 from model.Model import Model
-from UI.errorhandling import app_logger
-from model.utils import create_image_grid
 
-update_splash(curpc, "Loading system modules...")
+update_splash(curpc, "Loading Model Utilities and SAHI...")
 curpc += 1
-from UI.right_layout.plugins.tracker import Tracker as Tracker_plugin
 
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from UI.Slider import Slider
+from model.utils import *
 
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from UI.right_layout.plugins.BasePlagin import BasePlugin
+# Additional imports from InstanSeg utilities
+from instanseg.utils.utils import export_to_torchscript
 
-update_splash(curpc, "Loading system modules...")
+update_splash(curpc, "Import loading complete!")
 curpc += 1
-from UI.errorhandling import app_logger
 
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from UI.CustomFileDialog import CustomFileDialog
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from model.utils import COLOR_NUMBER as color_number
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
-from model.utils import create_image_grid
-
-update_splash(curpc, "Loading system modules...")
-curpc += 1
+# Note: This file consolidates all imports used across the Cells-Calculator project
+# Some imports are wrapped in try/except blocks for optional dependencies
+# that may not be available in all environments.
+# Generated on: 2025-10-06
+# Total modules covered: All core application files (excluding SAHI library internals)
