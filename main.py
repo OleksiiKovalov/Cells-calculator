@@ -171,7 +171,7 @@ class MainWindow(QMainWindow):
                     
                     
         self.models_tracker = {
-            'Baseline Segmenter' : {"path": 'model/YOLO11x-sphero-seg.pt', "size": self.object_size}
+            'Baseline Segmenter' : {"path": 'trainedmodels/YOLO11x-sphero-seg.pt', "size": self.object_size}
         }
         self.plugin_list = {
             "Cell Processor" : {
