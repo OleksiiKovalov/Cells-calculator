@@ -1,16 +1,20 @@
+# Standard library imports
 import os
 import traceback
-from PyQt5.QtWidgets import QPushButton, QGraphicsView, QMessageBox, QGraphicsView, QGraphicsScene,\
-     QComboBox, QLabel
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
 
+# Third-party imports
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import (
+    QPushButton, QGraphicsView, QMessageBox, QGraphicsScene,
+    QComboBox, QLabel
+)
+
+# Local application imports
+from UI.right_layout.plugins.BasePlugin import BasePlugin
 from model.tracker import Tracker as T
 
-from UI.right_layout.plugins.BasePlagin import BasePlugin
-from UI.Slider import Slider
-
-class Tracker(BasePlugin):
+class TrackerPlugin(BasePlugin):
     """
     Class for Tracker plugin of the application.
     This plugin is used for tracking cellular spheroids on given sequential image frames.

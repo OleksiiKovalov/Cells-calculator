@@ -3,9 +3,10 @@ In this module the NucleiCounter class is defined which is used
 to calculate stained nuclei presented in LSM images.
 """
 
+# Third-party imports
+import cv2
 import numpy as np
 import pandas as pd
-import cv2
 from sklearn.cluster import DBSCAN
 
 class NucleiCounter():

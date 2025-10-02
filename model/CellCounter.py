@@ -3,12 +3,21 @@ In this module the CellCounter class is defined which is used
 to calculate cells on a given contrast microimage.
 """
 
+# Standard library imports
 import os
+
+# Third-party imports
 import cv2
 import numpy as np
 import pandas as pd
+
+# Local application imports
+from UI.app_globals import set_global
 from model.BaseModel import BaseModel
-from model.utils import draw_bounding_box, filter_detections
+from model.utils import safe_image_read, safe_image_write
+from model.utils import draw_bounding_box, filter_detections, safeimagesave
+from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
+
 
 CLASSES = ['Cell']
 colors = np.random.uniform(0, 255, size=(len(CLASSES), 3))
@@ -53,7 +62,9 @@ class CellCounter(BaseModel):
         """
         # Read the input image
         if self.detections is None:
-            original_image: np.ndarray = cv2.imread(input_image)
+            original_image: np.ndarray = safe_image_read(input_image, color_mode='color')
+            if original_image is None:
+                raise ValueError(f"Could not read image: {input_image}")
             self.original_image = original_image.copy()
             [height, width, _] = original_image.shape
 
@@ -68,6 +79,9 @@ class CellCounter(BaseModel):
             # Preprocess the image and prepare blob for model
             blob = cv2.dnn.blobFromImage(image, scalefactor=1 / 255, size=(512, 512), swapRB=True)
             self.model.setInput(blob)
+
+            set_global('image_inference', image)
+            safeimagesave(image, IMAGE_FILE_NAME_INGFERENCE)
 
             # Perform inference
             outputs = self.model.forward()
@@ -141,7 +155,8 @@ class CellCounter(BaseModel):
         # by the filter_detections() function.
         # TODO: pass the min/max_size params to filter_detections() call below.
         # TODO: when opening a new image or folder of images, reset boundary sliders to their default values (min=0%, max=10%).
-        filtered_detections = filter_detections(detections, min_size = self.object_size['min_size'], max_size= self.object_size['max_size'])
+        #filtered_detections = filter_detections(detections, min_size = self.object_size['min_size'], max_size= self.object_size['max_size'])
+        filtered_detections = detections
         for i in range(filtered_detections.shape[0]):
             draw_bounding_box(
                 original_image,
@@ -159,7 +174,6 @@ class CellCounter(BaseModel):
             os.remove(filename)
         except:
             pass
-        cv2.imwrite(filename, original_image)
+        safe_image_write(original_image, filename)
 
         return filtered_detections
-        

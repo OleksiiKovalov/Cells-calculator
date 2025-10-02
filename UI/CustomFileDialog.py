@@ -1,11 +1,19 @@
+# Standard library imports
+import re
 import sys
 from pathlib import Path
 from typing import Optional, List, Dict, Callable, Any, Union
-from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QDir, QFileInfo, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor, QPixmap, QPainter
+
+# Third-party imports
+from PyQt5.QtCore import (
+    Qt, QAbstractTableModel, QModelIndex, QDir, QFileInfo, 
+    pyqtSignal, QEvent, QDateTime
+)
+from PyQt5.QtGui import QBrush, QColor, QPixmap
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
-    QTreeView, QHeaderView, QLabel, QComboBox, QLineEdit, QMessageBox, QFileIconProvider, QMenu, QAction,
+    QTreeView, QHeaderView, QLabel, QComboBox, QLineEdit, 
+    QMessageBox, QFileIconProvider, QMenu, QAction,
     QScrollArea, QSplitter, QFrame
 )
 
@@ -331,8 +339,7 @@ class CustomFileDialog(QDialog):
         
         
         # Always show selection even when tree view is not focused
-        from PyQt5.QtWidgets import QAbstractItemView
-        
+       
         # Set style to always show selection
         self.tree_view.setStyleSheet("""
             QTreeView::item:selected:!active {
@@ -774,7 +781,6 @@ class CustomFileDialog(QDialog):
         current_filter = self.file_filters[self.current_filter_index]
         
         # Extract extensions from filter string like "Images (*.png *.jpg *.jpeg)"
-        import re
         extensions = []
         
         # Find all *.ext patterns
@@ -866,9 +872,6 @@ class CustomFileDialog(QDialog):
     
     def eventFilter(self, obj, event):
         """Handle keyboard events for the tree view"""
-        from PyQt5.QtCore import QEvent
-        from PyQt5.QtGui import QKeyEvent
-        
         if obj == self.tree_view and event.type() == QEvent.KeyPress:
             key_event = event
             if key_event.key() == Qt.Key_Return or key_event.key() == Qt.Key_Enter:
@@ -996,7 +999,6 @@ def example_background_color_rule(file_info: QFileInfo) -> Optional[QColor]:
         return QColor(255, 230, 230)
     
     # Highlight recently modified files with light green background
-    from PyQt5.QtCore import QDateTime
     if file_info.lastModified().daysTo(QDateTime.currentDateTime()) < 1:
         return QColor(230, 255, 230)
     

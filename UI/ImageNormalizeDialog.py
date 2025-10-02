@@ -1,11 +1,12 @@
-from PyQt5.QtWidgets import (
-    QApplication, QDialog, QVBoxLayout, QLabel, QSlider,
-    QHBoxLayout, QSizePolicy
-)
+# Third-party imports
+import numpy as np
+from csbdeep.utils import normalize
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QImage
-from csbdeep.utils import normalize
-import numpy as np
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QLabel, QSlider,
+    QHBoxLayout, QSizePolicy
+)
 
 class ImageNormalizeDialog(QDialog):
     def __init__(self, image, parent=None):

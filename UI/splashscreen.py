@@ -21,16 +21,19 @@ Usage:
     splash.update_progress(50, "Loading...")
 """
 
-from PyQt5.QtWidgets import QSplashScreen, QProgressBar, QLabel, QApplication
+# Third-party imports
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap, QFont, QPainter, QColor, QPen, QLinearGradient
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QSplashScreen, QProgressBar, QLabel, QApplication
+
+# Local application imports
 from UI.errorhandling import app_logger
 
 
 class SplashScreen(QSplashScreen):
     """Custom splash screen with progress bar for application initialization"""
     
-    def __init__(self):
+    def __init__(self,maxprogress=100):
         # Create a splash screen pixmap
         splash_pixmap = QPixmap(450, 320)
         splash_pixmap.fill(Qt.white)
@@ -87,7 +90,7 @@ class SplashScreen(QSplashScreen):
         
         # Create progress bar with custom style
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setRange(0, maxprogress)
         self.progress_bar.setValue(0)
         self.progress_bar.setFixedSize(350, 25)
         self.progress_bar.setStyleSheet("""
@@ -132,7 +135,7 @@ class SplashScreen(QSplashScreen):
         self.progress_bar.setValue(value)
         if message:
             self.status_label.setText(message)
-            app_logger().info(f"SplashScreen: {message}")
+            app_logger().info(f"SplashScreen:{value}: {message}")
         QApplication.processEvents()
     
     def show_error(self, error_message):
@@ -162,11 +165,13 @@ class SplashScreen(QSplashScreen):
         QApplication.processEvents()
 
 globalsplash = None  # Global reference to splash screen instance
+globalsplashprogress = 0
 
 def init_splash():
     global globalsplash
     if globalsplash is None:
-        globalsplash = SplashScreen()
+        globalspalshprogress = 0
+        globalsplash = SplashScreen(33)
         globalsplash.show()
         globalsplash.update_progress(5, "Starting application...")
 
@@ -178,6 +183,14 @@ def close_splash():
 
 def update_splash(value, message=""):
     global globalsplash
+    global globalsplashprogress
+    globalsplashprogress +=  1
+    value = globalsplashprogress
     if globalsplash is not None:
         globalsplash.update_progress(value, message)
+        
+def show_splash_error(message):
+    global globalsplash
+    if globalsplash is not None:
+        globalsplash.show_error(message)        
         

@@ -1,3 +1,4 @@
+# Third-party imports
 from PyQt5.QtCore import QObject, pyqtSignal
 
 

@@ -2,15 +2,23 @@
 Here we define tracker for cellular spheroids.
 This class differs a lot from an ordinary model, so we write it from scratch.
 """
+
+# Standard library imports
 import os
 import shutil
 from pathlib import Path
+
+# Third-party imports
+import cv2
 import numpy as np
 import pandas as pd
-import cv2
 
-from model.segmenter import Segmenter
+# Local application imports
+from model.YOLOSegmenter import YoloSegmenter
 from model.utils import *
+from model.utils import safe_image_read
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
+
 
 class Tracker():
     """
@@ -20,7 +28,7 @@ class Tracker():
     """
     def __init__(self, path_to_model: str, size):
         self.path = path_to_model
-        self.model = Segmenter(path_to_model, size)
+        self.model = YoloSegmenter(path_to_model, size)
         self.output_dir = Path("tracker_output")
         self.img_dir = self.output_dir / "frames"
         self.table_dir = self.output_dir / "tabular data"
@@ -77,7 +85,7 @@ class Tracker():
             self.model.clear_cached_detections()
             # if it is the first frame in the sequence, we need to process it a bit differently
             if zero_frame:
-                current_results = pandas_to_ultralytics(output, cv2.imread(path),
+                current_results = pandas_to_ultralytics(output, safe_image_read(path, color_mode='color'),
                                                         path=filename, frame_num=i)
                 if current_results is None:
                     continue
@@ -166,7 +174,7 @@ class Tracker():
                                            output[['id_label', 'bin_mask']],
                                            left_on='old_label', right_on='id_label', how='inner')
                 current_results['id_label'] = filtered_results['id_label'].tolist()
-                current_results = pandas_to_ultralytics(current_results, cv2.imread(path),
+                current_results = pandas_to_ultralytics(current_results, safe_image_read(path, color_mode='color'),
                                                         path=filename, frame_num=i)
                 if current_results is None:
                     continue

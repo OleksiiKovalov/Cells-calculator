@@ -1,8 +1,13 @@
+# Standard library imports
 import sys
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout,\
-     QHBoxLayout, QLabel, QSlider, QLineEdit
+
+# Third-party imports
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import (
+    QApplication, QWidget, QVBoxLayout,
+    QHBoxLayout, QLabel, QSlider, QLineEdit
+)
 
 
 class CustomSlider(QSlider):

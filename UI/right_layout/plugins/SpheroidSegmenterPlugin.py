@@ -1,16 +1,22 @@
+# Standard library imports
 import os
 import traceback
-from PyQt5.QtWidgets import QLabel, QPushButton, QGraphicsView, QGraphicsView, QGraphicsScene, \
-    QGraphicsTextItem, QComboBox, QPushButton, QGraphicsView, QCheckBox
-from PyQt5.QtGui import QFont
+
+# Third-party imports
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import (
+    QLabel, QPushButton, QGraphicsView, QGraphicsScene, 
+    QGraphicsTextItem, QComboBox, QCheckBox
+)
 
-
+# Local application imports
 from UI.Slider import Slider
-from UI.right_layout.plugins.BasePlagin import BasePlugin
+from UI.right_layout.plugins.BasePlugin import BasePlugin
+from model.utils import IMAGE_FILE_NAME_DETECTION
 
 
-class SpheroidSegmenter(BasePlugin):
+class SpheroidSegmenterPlugin(BasePlugin):
     """
     Plugin for segmenting cellular spheroids on a single given image.
     Currently this plugin is not used in the app and is unavailable.
@@ -270,7 +276,7 @@ class SpheroidSegmenter(BasePlugin):
             # Check if the show boundary flag is set
             if self.show_boundry:
                 # If set, add an image with bounding box detections to the scene
-                self.plugin_signal.emit("add_image", ".cache\\cell_tmp_img_with_detections.png" )
+                self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_DETECTION)
             else:
                 # If not set, add the original image to the scene
                 self.plugin_signal.emit("add_image", self.lsm_path)

@@ -26,15 +26,15 @@ Usage:
     settings.save()
 """
 
+# Standard library imports
 import json
+import logging
 import os
 import shutil
 import threading
-import tempfile
-import traceback
-from typing import Any, Dict, Optional, Union
+import time
 from pathlib import Path
-import logging
+from typing import Any, Dict, Optional, Union
 
 
 class SettingsManager:
@@ -148,7 +148,6 @@ class SettingsManager:
         
         try:
             # Create backup filename with timestamp
-            import time
             timestamp = int(time.time())
             backup_file = self.settings_file.parent / f"{self.settings_file.stem}.backup.{timestamp}{self.settings_file.suffix}"
             
