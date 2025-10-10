@@ -29,8 +29,25 @@ class StardistSegmenter(BaseModel):
             self.model = StarDist2D(None, name=name, basedir=path)
             self.image_preprocess_settings_default = OrderedDict([("rgb2gray", ""), ("normalize", "1,99.8")])            
 
-    def init_x10_model(self, path_to_model):
-        pass
+    def init_x10_model(self, path_to_model: str):
+        from stardist.models import StarDist2D
+        import tensorflow as tf
+        from errorhandling import app_logger
+
+        app_logger().warning(f"Stardist x10: Num GPUs Available:{len(tf.config.list_physical_devices('GPU'))}")
+
+        if path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018"):
+            self.is_custom_model = False
+            self.model_x10 = StarDist2D.from_pretrained(path_to_model)
+
+            self.image_preprocess_settings_default = OrderedDict([("gray2rgb", ""), ("normalize", "1,99.5")])
+        else:
+            self.is_custom_model = True
+            path = os.path.dirname(path_to_model)
+            name = os.path.basename(path_to_model)
+            self.model_x10 = StarDist2D(None, name=name, basedir=path)
+            self.image_preprocess_settings_default = OrderedDict([("rgb2gray", ""), ("normalize", "1,99.5")])
+
 
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
@@ -80,10 +97,66 @@ class StardistSegmenter(BaseModel):
             raise RuntimeError(f"Error when inferrecing StardistSegmenter: {e}")
         
 
-    def count_x10(self, input_image: str, colormap="tab20",
-              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.01,
-              alpha=0.75, **kwargs):
-        raise NotImplementedError
+    def count_x10(self, input_image, colormap="tab10",
+              filename=".cache/cell_tmp_img_with_detections.png", 
+              min_score=0.01, alpha=0.75, **kwargs):
+        from skimage.io import imread
+        from skimage.transform import resize
+        from model.utils import safeimagesave, filter_detections, plot_predictions
+
+        image = imread(input_image)
+        h0, w0 = image.shape[:2]
+
+        scale_factor = 0.5
+        image_small = resize(image, (int(h0 * scale_factor), int(w0 * scale_factor)), preserve_range=True, anti_aliasing=False)
+        image_small = image_small.astype(image.dtype)
+
+        image_preprocess_settings = (
+            self.model_data["image_preprocess"]
+            if "image_preprocess" in self.model_data
+            else self.image_preprocess_settings_default
+        )
+        img_inference = process_loaded_image(image=image_small, settings=image_preprocess_settings)
+
+        safeimagesave(img_inference, ".cache/cell_tmp_img_inference_x10.png")
+
+        self.original_image = safegray2rgb(image)
+        try:
+            labels, details = self.model_x10.predict_instances(img_inference)
+
+            self.detections = self.stardist_results_to_pandas(
+                labels, 
+                scores=details["prob"], 
+                original_shape=image.shape[:2],
+                inference_shape=img_inference.shape[:2]
+            )
+
+            detections = self.detections[self.detections['confidence'] >= min_score]
+            self.object_size['signal']("set_size", self.detections['box'].copy())
+
+            filtered_detections = filter_detections(
+                detections,
+                min_size=self.object_size['min_size'],
+                max_size=self.object_size['max_size']
+            )
+
+            if alpha > 0:
+                self.prediction_image = plot_predictions(
+                    self.original_image.copy(),
+                    filtered_detections['mask'].tolist(),
+                    filename=filename,
+                    colormap=colormap,
+                    alpha=alpha
+                )
+            return filtered_detections
+
+        except Exception as e:
+            import traceback
+            from errorhandling import app_logger
+            traceback.print_exc()
+            app_logger().exception(e)
+            raise RuntimeError(f"Error when inferrecing StardistSegmenter (x10): {e}")
+
     
     def image_preprocess(self,image):
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)        
