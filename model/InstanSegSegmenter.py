@@ -45,12 +45,16 @@ class InstansegSegmenter(BaseModel):
             self.model_x10 = InstanSeg(path_to_model, verbosity=1)
         else:
             default_model = 'fluorescence_nuclei_and_cells'
-            print(f"Попередження: Модель x10 не вказана або невірна, використовується '{default_model}'")
+            if path_to_model:
+                print(f"Попередження: Шлях/назва '{path_to_model}' не валідні для InstanSeg. Використовується '{default_model}'.")
+            else:
+                print(f"Попередження: Модель x10 не вказана або невірна, використовується '{default_model}'")
             self.model_x10 = InstanSeg(default_model, verbosity=1)
-
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model_x10 = self.model_x10.to(device)
-
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            from errorhandling import app_logger
+            app_logger().warning(f"InstansegSegmenter: Device used:{device}")        
+            self.model = self.model.to(device)
+        
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
