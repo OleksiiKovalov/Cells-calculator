@@ -19,10 +19,25 @@
 		"path": "brightfield_nuclei",
 		"model_type": "instanseg"
 	},
-	"InstanSeg trained 0605": {
+	"InstanSeg trained 0605 Res": {
+		"path": "trainedmodels/instanseg_20250605.pt",
+		"model_type": "instanseg",
+		"image_preprocess": [
+			{
+				"gray2rgb":""
+			},
+			{
+				"resize": "512:512"
+			}
+		]
+
+	},
+
+	"InstanSeg trn 0605 NoRes": {
 		"path": "trainedmodels/instanseg_20250605.pt",
 		"model_type": "instanseg"
 	},
+
 	"Stardist 2D_versatile_he": {
 		"path": "2D_versatile_he",
 		"model_type": "stardist"
@@ -35,6 +50,19 @@
 		"path": "trainedmodels/cpsam_finetuned.pth",
 		"model_type": "cellpose",
 		"diameter":"40"
+	},
+	"Cellpose trained 512": {
+		"path": "trainedmodels/cpsam_finetuned.pth",
+		"model_type": "cellpose",
+		"diameter":"40",
+		"image_preprocess": [
+			{
+				"gray2rgb":""
+			},
+			{
+				"resize": "512:512"
+			}
+		]
 	},
 	"Cellpose cyto": {
 		"path": "cyto",

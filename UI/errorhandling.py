@@ -1,0 +1,247 @@
+import logging
+import sys
+import traceback # For more detailed traceback formatting if needed
+from PyQt5.QtWidgets import QApplication, QMessageBox
+import io
+from contextlib import redirect_stdout, redirect_stderr
+import os
+from datetime import datetime
+import glob
+
+def cleanup_old_logs():
+    """
+    Keep only the last 14 log files, delete older ones.
+    """
+    try:
+        # Ensure logs directory exists
+        logs_dir = "logs"
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir)
+            return
+        
+        # Get all log files in the logs directory matching YYYYMMDD.log pattern
+        log_pattern = os.path.join(logs_dir, "????????.log")
+        log_files = glob.glob(log_pattern)
+        
+        # Sort by filename (which is the date) in descending order
+        log_files.sort(reverse=True)
+        
+        # Keep only the first 14 files (most recent), delete the rest
+        if len(log_files) > 14:
+            files_to_delete = log_files[14:]
+            for file_path in files_to_delete:
+                try:
+                    os.remove(file_path)
+                    print(f"Deleted old log file: {file_path}")
+                except OSError as e:
+                    print(f"Could not delete log file {file_path}: {e}")
+                    
+    except Exception as e:
+        print(f"Error during log cleanup: {e}")
+
+# Configure your logger (do this once, typically at the start of your app)
+def setup_logging():
+    # Create logs directory if it doesn't exist
+    logs_dir = "logs"
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir)
+    
+    # Clean up old log files
+    cleanup_old_logs()
+    
+    # Create a logger
+    logger = logging.getLogger() # Get the root logger
+    logger.setLevel(logging.INFO) # Set the minimum logging level for the logger
+
+    # Create console handler and set level to debug
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO) # Log INFO and above to console
+
+    # Create file handler with date-based filename
+    current_date = datetime.now().strftime("%Y%m%d")
+    log_filename = os.path.join(logs_dir, f"{current_date}.log")
+    fh = logging.FileHandler(log_filename, mode='a', encoding='utf-8')
+    fh.setLevel(logging.INFO) # Log INFO and above to file
+
+    # Create formatter
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s'
+    )
+    error_formatter = logging.Formatter( # Potentially a more detailed one for errors
+        '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(funcName)s - %(message)s\n%(exc_info)s'
+    )
+
+
+    # Add formatter to handlers
+    ch.setFormatter(formatter)
+    fh.setFormatter(formatter) # Use the same formatter or a different one for the file
+
+    # Add handlers to the logger
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+
+    return logger
+
+# --- Global Unhandled Exception Handler ---
+def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
+    """
+    Catches unhandled exceptions, logs them, and ensures they are still printed to stderr.
+    """
+    if issubclass(exc_type, KeyboardInterrupt):
+        # Allow KeyboardInterrupt to interrupt the program as usual
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    # Log the exception with traceback
+    # logger.error() or logger.critical() can be used.
+    # logger.exception() is convenient as it automatically includes exception info.
+    app_logger().critical("Unhandled exception caught:", exc_info=(exc_type, exc_value, exc_traceback))
+    error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    msgbox = QMessageBox()
+    msgbox.setIcon(QMessageBox.Critical)
+    msgbox.setWindowTitle("Unhandled Exception")
+    msgbox.setText("An error occurred:")
+    msgbox.setDetailedText(error_msg)
+    msgbox.exec_()
+    
+def app_logger():
+    return app_logger_int
+
+class LoggerWriter:
+    """
+    A file-like object that redirects writes to a logger instance.
+    """
+    def __init__(self, logger, level):
+        self.logger = logger
+        self.level = level
+        self.buffer = []
+
+    def write(self, message):
+        # Handle empty messages and newlines
+        if message and message.strip():
+            # Log the message at the specified level
+            self.logger.log(self.level, message.strip())
+        
+        # Also write to original stdout/stderr for console visibility
+        if self.level == logging.INFO:
+            sys.__stdout__.write(message)
+        else:
+            sys.__stderr__.write(message)
+
+    def flush(self):
+        # Flush the original streams
+        if self.level == logging.INFO:
+            sys.__stdout__.flush()
+        else:
+            sys.__stderr__.flush()
+
+def setup_console_logging():
+    """
+    Redirect stdout and stderr to also write to the logger.
+    This ensures all print statements and error messages are logged to file.
+    """
+    logger = app_logger_int
+    
+    # Create custom writers that log to file AND display on console
+    stdout_logger = LoggerWriter(logger, logging.INFO)
+    stderr_logger = LoggerWriter(logger, logging.ERROR)
+    
+    # Redirect stdout and stderr
+    sys.stdout = stdout_logger
+    sys.stderr = stderr_logger
+    
+    logger.info("Console output redirection setup complete - all print statements will now be logged to file")
+
+def restore_console():
+    """
+    Restore original stdout and stderr.
+    Call this if you need to disable console logging redirection.
+    """
+    sys.stdout = sys.__stdout__
+    sys.stderr = sys.__stderr__
+    app_logger_int.info("Console output redirection disabled - restored original stdout/stderr")
+
+class TeeLogger:
+    """
+    A more advanced logger that can capture and log specific operations.
+    Use this for selective logging of operations.
+    """
+    def __init__(self, logger, original_stream, log_level=logging.INFO):
+        self.logger = logger
+        self.original_stream = original_stream
+        self.log_level = log_level
+        
+    def write(self, message):
+        # Write to original stream (console)
+        self.original_stream.write(message)
+        
+        # Log to file if message is not empty/whitespace
+        if message and message.strip():
+            self.logger.log(self.log_level, f"CONSOLE: {message.strip()}")
+            
+    def flush(self):
+        self.original_stream.flush()
+
+def setup_selective_console_logging():
+    """
+    Alternative setup that prefixes console messages in the log file.
+    This makes it easier to distinguish between direct log calls and console output.
+    """
+    logger = app_logger_int
+    
+    # Store original streams
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    
+    # Create tee loggers
+    sys.stdout = TeeLogger(logger, original_stdout, logging.INFO)
+    sys.stderr = TeeLogger(logger, original_stderr, logging.ERROR)
+    
+    logger.info("Selective console logging setup - console output will be prefixed with 'CONSOLE:' in log file")
+
+def log_function_calls(func):
+    """
+    Decorator to log function calls and their results.
+    Usage: @log_function_calls
+    """
+    def wrapper(*args, **kwargs):
+        logger = app_logger_int
+        func_name = func.__name__
+        
+        # Log function entry
+        logger.info(f"FUNCTION_CALL: Entering {func_name} with args={args}, kwargs={kwargs}")
+        
+        try:
+            result = func(*args, **kwargs)
+            logger.info(f"FUNCTION_CALL: {func_name} completed successfully")
+            return result
+        except Exception as e:
+            logger.error(f"FUNCTION_CALL: {func_name} failed with error: {str(e)}")
+            raise
+            
+    return wrapper
+
+def log_print(*args, **kwargs):
+    """
+    Enhanced print function that always logs to file.
+    Use this instead of print() for important messages you want logged.
+    
+    Usage: log_print("This will appear in console AND log file")
+    """
+    # Print to console
+    print(*args, **kwargs)
+    
+    # Also log to file
+    message = ' '.join(str(arg) for arg in args)
+    app_logger_int.info(f"LOG_PRINT: {message}")
+
+# Set the custom excepthook
+
+app_logger_int = setup_logging()
+sys.excepthook = handle_unhandled_exception
+
+# Setup console output redirection
+setup_console_logging()
+
+# Get a logger for the current module (best practice)
+logger = logging.getLogger(__name__) # This will inherit settings from the root logger configured above
