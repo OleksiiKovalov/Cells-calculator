@@ -1,5 +1,16 @@
+from pathlib import Path
 from PyQt5.QtWidgets import QAction, QFileDialog, QMenuBar
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
+from PyQt5.QtCore import QFileInfo, pyqtSignal
+from pyparsing import Optional
+from UI.CustomFileDialog import CustomFileDialog
+from pathlib import Path
+from typing import Optional
+from PyQt5.QtCore import QFileInfo, pyqtSignal
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import QDialog, QAction
+from pathlib import PureWindowsPath, PurePosixPath
+from UI.settings_manager import get_setting, set_setting
 
 class menubar(QMenuBar):
     menubar_signal = pyqtSignal(str, object)
@@ -18,6 +29,7 @@ class menubar(QMenuBar):
         
         self.open_lsm_action = QAction("Open Image", self)
         self.open_lsm_action.triggered.connect(self.open_file)
+        self.open_lsm_action.setShortcut("Ctrl+O") 
         self.open_lsm_action.setEnabled(False)
 
         self.open_folder_action = QAction("Open Folder", self)
@@ -104,14 +116,59 @@ class menubar(QMenuBar):
         if action_name == "Save_as":
             self.save_as_action.setEnabled(value)
 
+    def get_process_time(self, file_info: QFileInfo) -> str:
+        """Example function for process time column"""
+        if file_info.isDir():
+            return ""
+        
+        size = file_info.size()
+        if size < 1024 * 1024:  # < 1MB
+            return "~1s"
+        elif size < 10 * 1024 * 1024:  # < 10MB
+            return "~5s"
+        elif size < 100 * 1024 * 1024:  # < 100MB
+            return "~30s"
+        else:
+            return "~2m"
+        
+    def example_text_color_rule(self, file_info: QFileInfo) -> Optional[QColor]:
+        """Example function to set text color based on file type"""
+#        if file_info.isDir():
+#            return QColor(100, 100, 100)  # Gray for directories
+
+        if file_info.isFile():
+            filename = str(PureWindowsPath(file_info.absoluteFilePath()))
+            val = self.parent.image_mru.get(filename)
+            if val is not None:
+                if val.year == 1:
+                    return QColor(0, 150, 0)  # Green for recently opened files
+                return QColor(0, 0, 150)  # Blue for processed files
+        return None  # Use default color
+
     def open_file(self):
-        file_path, _ = QFileDialog.getOpenFileName(
-            caption="Open Image File",
-            directory="",
-            filter="Image Files (*.png *.jpg *.bmp *.lsm *.TIF)",
+        dialog = CustomFileDialog(
+            caption="Select Image File",
+            directory=Path.home(),
+            parent=self.parent
         )
-        if file_path:
-            self.menubar_signal.emit("open_file", file_path)
+        dialog.add_custom_column("Process Time", 100, self.get_process_time)
+        dialog.set_color_rule(self.example_text_color_rule)
+        
+        # Set file filters
+        dialog.set_file_filters([
+            "Images (*.png *.jpg *.jpeg *.tif *.tiff)",
+            "Documents (*.txt *.doc *.pdf)",
+            "All files (*.*)"
+        ])
+        
+        last_opened_file = get_setting("paths.last_opened_file","")
+        dialog.openAt(get_setting("paths.last_opened_file",""),True)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            set_setting("paths.last_opened_file", str(dialog.get_selected_file()))
+            selected_file =  str(PureWindowsPath(dialog.get_selected_file()))
+            self.menubar_signal.emit("open_file", str(selected_file))
+        dialog = None
 
     def open_folder(self):
         folder_path = QFileDialog.getExistingDirectory(

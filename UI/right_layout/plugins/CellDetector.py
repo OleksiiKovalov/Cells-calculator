@@ -1,16 +1,19 @@
 import os
 import traceback
+import cv2
+import os
 from PyQt5.QtWidgets import QCheckBox, QPushButton, QGraphicsView, QGraphicsView, QGraphicsScene,\
     QGraphicsTextItem, QComboBox, QLabel
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
+
 from UI.Slider import Slider
 from UI.right_layout.plugins.BasePlagin import BasePlugin
+
 from model.Model import Model
-from errorhandling import app_logger
-import cv2
-import os
+from UI.errorhandling import app_logger
 from model.utils import create_image_grid
+
 
 class CellDetector(BasePlugin):
     def get_name(self):

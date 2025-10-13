@@ -33,4 +33,4 @@ app.log
 /.vscode
 /.vs
 /packages
-
+/logs

@@ -11,7 +11,9 @@ class InstansegSegmenter(BaseModel):
         super().__init__(path_to_model, object_size,model_data)
    
     def init_x20_model(self, path_to_model: str):
-        self.image_preprocess_settings_default = OrderedDict([("gray2rgb", "")])        
+        import json
+        from collections import OrderedDict
+        self.image_preprocess_settings_default = json.loads("[{\"gray2rgb\":\"\"}]", object_pairs_hook=OrderedDict)
         from instanseg import InstanSeg
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація InstanSeg з моделлю: {path_to_model}")
@@ -28,7 +30,7 @@ class InstansegSegmenter(BaseModel):
                 print(f"Попередження: Не вказано модель InstanSeg. Використовується '{default_model}'.")
             self.model = InstanSeg(default_model, verbosity=1)
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            from errorhandling import app_logger
+            from UI.errorhandling import app_logger
             app_logger().warning(f"InstansegSegmenter: Device used:{device}")        
             self.model = self.model.to(device)
             

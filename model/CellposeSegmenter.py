@@ -15,7 +15,8 @@ class CellposeSegmenter(BaseModel):
         self.cellpose_diam = None
     
     def init_x20_model(self, path_to_model: str):
-        self.image_preprocess_settings_default = OrderedDict([("gray2rgb", "")])
+        import json
+        self.image_preprocess_settings_default = json.loads("[{\"gray2rgb\":\"\"}]", object_pairs_hook=OrderedDict)
         from cellpose import models as cp_models # Для Cellpose
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація Cellpose з моделлю: {path_to_model}")
@@ -30,7 +31,7 @@ class CellposeSegmenter(BaseModel):
             else:
                 print(f"Попередження: Не вказано модель Cellpose. Використовується '{default_model}'.")
             self.model = cp_models.CellposeModel(model_type=default_model, gpu=self.use_gpu)
-            from errorhandling import app_logger
+            from UI.errorhandling import app_logger
             app_logger().warning(f"CellposeSegmenter: GPU Used:{self.use_gpu}")        
 
     def init_x10_model(self, path_to_model):

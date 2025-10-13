@@ -1,3 +1,4 @@
+import json
 import numpy as np
 from model.BaseModel import BaseModel
 from model.utils import *
@@ -16,18 +17,18 @@ class StardistSegmenter(BaseModel):
     def init_x20_model(self, path_to_model: str):
         from stardist.models import StarDist2D
         import tensorflow as tf
-        from errorhandling import app_logger
+        from UI.errorhandling import app_logger
         app_logger().warning(f"Stardist: Num GPUs Available:{len(tf.config.list_physical_devices('GPU'))}")        
         if(path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018")):
             self.is_custom_model = False
             self.model = StarDist2D.from_pretrained(path_to_model)
-            self.image_preprocess_settings_default = OrderedDict([("gray2rgb", ""), ("normalize", "1,99.8")])            
+            self.image_preprocess_settings_default = json.loads("[{\"gray2rgb\":\"\"} , {\"normalize\":\"1,99.8\"}]", object_pairs_hook=OrderedDict)
         else:
             self.is_custom_model = True
             path =os.path.dirname(path_to_model)
             name =os.path.basename(path_to_model)
             self.model = StarDist2D(None, name=name, basedir=path)
-            self.image_preprocess_settings_default = OrderedDict([("rgb2gray", ""), ("normalize", "1,99.8")])            
+            self.image_preprocess_settings_default = json.loads("[{\"rgb2gray\":\"\"} , {\"normalize\":\"1,99.8\"}]", object_pairs_hook=OrderedDict)
 
     def init_x10_model(self, path_to_model: str):
         from stardist.models import StarDist2D
@@ -91,7 +92,7 @@ class StardistSegmenter(BaseModel):
             return filtered_detections
         except Exception as e:
             import traceback
-            from errorhandling import app_logger
+            from UI.errorhandling import app_logger
             traceback.print_exc()
             app_logger().exception(e)
             raise RuntimeError(f"Error when inferrecing StardistSegmenter: {e}")
