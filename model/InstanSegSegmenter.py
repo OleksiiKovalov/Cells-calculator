@@ -34,9 +34,29 @@ class InstansegSegmenter(BaseModel):
             app_logger().warning(f"InstansegSegmenter: Device used:{device}")        
             self.model = self.model.to(device)
             
-    def init_x10_model(self, path_to_model):
-        pass
-
+    def init_x10_model(self, path_to_model: str):
+        from instanseg import InstanSeg
+        self.image_preprocess_settings_default = OrderedDict([("gray2rgb", "")])
+        
+        if path_to_model and os.path.exists(path_to_model):
+            print(f"Ініціалізація InstanSeg x10 з моделлю: {path_to_model}")
+            model_module = torch.jit.load(path_to_model)
+            self.model_x10 = InstanSeg(model_module, verbosity=1)
+        elif path_to_model in ['brightfield_nuclei', 'fluorescence_nuclei_and_cells']:
+            print(f"Ініціалізація InstanSeg x10 зі стандартною моделлю: {path_to_model}")
+            self.model_x10 = InstanSeg(path_to_model, verbosity=1)
+        else:
+            default_model = 'fluorescence_nuclei_and_cells'
+            if path_to_model:
+                print(f"Попередження: Шлях/назва '{path_to_model}' не валідні для InstanSeg. Використовується '{default_model}'.")
+            else:
+                print(f"Попередження: Модель x10 не вказана або невірна, використовується '{default_model}'")
+            self.model_x10 = InstanSeg(default_model, verbosity=1)
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            from errorhandling import app_logger
+            app_logger().warning(f"InstansegSegmenter: Device used:{device}")        
+            self.model = self.model.to(device)
+        
     def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
               filename=".cache/cell_tmp_img_with_detections.png", min_score=0.05,
               alpha=0.75, store_bin_mask=False, **kwargs):
@@ -95,10 +115,62 @@ class InstansegSegmenter(BaseModel):
         cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
         cv2.imwrite(filename, image)
         return
-    def count_x10(self, input_image: str, colormap="tab20",
-              filename=".cache/cell_tmp_img_with_detections.png", min_score=0.01,
-              alpha=0.75, **kwargs):
-        raise NotImplementedError
+    
+    def count_x10(self, input_image, colormap="tab10",
+              filename=".cache/cell_tmp_img_with_detections.png", 
+              min_score=0.01, alpha=0.75, scale_factor=0.5, **kwargs):
+        from skimage.io import imread
+        from skimage.transform import resize
+        from model.utils import safeimagesave, filter_detections, plot_predictions
+
+        image = imread(input_image)
+        h0, w0 = image.shape[:2]
+
+        image_small = resize(image, (int(h0 * scale_factor), int(w0 * scale_factor)),
+                            preserve_range=True, anti_aliasing=False).astype(image.dtype)
+
+        img_inference = process_loaded_image(image=image_small, settings=self.image_preprocess_settings_default)
+        safeimagesave(img_inference, ".cache/cell_tmp_img_inference_x10.png")
+
+        self.original_image = safegray2rgb(image)
+
+        try:
+            labeled_output = self.model_x10.eval_medium_image(
+                image=img_inference,
+                return_image_tensor=False,
+                target="cells"
+            )
+
+            self.detections = self.instanseg_results_to_pandas(labeled_output)
+
+            detections = self.detections[self.detections['confidence'] >= min_score]
+            self.object_size['signal']("set_size", self.detections['box'].copy())
+
+            filtered_detections = filter_detections(
+                detections,
+                min_size=self.object_size['min_size'],
+                max_size=self.object_size['max_size']
+            )
+
+            self.prediction_image = None
+            if alpha > 0:
+                self.prediction_image = plot_predictions(
+                    self.original_image.copy(),
+                    filtered_detections['mask'].tolist(),
+                    filename=filename,
+                    colormap=colormap,
+                    alpha=alpha
+                )
+
+            return filtered_detections
+
+        except Exception as e:
+            import traceback
+            from errorhandling import app_logger
+            traceback.print_exc()
+            app_logger().exception(e)
+            raise RuntimeError(f"Error when inferrecing InstanSegSegmenter (x10): {e}")
+
     
     def image_preprocess(self,image):
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)       
