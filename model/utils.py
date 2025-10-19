@@ -355,10 +355,14 @@ def denormalize_coordinates(coords, image_shape):
 def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_with_detections.png",
                      alpha=.75, colormap="tab20"):
     """Draws predicted masks on the image."""
+    
+    is_bgr_input = np.mean(image[..., 0]) > np.mean(image[..., 2])
+
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
     if not pred_masks:
         print("No masks found.")
-        return
+        return image
+
     overlay = image.copy()
     for i, mask in enumerate(pred_masks):
         coords = np.array(mask)
@@ -367,7 +371,16 @@ def plot_predictions(image, pred_masks, filename: str = ".cache/cell_tmp_img_wit
             coords = denormalize_coordinates(coords, image.shape)
         coords = coords.astype(int)
         cv2.fillPoly(overlay, [coords], color)
+
     cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
+
+    # Якщо вхід був RGB, а зараз BGR → конвертуємо назад
+    if not is_bgr_input:
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    elif is_bgr_input and np.mean(image[..., 0]) < np.mean(image[..., 2]):
+        # якщо було BGR, але модель зробила RGB
+        image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
     cv2.imwrite(filename, image)
     return image
 
