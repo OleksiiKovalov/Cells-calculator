@@ -1,0 +1,157 @@
+{
+	"Template":{
+		"enabled": "false",
+		"path": "trainedmodels/template_model.onnx",
+		"model_type": "cellcounter;yolo;instanseg;stardist;cellpose",
+		"preload": "True",
+		"x20":
+		{
+			"InferenceMethodName": "eval_medium_image",
+			"TileSize": "512",
+			"image_preprocess": [
+				{
+					"resize": "512:512"
+				},
+				{
+				"resizeandpad": "512:512"
+				},
+				{
+				"gray2rgb": ""
+				},
+				{
+				"rgb2gray": ""
+				},
+				{
+				"normalize": "1,99 csbdeep.utils.normalize"
+				},
+				{
+				"clip": "1,99 np.clip"
+				}
+			]
+		},
+		"x10":{
+		}
+
+	},
+	"Detector": {
+		"path": "trainedmodels/yolov8m-det.onnx",
+		"model_type": "cellcounter",
+		"preload": "True",
+		"x10":{
+		}
+	},
+	"YOLO-512 Segmenter": {
+		"path": "trainedmodels/YOLO11x-512-seg.pt",
+		"model_type": "yolo",
+		"x10":{
+		}
+	},
+	"YOLO-680 Segmenter": {
+		"enabled": "false",
+		"path": "trainedmodels/YOLO11x-680-seg.pt",
+		"model_type": "yolo",
+		"x10":{
+		}
+	},
+	"InstanSeg Flu_nc": {
+		"enabled": "true",
+		"path": "fluorescence_nuclei_and_cells",
+		"model_type": "instanseg"
+	},
+	"InstanSeg bright_nuc": {
+		"enabled": "false",
+		"path": "brightfield_nuclei",
+		"model_type": "instanseg"
+	},
+	"InstanSeg trained 0605 512": {
+		"enabled": "true",
+		"path": "trainedmodels/instanseg_20250605.pt",
+		"model_type": "instanseg",
+
+		"x20":
+		{
+			"inference_method_name": "eval_medium_image",
+			"tile_size": 512,
+			"image_preprocess": [
+				{
+					"gray2rgb":""
+				},
+				{
+					"resize": "512:512"
+				}
+			]
+		},
+
+		"x10":
+		{
+			"inference_method_name": "eval_medium_image",
+			"tile_size": "1024",
+			"image_preprocess": [
+				{
+					"gray2rgb":""
+				}
+			]
+		}
+
+	},
+	"InstanSeg trn 0605 NoRes": {
+		"enabled": "false",
+		"path": "trainedmodels/instanseg_20250605.pt",
+		"model_type": "instanseg"
+	},
+	"Neuroblastoma Inst": {
+		"enabled": "true",
+		"path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt",
+		"model_type": "instanseg"
+	},
+	"Stardist 2D_versatile_he": {
+		"enabled": "false",
+		"path": "2D_versatile_he",
+		"model_type": "stardist"
+	},
+	"Stardist trained 0602": {
+		"enabled": "false",
+		"path": "trainedmodels/stardist0602",
+		"model_type": "stardist"
+	},
+	"Cellpose trained": {
+		"enabled": "false",
+		"path": "trainedmodels/cpsam_finetuned.pth",
+		"model_type": "cellpose",
+		"diameter":"40"
+	},
+	"Cellpose trained 512": {
+		"enabled": "false",
+		"path": "trainedmodels/cpsam_finetuned.pth",
+		"model_type": "cellpose",
+		"diameter":"40",
+		"image_preprocess": [
+			{
+				"gray2rgb":""
+			},
+			{
+				"resize": "512:512"
+			}
+		]
+	},
+	"Cellpose cyto": {
+		"enabled": "false",
+		"path": "cyto",
+		"model_type": "cellpose"
+	},
+	"Cellpose nuclei": {
+		"enabled": "false",
+		"path": "nuclei",
+		"model_type": "cellpose"
+	},
+	"Cellpose cyto2": {
+		"enabled": "false",
+		"path": "cyto2",
+		"model_type": "cellpose"
+	},
+	"Cellpose cyto3": {
+		"enabled": "false",
+		"path": "cyto3",
+		"model_type": "cellpose"
+	}
+}
