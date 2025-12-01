@@ -17,6 +17,7 @@ Usage:
 from collections import OrderedDict
 import json
 import sys
+from UI import app_globals
 from UI.app_globals import FILENAME_MODEL_CONFIG, get_global, register_model, set_global
 import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
@@ -77,6 +78,9 @@ if __name__ == '__main__':
         # Brief delay to ensure splash screen is visible and initialization complete
         QTimer.singleShot(200, show_main_window)
         
+        #we will run on old PC with low memory - so we disable automatic memory cleanup, otherwise it may lead to non-stop cleanup loops
+        #app_globals.get_memory_manager().start_threshold_cleanup(80, 5, locals(), globals())
+
         # Start the application event loop
         app_logger().info("Entering application event loop...")
         sys.exit(app.exec_())

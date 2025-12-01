@@ -495,7 +495,7 @@ def denormalize_coordinates(coords, image_shape):
     return coords * np.array([image_shape[1], image_shape[0]])
 
 def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=.75, colormap="tab20"):
+                     alpha=.75, colormap="tab20", border_fill: int = None):
     """Draws predicted masks on the image."""
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
     if not pred_masks:
@@ -508,7 +508,10 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
         if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
             coords = denormalize_coordinates(coords, image.shape)
         coords = coords.astype(int)
-        cv2.fillPoly(overlay, [coords], color)
+        if border_fill is None or border_fill <= 0:
+            cv2.fillPoly(overlay, [coords], color)
+        else:
+            cv2.polylines(overlay, [coords], isClosed=True, color=color, thickness=border_fill)
     cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
     safe_image_write(image, filename)
     return image

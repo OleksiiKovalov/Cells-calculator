@@ -14,6 +14,7 @@ from PyQt5.QtWidgets import (
 )
 
 # Local application imports
+from UI import app_globals
 from UI.WaitWindow import run_with_wait_window
 from UI.app_globals import get_global, set_global
 from UI.errorhandling import app_logger
@@ -122,7 +123,7 @@ class RangeSliderWrapper(QWidget):
         
         # Emit signal based on Auto Apply setting
         if self.auto_apply_checkbox.isChecked():
-            self.rangeChanged.emit(min_value, max_value)
+            self.refresh_visualization()
         else:
             # Enable apply button when not auto-applying
             self.apply_button.setEnabled(True)
@@ -161,9 +162,8 @@ class RangeSliderWrapper(QWidget):
     
     def on_apply_clicked(self):
         """Handle Apply button click"""
-        min_value = self.object_size['min_size']
-        max_value = self.object_size['max_size']
         self.applyRequested.emit(min_value, max_value)
+        self.refresh_visualization()
         self.apply_button.setEnabled(False)  # Disable until next change 
     
     def change_default(self, min_size, max_size):
@@ -269,24 +269,34 @@ class CellDetectorPlugin(BasePlugin):
                 self.lsm_filesList = None
                 self.button.setEnabled(False)
 
+    def refresh_visualization_params(self):
+        self.object_size["color_map"] = self.colormap_combo.currentText()
+        # Convert percentage text to float value (e.g., "75%" -> 0.75)
+        alpha_value = float(self.alpha_combo.currentText().rstrip('%')) / 100.0
+        self.object_size["alpha"] = alpha_value
+        self.object_size["border_fill"] = [-1,1,2][self.border_combo.currentIndex()]
+        return
+
     def update_colormap(self, colormap):
-        self.object_size["color_map"] = colormap
-        
-        # Trigger redraw with new colormap using current range slider values
-        current_min = self.object_size['min_size']
-        current_max = self.object_size['max_size']
-        self.on_range_slider_changed(current_min, current_max)
+        if self.range_slider.auto_apply_checkbox.isChecked():
+            self.refresh_visualization()
+        else:
+            self.range_slider.apply_button.setEnabled(True) 
     
     def update_alpha(self, alpha_text):
-        """Handle alpha combo box changes"""
-        # Convert percentage text to float value (e.g., "75%" -> 0.75)
-        alpha_value = float(alpha_text.rstrip('%')) / 100.0
-        self.object_size["alpha"] = alpha_value
-        
-        # Trigger redraw with new alpha using current range slider values
-        current_min = self.object_size['min_size']
-        current_max = self.object_size['max_size']
-        self.on_range_slider_changed(current_min, current_max)
+        if self.range_slider.auto_apply_checkbox.isChecked():
+            self.refresh_visualization()
+        else:
+            self.range_slider.apply_button.setEnabled(True) 
+
+    def update_border_combo(self, border_text):
+        if self.range_slider.auto_apply_checkbox.isChecked():
+            self.refresh_visualization()
+        else:
+            self.range_slider.apply_button.setEnabled(True) 
+
+
+
     # def update_lineWidth(self):
     #     # Получаем значение из QLineEdit
     #     input_text = self.LineWidth_edit.text()
@@ -511,6 +521,9 @@ class CellDetectorPlugin(BasePlugin):
                 if model:
                     del model
                     model = None
+
+        app_globals.get_memory_manager().clean_all()
+
         if model:
             return model.cell_counter.original_image, model.cell_counter.prediction_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
         else:
@@ -593,6 +606,10 @@ class CellDetectorPlugin(BasePlugin):
                     time.sleep(0.01)
 
             imageGrid = create_image_grid(self.batch_processedImages,self.batch_labels)
+    
+            result_text = "\n".join(self.batch_labels)
+            self.results_text.setPlainText(result_text)
+
             self.batch_processedImages, self.batch_labels = None, None
 
             safe_image_write(imageGrid, IMAGE_FILE_NAME_GRID)
@@ -600,6 +617,7 @@ class CellDetectorPlugin(BasePlugin):
             plt.axis('off')  # Hide axes
             plt.title("Image")
             plt.show()            
+            app_globals.get_memory_manager().clean_all()
         finally:
             pass
 
@@ -853,17 +871,22 @@ class CellDetectorPlugin(BasePlugin):
         # Redraw with the new display mode
         self.draw_bounding_box()
 
-    def on_range_slider_changed(self, min_value, max_value):
+    def refresh_visualization(self):
         """
-        Handle range slider value changes.
+        Refresh the detection visualization with current UI settings.
         
         Args:
-            min_value (float): New minimum size value
-            max_value (float): New maximum size value
+            min_value (float): Minimum size value for filtering
+            max_value (float): Maximum size value for filtering
         """
         detections = get_global('detections')
         if detections is None:
             return
+        
+        min_value = self.object_size['min_size']
+        max_value = self.object_size['max_size']
+
+        self.refresh_visualization_params()
         
         filtered_detections = filter_detections(detections, min_size=min_value, max_size=max_value)        
         
@@ -874,7 +897,8 @@ class CellDetectorPlugin(BasePlugin):
                 filtered_detections['mask'].tolist(), 
                 filename=IMAGE_FILE_NAME_DETECTION, 
                 colormap=self.object_size["color_map"], 
-                alpha=self.object_size.get("alpha", 0.75)
+                alpha=self.object_size.get("alpha", 0.75),
+                border_fill=self.object_size.get("border_fill", None )
             )
         else:
             image = get_global('image_inference').copy()
@@ -1044,8 +1068,8 @@ class CellDetectorPlugin(BasePlugin):
         self.range_slider = RangeSliderWrapper(self.object_size, self.default_object_size)
         
         # Connect range slider change signals
-        self.range_slider.rangeChanged.connect(self.on_range_slider_changed)
-        self.range_slider.applyRequested.connect(self.on_range_slider_changed)
+        self.range_slider.applyRequested.connect(self.refresh_visualization)
+        self.range_slider.rangeChanged.connect(self.refresh_visualization)
 
         # LineWidth_label = QLabel("Line Width:")
         # LineWidth_label.setFont(QFont("Arial", 16))
@@ -1087,13 +1111,29 @@ class CellDetectorPlugin(BasePlugin):
         # Initialize alpha in object_size
         self.object_size["alpha"] = 0.75  # Default 75%
         
-        # Create horizontal layout for colormap and alpha
+        # Create border style combo box
+        border_label = QLabel("Border:")
+        border_label.setFont(QFont("Arial", 16))
+        
+        self.border_combo = QComboBox()
+        self.border_combo.setFont(QFont("Arial", 16))
+        
+        # Add border values
+        border_values = ["Solid", "1pt", "2pt"]
+        self.border_combo.addItems(border_values)
+        self.border_combo.setCurrentText("Solid")  # Default to Solid
+        self.border_combo.currentTextChanged.connect(self.update_border_combo)  # Same event as alpha
+        
+        # Create horizontal layout for colormap, alpha, and border
         colormap_layout = QHBoxLayout()
         colormap_layout.addWidget(colormap_label)
         colormap_layout.addWidget(self.colormap_combo)
         colormap_layout.addSpacing(20)
         #colormap_layout.addWidget(alpha_label)
         colormap_layout.addWidget(self.alpha_combo)
+        colormap_layout.addSpacing(10)
+        colormap_layout.addWidget(border_label)
+        colormap_layout.addWidget(self.border_combo)
         
         # Create widget to contain the horizontal layout
         colormap_widget = QWidget()

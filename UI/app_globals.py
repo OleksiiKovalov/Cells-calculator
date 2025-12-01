@@ -7,6 +7,8 @@ across different components of the application.
 
 from sys import modules
 
+from UI.memory_manager import MemoryManager
+
 
 FILENAME_MODEL_CONFIG = "modelconfig.json"
 CASH_DIRECTORY = ".cache"
@@ -26,6 +28,7 @@ class AppGlobals:
     """
     
     _instance = None
+    memory_manager: MemoryManager = None
     
     def __new__(cls):
         """Ensure only one instance exists (singleton pattern)."""
@@ -60,6 +63,7 @@ class AppGlobals:
         
         self.registered_models = {}
         self.registered_models_libs = {}
+        self.memory_manager = MemoryManager()
         self._initialized = True
     
     def get(self, key: str, default=None):
@@ -195,3 +199,7 @@ def get_all_globals() -> dict:
 def list_global_keys():
     """Get list of all global keys."""
     return list(app_globals.keys())
+
+def get_memory_manager() -> MemoryManager:
+    """Get the global memory manager instance."""
+    return app_globals.memory_manager
