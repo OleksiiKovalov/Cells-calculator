@@ -1084,8 +1084,6 @@ class CellDetectorPlugin(BasePlugin):
         # LineWidth_layout.addWidget(LineWidth_label)
         # LineWidth_layout.addWidget(self.LineWidth_edit)
 
-        colormap_label = QLabel("Colormap:")
-        colormap_label.setFont(QFont("Arial", 16))
 
         self.colormap_combo = QComboBox()
         self.colormap_combo.setFont(QFont("Arial", 16))
@@ -1111,9 +1109,6 @@ class CellDetectorPlugin(BasePlugin):
         # Initialize alpha in object_size
         self.object_size["alpha"] = 0.75  # Default 75%
         
-        # Create border style combo box
-        border_label = QLabel("Border:")
-        border_label.setFont(QFont("Arial", 16))
         
         self.border_combo = QComboBox()
         self.border_combo.setFont(QFont("Arial", 16))
@@ -1126,13 +1121,11 @@ class CellDetectorPlugin(BasePlugin):
         
         # Create horizontal layout for colormap, alpha, and border
         colormap_layout = QHBoxLayout()
-        colormap_layout.addWidget(colormap_label)
         colormap_layout.addWidget(self.colormap_combo)
         colormap_layout.addSpacing(20)
         #colormap_layout.addWidget(alpha_label)
         colormap_layout.addWidget(self.alpha_combo)
         colormap_layout.addSpacing(10)
-        colormap_layout.addWidget(border_label)
         colormap_layout.addWidget(self.border_combo)
         
         # Create widget to contain the horizontal layout
