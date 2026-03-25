@@ -34,3 +34,4 @@ app.log
 /.vs
 /packages
 /logs
+.DS_Store
