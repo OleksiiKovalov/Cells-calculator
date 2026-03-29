@@ -23,25 +23,37 @@ jobs:
           channels: defaults
           activate-environment: client-env
 
+      - name: Cache Conda packages
+        uses: actions/cache@v4
+        with:
+          path: C:\Miniconda\pkgs
+          key: windows-conda-anaconda-2024-10
+
       - name: Install Anaconda Metapackage
         shell: bash -l {0}
         run: |
           conda install --override-channels -c defaults anaconda=2024.10 --yes
 
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install Project Requirements
         shell: bash -l {0}
         run: |
-          # We try to install frozen requirements on top of the Anaconda baseline
-          # If there is a version conflict, this step will fail.
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Verify Environment Integrity
         shell: bash -l {0}
         run: |
-          echo "Verifying if we are running on the Anaconda 2024.10 baseline..."
-          # If the output says 'custom', it means a library was forced to change
-          conda list anaconda
+          echo "Running pip check to ensure no Dependency Hell was created..."
+          pip check
+          echo "Verifying Core Science Libraries are still intact..."
           python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
 
       - name: Smoke Test Qt UI (Headless)
