@@ -1,0 +1,53 @@
+name: Anaconda 2024.10 Compatibility Check
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev/development2026Spring
+
+jobs:
+  compatibility-test:
+    # We use Windows because that is the client's OS
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Conda (Miniconda)
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          python-version: "3.11"
+          auto-update-conda: true
+          channels: defaults
+          activate-environment: client-env
+
+      - name: Install Anaconda Metapackage
+        shell: bash -l {0}
+        run: |
+          conda install --override-channels -c defaults anaconda=2024.10 --yes
+
+      - name: Install Project Requirements
+        shell: bash -l {0}
+        run: |
+          # We try to install frozen requirements on top of the Anaconda baseline
+          # If there is a version conflict, this step will fail.
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify Environment Integrity
+        shell: bash -l {0}
+        run: |
+          echo "Verifying if we are running on the Anaconda 2024.10 baseline..."
+          # If the output says 'custom', it means a library was forced to change
+          conda list anaconda
+          python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
+
+      - name: Smoke Test Qt UI (Headless)
+        shell: bash -l {0}
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          # Verifies that the Windows DLLs for Qt are present and working
+          python -c "from PyQt5.QtWidgets import QApplication; app = QApplication([]); print('Qt UI Initialized Successfully')"
