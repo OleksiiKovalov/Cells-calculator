@@ -1,4 +1,4 @@
-name: Anaconda 2024.10 Compatibility Check
+name: Check requirements.txt
 
 on:
   pull_request:
@@ -8,48 +8,26 @@ on:
 
 jobs:
   compatibility-test:
-    # We use Windows because that is the client's OS
     runs-on: windows-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Conda (Miniconda)
-        uses: conda-incubator/setup-miniconda@v3
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          auto-update-conda: true
-          channels: defaults
-          activate-environment: client-env
-
-      - name: Cache Conda packages
-        uses: actions/cache@v4
-        with:
-          path: C:\Miniconda\pkgs
-          key: windows-conda-anaconda-2024-10
-
-      - name: Install Anaconda Metapackage
-        shell: bash -l {0}
-        run: |
-          conda install --override-channels -c defaults anaconda=2024.10 --yes
-
-      - name: Cache pip packages
-        uses: actions/cache@v4
-        with:
-          path: ~\AppData\Local\pip\Cache
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
+          cache: "pip"
 
       - name: Install Project Requirements
-        shell: bash -l {0}
+        shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Verify Environment Integrity
-        shell: bash -l {0}
+        shell: bash
         run: |
           echo "Running pip check to ensure no Dependency Hell was created..."
           pip check
@@ -57,7 +35,7 @@ jobs:
           python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
 
       - name: Smoke Test Qt UI (Headless)
-        shell: bash -l {0}
+        shell: bash
         env:
           QT_QPA_PLATFORM: offscreen
         run: |
