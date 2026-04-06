@@ -16,7 +16,12 @@ import pandas as pd
 # Local application imports
 from model.YOLOSegmenter import YoloSegmenter
 from model.utils import compute_iou, plot_mask, pandas_to_ultralytics, safe_image_read
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
+from UI.app_globals import ( 
+    IMAGE_FILE_NAME_DETECTION, 
+    IMAGE_FILE_NAME_GRID, 
+    IMAGE_FILE_NAME_INGFERENCE, 
+    IMAGE_FILE_NAME_TMP
+)
 
 
 class Tracker:

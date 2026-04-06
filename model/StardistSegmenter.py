@@ -28,7 +28,13 @@ from model.utils import (
     safe_image_read, 
     OrderedDict
 )
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_INSTANCES, IMAGE_FILE_NAME_TMP
+from UI.app_globals import (
+    IMAGE_FILE_NAME_DETECTION, 
+    IMAGE_FILE_NAME_GRID, 
+    IMAGE_FILE_NAME_INGFERENCE, 
+    IMAGE_FILE_NAME_INSTANCES, 
+    IMAGE_FILE_NAME_TMP
+)
 
 
 

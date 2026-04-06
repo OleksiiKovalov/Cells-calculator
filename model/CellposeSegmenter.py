@@ -7,7 +7,6 @@ from typing import Optional, List, Tuple, Dict, Any
 import cv2  # OpenCV for findContours
 import numpy as np
 import pandas as pd
-from collections import OrderedDict
 from cellpose import models as cp_models  # For Cellpose
 from scipy.ndimage import find_objects  # Efficient bounding box calculation
 from skimage.color import rgb2gray

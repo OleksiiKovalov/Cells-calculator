@@ -18,8 +18,14 @@ from skimage.io import imread
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_INGFERENCE, set_global
 from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
-from model.utils import (plot_mask, plot_predictions, process_loaded_image,
-                         resize_and_pad_cv, safegray2rgb, safeimagesave)
+from model.utils import (
+    plot_mask, 
+    plot_predictions, 
+    process_loaded_image,
+    resize_and_pad_cv, 
+    safegray2rgb, 
+    safeimagesave
+)
 
 
 class InstansegSegmenter(BaseModel):
