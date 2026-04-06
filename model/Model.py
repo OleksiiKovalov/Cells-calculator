@@ -14,7 +14,7 @@ from UI.app_globals import get_registered_model
 from model.NucleiCounter import NucleiCounter
 from model.utils import is_image_valid, calculate_lsm, show_error_message
 
-class Model():
+class Model:
     """
     The class for object of general model.
     To use the class instances, define a new instance and use
@@ -32,17 +32,21 @@ class Model():
     - 'Cells': the number of cells detected;
     - '%': the target percentage value obtained.
     """
-    def __init__(self, path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
-                 threshold=100, eps=5, min_samples=10,
-                 object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
-                 model_type = "",
-                 model_data = None,
-                 model_name = None):
-        self.nuclei_counter = NucleiCounter(threshold=threshold,
-                                            eps=eps, min_samples=min_samples)
+    def __init__(
+        self, 
+        path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
+        threshold=100, eps=5, min_samples=10,
+        object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
+        model_type = "",
+        model_data = None,
+        model_name = None
+    ):
+        self.nuclei_counter = NucleiCounter(
+            threshold=threshold,
+            eps=eps,
+            min_samples=min_samples
+        )
         self.path = path
-        # self.cell_counter = CellCounter(path=path, object_size = object_size)
-        # self.cell_counter = Segmenter("model/best_n.pt", object_size = object_size)
         self.init_counter(path, object_size,model_type,model_data)
         self.inference_duration = 0
         self.model_name = model_name       

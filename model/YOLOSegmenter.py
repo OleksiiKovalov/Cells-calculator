@@ -19,8 +19,13 @@ from model.BaseModel import BaseModel
 from sahi.auto_model import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from sahi.utils.cv import read_image
-from model.utils import *
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
+from model.utils import results_to_pandas, sahi_to_pandas, plot_predictions
+from UI.app_globals import (
+    IMAGE_FILE_NAME_DETECTION,
+    IMAGE_FILE_NAME_GRID,
+    IMAGE_FILE_NAME_INGFERENCE,
+    IMAGE_FILE_NAME_TMP,
+)
 
 
 class YoloSegmenter(BaseModel):
@@ -32,14 +37,23 @@ class YoloSegmenter(BaseModel):
             model_type='yolov8',
             model_path=path_to_model,
             confidence_threshold=0.005,
-            device="cpu", # or 'cuda:0'
+            device="cpu",  # or 'cuda:0'
         )
 
-    def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
-              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.05,
-              alpha=0.75, store_bin_mask=False, **kwargs):
+    def count_x20(
+        self,
+        input_image,
+        plot=True,
+        colormap="tab20",
+        tracking=False,
+        filename=IMAGE_FILE_NAME_DETECTION,
+        min_score=0.05,
+        alpha=0.75,
+        store_bin_mask=False,
+        **kwargs
+    ):
         """
-        This function performs inference on a given image using a pre-trained given model.
+        This function performs inference on a given image using a pre-trained model.
         The general pipeline can be described through the following steps:
         1. Load model, load image;
         2. Perform forward propagation and get results: bboxes, masks, confs;
@@ -48,61 +62,80 @@ class YoloSegmenter(BaseModel):
         5. Display obtained results through masks, if available, or simply through bboxes.
 
         Args:
-            - model: loaded ultralytics YOLO model;
-            - input_image: path to input image;
-            - **kwargs: additional configurations for model inference: conf, iou etc.
+            input_image: path to input image
+            plot: whether to plot predictions
+            colormap: colormap for plotting
+            tracking: whether tracking is enabled
+            filename: filename for output
+            min_score: minimum confidence score
+            alpha: alpha for plotting
+            store_bin_mask: whether to store binary mask
+            **kwargs: additional configurations for model inference: conf, iou etc.
 
         Returns:
-            - list of dictionaries containing detections information.
+            list of dictionaries containing detections information.
         """
         try:
             os.remove(filename)
         except FileNotFoundError:
             pass
 
-        #every time detect from fresh
+        # Every time detect from fresh
         self.detections = None
         
         colormap = self.object_size['color_map']
-        if self.detections is None:
-            outputs = self.model(input_image, conf=0.3, iou=0.6,
-                                max_det = 2000, retina_masks=True, **kwargs)[0]
-            self.original_image = outputs.orig_img
-            if outputs.masks is None:
-                return None
-            self.detections = results_to_pandas(outputs, store_bin_mask)
-            self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
-            self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w,
-            self.h, self.w, self.h]))
+        outputs = self.model(
+            input_image,
+            conf=0.3,
+            iou=0.6,
+            max_det=2000,
+            retina_masks=True,
+            **kwargs
+        )[0]
+        self.original_image = outputs.orig_img
+        if outputs.masks is None:
+            return None
+        self.detections = results_to_pandas(outputs, store_bin_mask)
+        self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
+        self.detections['box'] = self.detections['box'].apply(
+            lambda b: b * np.array([self.w, self.h, self.w, self.h])
+        )
 
-            if tracking is False:
-                self.object_size['signal']("set_size", self.detections['box'].copy())
-                self.detections[['id_label', 'confidence', 'diameter', 'area',
-                                 'volume']].to_csv(self.out_dir / "cell_data.csv",
-                                                   sep=';', index=False)
+        if tracking is False:
+            self.object_size['signal']("set_size", self.detections['box'].copy())
+            self.detections[['id_label', 'confidence', 'diameter', 'area', 'volume']].to_csv(
+                self.out_dir / "cell_data.csv",
+                sep=';',
+                index=False
+            )
 
         detections = self.detections[self.detections['confidence'] >= min_score]
         if tracking is False:
             self.object_size['signal']("set_size", self.detections['box'].copy())
         original_image = self.original_image.copy()
-        # if tracking is False:
-        #     filtered_detections = filter_detections(detections,
-        #                                             min_size = self.object_size['min_size'],
-        #                                             max_size= self.object_size['max_size'])
-        # else:
-        #     filtered_detections = detections
 
         filtered_detections = detections
 
         self.prediction_image = None
         if plot is True:
-            self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
-                            filename=filename, colormap=colormap, alpha=self.object_size.get("alpha", 0.75))
+            self.prediction_image = plot_predictions(
+                original_image,
+                filtered_detections['mask'].tolist(),
+                filename=filename,
+                colormap=colormap,
+                alpha=self.object_size.get("alpha", 0.75)
+            )
         return filtered_detections
 
-    def count_x10(self, input_image: str, colormap="tab20",
-              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.01,
-              alpha=0.75, **kwargs):
+    def count_x10(
+        self,
+        input_image: str,
+        colormap="tab20",
+        filename=IMAGE_FILE_NAME_DETECTION,
+        min_score=0.01,
+        alpha=0.75,
+        **kwargs
+    ):
         try:
             os.remove(filename)
         except FileNotFoundError:
@@ -126,12 +159,14 @@ class YoloSegmenter(BaseModel):
 
         original_image = self.original_image.copy()
 
-        # filtered_detections = filter_detections(detections,
-        #                                         min_size = self.object_size['min_size'],
-        #                                         max_size= self.object_size['max_size'])
         filtered_detections = detections
         
         self.prediction_image = None
-        self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
-                         filename=filename, colormap=colormap, alpha=alpha)
+        self.prediction_image = plot_predictions(
+            original_image,
+            filtered_detections['mask'].tolist(),
+            filename=filename,
+            colormap=colormap,
+            alpha=alpha
+        )
         return filtered_detections
