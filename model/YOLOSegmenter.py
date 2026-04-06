@@ -21,7 +21,7 @@ from model.sahi.predict import get_sliced_prediction
 from model.sahi.utils.cv import read_image
 from model.utils import *
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
-
+from UI.app_globals import set_global
 
 class YoloSegmenter(BaseModel):
     def init_x20_model(self, path_to_model: str):
@@ -96,6 +96,7 @@ class YoloSegmenter(BaseModel):
 
         self.prediction_image = None
         if plot is True:
+            set_global('image_inference', original_image)
             self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                             filename=filename, colormap=colormap, alpha=self.object_size.get("alpha", 0.75))
         return filtered_detections
@@ -131,6 +132,7 @@ class YoloSegmenter(BaseModel):
         #                                         max_size= self.object_size['max_size'])
         filtered_detections = detections
         
+        set_global('image_inference', original_image)
         self.prediction_image = None
         self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
                          filename=filename, colormap=colormap, alpha=alpha)
