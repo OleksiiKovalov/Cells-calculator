@@ -2,6 +2,7 @@
 import json
 import os
 from typing import Optional, List, Tuple, Dict, Any
+from collections import OrderedDict
 
 # Third-party imports
 import cv2  # OpenCV for findContours

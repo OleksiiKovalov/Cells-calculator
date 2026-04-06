@@ -3,6 +3,7 @@ import json
 import os
 import traceback
 from typing import List, Dict, Any
+from collections import OrderedDict
 
 # Third-party imports
 import cv2  # OpenCV for findContours
@@ -26,7 +27,6 @@ from model.utils import (
     safegray2rgb, 
     safeimagesave, 
     safe_image_read, 
-    OrderedDict
 )
 from UI.app_globals import (
     IMAGE_FILE_NAME_DETECTION, 
