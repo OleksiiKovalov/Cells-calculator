@@ -5,32 +5,29 @@ import math
 import os
 import shutil
 import sys
+from collections import OrderedDict
 
 # Third-party imports
 import cv2
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import torch
 import tiffile
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-
-# Scientific computing imports
-from collections import OrderedDict
+import torch
 from csbdeep.utils import normalize
+from PyQt5.QtWidgets import QMessageBox
 from skimage.color import gray2rgb, rgb2gray
 from skimage.io import imsave
 from skimage.transform import resize
 from ultralytics.engine.results import Results
 
-# Third-party imports
-from PyQt5.QtWidgets import QMessageBox
-
+# Local application imports
 from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION, 
-    IMAGE_FILE_NAME_GRID, 
-    IMAGE_FILE_NAME_INGFERENCE, 
-    IMAGE_FILE_NAME_TMP, 
+    IMAGE_FILE_NAME_DETECTION,
+    IMAGE_FILE_NAME_GRID,
+    IMAGE_FILE_NAME_INGFERENCE,
+    IMAGE_FILE_NAME_TMP,
     CASH_DIRECTORY
 )
 
@@ -232,9 +229,9 @@ def calculate_lsm(cell_counter, nuclei_counter,
         os.remove(tmp_path)
     except FileNotFoundError:
         pass
-    nuclei_count = nuclei_counter.countNuclei(img[:,:,nuclei_channel])
-    percentage = (1 - nuclei_count/cell_count.shape[0]) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage,3)}
+    nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
+    percentage = (1 - nuclei_count / cell_count.shape[0]) * 100
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage, 3)}
 
 
 
@@ -257,7 +254,12 @@ def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_
     else:
         cv2.circle(img, (x, y), 2, color, -1)
 
-def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512, 512)) -> pd.DataFrame:
+def filter_detections(
+    detections: pd.DataFrame, 
+    min_size: float = 0.0, 
+    max_size: float = 1.0, 
+    img_size: tuple = (512, 512)
+) -> pd.DataFrame:
     """
     [DEPRECATED] Filters bounding boxes based on their area.
     No longer used - new inference pipeline implemented.
@@ -279,7 +281,7 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
     return filtered_detections
 
-def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
+def results_to_pandas(outputs: Results, store_bin_mask: bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
     if not store_bin_mask:
         data = {
@@ -403,10 +405,10 @@ def compute_iou(masks_1: list, masks_2: list) -> np.array:
             mask_2_morphologies.append(morphology)
             intersection = np.sum(mask1 * mask2)
             union = np.sum(np.clip(mask1 + mask2, 0, 1))
-            iou_matrix[i,j] = intersection / union
+            iou_matrix[i, j] = intersection / union
     return iou_matrix, mask_2_morphologies
 
-def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
+def plot_mask(in_mask: np.array, image_size=(1000, 1000)) -> np.array:
     """
     Plots given mask on a 1000x1000 canvas for its further processing.
     This util is used as a helper for compute_iou() function above.
@@ -422,7 +424,7 @@ def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
     the foreground (the polygon for the given mask).
     """
     if in_mask.max() > 1.0:
-        in_mask = in_mask /  np.array([image_size[1], image_size[0]])
+        in_mask = in_mask / np.array([image_size[1], image_size[0]])
     coords = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
     coords = coords.astype(np.int32)
     bin_mask = np.zeros(image_size, dtype=np.uint8)
@@ -471,7 +473,7 @@ def denormalize_coordinates(coords, image_shape):
     return coords * np.array([image_shape[1], image_shape[0]])
 
 def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=.75, colormap="tab20"):
+                     alpha=0.75, colormap="tab20"):
     """Draws predicted masks on the image."""
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
     if not pred_masks:
@@ -506,7 +508,14 @@ def calculate_morphology(bin_mask: np.array) -> dict:
     volume = (4/3) * np.pi * radius**3
     return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
 
-def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX, total_images=None) -> np.ndarray:
+def create_image_grid(
+    images, 
+    labels, 
+    label_font_scale=0.5, 
+    label_thickness=1, 
+    font=cv2.FONT_HERSHEY_SIMPLEX, 
+    total_images=None
+) -> np.ndarray:
     """Create a grid of images with labels."""
     # Resize all images to the same dimensions
     height, width = (next((img for img in images if img is not None), None)).shape[:2]
@@ -585,7 +594,13 @@ def process_loaded_image(image, settings: OrderedDict):
                 scale = min(target_width / orig_width, target_height / orig_height)
                 resized_width = int(orig_width * scale)
                 resized_height = int(orig_height * scale)
-                image = resize(image, output_shape=(resized_height,resized_width), order=0, preserve_range=True, anti_aliasing=False).astype(image.dtype)
+                image = resize(
+                    image, 
+                    output_shape=(resized_height,resized_width), 
+                    order=0, 
+                    preserve_range=True, 
+                    anti_aliasing=False
+                    ).astype(image.dtype)
 
             case "resizeandpad":
                 target_width, target_height = map(int, value.strip().split(":"))
