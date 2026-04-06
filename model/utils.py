@@ -291,6 +291,35 @@ def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size:
     # filtered_detections = filtered_detections[filtered_detections['box'].apply(lambda b: (min_size <= b[2] * b[3] / img_sq <= max_size).item())]
     return filtered_detections
 
+def filter_segmentation_detections(
+    detections: pd.DataFrame,
+    min_size: float = 0.0,
+    max_size: float = 1.0,
+    size_metric: str = "area"
+) -> pd.DataFrame:
+    """
+    Filters segmentation detections using morphology-based metrics.
+    
+    Supported metrics:
+    - area: relative object area / image area
+    - diameter: relative object diameter / sqrt(image area)
+    - volume: relative object volume / image volume surrogate
+    """
+    if detections is None or detections.empty:
+        return detections
+
+    metric = size_metric if size_metric in detections.columns else "area"
+
+    min_size = 0.0 if min_size is None else float(min_size)
+    max_size = 1.0 if max_size is None else float(max_size)
+
+    if min_size > max_size:
+        min_size, max_size = max_size, min_size
+
+    values = pd.to_numeric(detections[metric], errors="coerce")
+    keep = values.notna() & (values >= min_size) & (values <= max_size)
+    return detections.loc[keep].copy()
+
 def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
     if store_bin_mask is False:
@@ -420,8 +449,9 @@ def compute_iou(masks_1: list, masks_2: list) -> np.array:
 
 def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
     """
-    Plots given mask on a 1000x1000 canvas for its further processing.
-    This util is used as a helper for compute_iou() function above.
+    Rasterizes a polygon mask safely and calculates morphology.
+    Handles normalized and denormalized coordinates.
+    Guards against degenerate contours and out-of-bounds points.
 
     Input params:
     - in_mask: np.array - np.array of contour points in ultralytics.engine.Results.Masks.xyn format;
@@ -433,11 +463,29 @@ def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
     - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
     the foreground (the polygon for the given mask).
     """
-    if in_mask.max() > 1.0:
-        in_mask = in_mask /  np.array([image_size[1], image_size[0]])
-    coords = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
-    coords = coords.astype(np.int32)
     bin_mask = np.zeros(image_size, dtype=np.uint8)
+    if in_mask is None:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
+    coords = np.asarray(in_mask, dtype=np.float32).reshape(-1, 2)
+
+    if coords.shape[0] < 3:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
+    if coords.max() > 1.0:
+        coords = coords / np.array([image_size[1], image_size[0]], dtype=np.float32)
+
+    coords = coords * np.array([image_size[1], image_size[0]], dtype=np.float32)
+
+    coords[:, 0] = np.clip(coords[:, 0], 0, image_size[1] - 1)
+    coords[:, 1] = np.clip(coords[:, 1], 0, image_size[0] - 1)
+
+    coords = np.round(coords).astype(np.int32)
+
+    coords = np.unique(coords, axis=0)
+    if coords.shape[0] < 3:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
     cv2.fillPoly(bin_mask, [coords], 1)
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
@@ -495,7 +543,7 @@ def denormalize_coordinates(coords, image_shape):
     return coords * np.array([image_shape[1], image_shape[0]])
 
 def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=.75, colormap="tab20"):
+                     alpha=.75, colormap="tab20", color_ids=None):
     """Draws predicted masks on the image."""
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
     if not pred_masks:
@@ -503,11 +551,18 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
         return
     overlay = image.copy()
     for i, mask in enumerate(pred_masks):
-        coords = np.array(mask)
-        color = hex_colors[i % len(hex_colors)]
+        coords = np.asarray(mask, dtype=np.float32).reshape(-1, 2)
+        if coords.shape[0] < 3:
+            continue
+        color_index = i if color_ids is None else int(color_ids[i])
+        color = hex_colors[color_index % len(hex_colors)]
         if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
             coords = denormalize_coordinates(coords, image.shape)
-        coords = coords.astype(int)
+        coords[:, 0] = np.clip(coords[:, 0], 0, image.shape[1] - 1)
+        coords[:, 1] = np.clip(coords[:, 1], 0, image.shape[0] - 1)
+        coords = np.round(coords).astype(np.int32)
+        if len(np.unique(coords, axis=0)) < 3:
+            continue
         cv2.fillPoly(overlay, [coords], color)
     cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
     safe_image_write(image, filename)

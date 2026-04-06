@@ -117,16 +117,55 @@ class InstansegSegmenter(BaseModel):
                                                    sep=';', index=False)
             original_image = self.original_image.copy()
             #todo restore tracking feature
-            # if tracking is False:
-            #     filtered_detections = filter_detections(detections,
-            #                                             min_size = self.object_size['min_size'],
-            #                                             max_size= self.object_size['max_size'])
-            # else:
-            #     filtered_detections = detections
+            if tracking is False:
+                signal_fn = self.object_size.get('signal')
+                if callable(signal_fn):
+                    signal_fn("set_size", self.detections.copy())
+                
+                raw_min_size = self.object_size.get('min_size', 0.0)
+                raw_max_size = self.object_size.get('max_size', 1.0)
+                size_metric = self.object_size.get('size_metric', 'area')
 
-            filtered_detections = detections
+                raw_min_size = float(raw_min_size)
+                raw_max_size = float(raw_max_size)
 
-            set_global('detections', detections)
+                # Convert percent-like UI values for normalized metrics
+                if size_metric in ('area', 'diameter', 'volume'):
+                    if raw_min_size > 1.0:
+                        raw_min_size = raw_min_size / 100.0
+                    if raw_max_size > 1.0:
+                        raw_max_size = raw_max_size / 100.0
+
+                min_size = min(raw_min_size, raw_max_size)
+                max_size = max(raw_min_size, raw_max_size)
+
+                print(
+                    f"Instanseg detections before size filtering: {len(detections)} "
+                    f"Raw object_size values: min={self.object_size.get('min_size')}, "
+                    f"max={self.object_size.get('max_size')}, metric={self.object_size.get('size_metric', 'area')}"
+                )
+
+                filtered_detections = filter_segmentation_detections(detections,
+                                                        min_size=min_size,
+                                                        max_size=max_size,
+                                                        size_metric=size_metric)
+
+                print(
+                    f"InstanSeg detections after size filter: {len(filtered_detections)} "
+                    f"(min_size={min_size}, max_size={max_size}, metric={size_metric})"
+                )
+
+                filtered_detections[['id_label', 'confidence', 'diameter', 'area', 'volume']].to_csv(
+                    self.out_dir / f"{os.path.basename(self.original_image_path)}_{self.model_name}_cell_data.csv",
+                    sep=';',
+                    index=False
+                )
+            else:
+                filtered_detections = detections.copy()
+
+            #filtered_detections = detections
+
+            set_global('detections', filtered_detections)
             set_global('image_inference', img_inference)
             set_global('image_original', original_image)
             set_global('image_detections', None)
@@ -140,7 +179,7 @@ class InstansegSegmenter(BaseModel):
                 if h!=o_h or w!=o_w:
                     original_image = resize_and_pad_cv (original_image, w, h)
                 self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(), filename=filename, colormap=colormap
-                                                         , alpha=self.object_size.get("alpha", 0.75))
+                                                         , alpha=self.object_size.get("alpha", 0.75), color_ids=filtered_detections['id_label'].tolist())
 
             return filtered_detections
         except Exception as e:
@@ -152,9 +191,41 @@ class InstansegSegmenter(BaseModel):
               alpha=0.75, **kwargs):
         return self.count_x20(input_image, plot = True, colormap=colormap, tracking=False,
               filename=filename, min_score=min_score,       alpha=alpha, store_bin_mask=False,x10=True, **kwargs)
-    
+
+    def _extract_polygon_from_geometry(self, geometry):
+        geom = shape(geometry)
+
+        if geom.is_empty:
+            return None, None
+
+        if not geom.is_valid:
+            geom = geom.buffer(0)
+
+        if geom.is_empty:
+            return None, None
+
+        if geom.geom_type == "Polygon":
+            poly = geom
+        elif geom.geom_type == "MultiPolygon":
+            if len(geom.geoms) == 0:
+                return None, None
+            poly = max(geom.geoms, key=lambda g: g.area)
+        else:
+            return None, None
+
+        coords = np.asarray(poly.exterior.coords[:-1], dtype=np.float32)
+        if coords.shape[0] < 3:
+            return None, None
+
+        return poly, coords
+
     def instanseg_results_to_pandas(self, labeled_output) -> pd.DataFrame:
-        instanseg_objects = labels_to_features(labeled_output[:,0,:].numpy())
+        if torch.is_tensor(labeled_output):
+            label_map_np = labeled_output[:, 0, :].detach().cpu().numpy()
+        else:
+            label_map_np = labeled_output[:, 0, :]
+        h, w = labeled_output.shape[-2], labeled_output.shape[-1]
+        instanseg_objects = labels_to_features(label_map_np)
         data = {
             "id_label": [],
             "box": [],
@@ -169,24 +240,26 @@ class InstansegSegmenter(BaseModel):
         minx, miny, maxx, maxy = None, None, None, None
         for i, feature in enumerate(features):
             geom = shape(feature['geometry'])  # Convert to shapely geometry
-            bounds = geom.bounds  # (minx, miny, maxx, maxy)
-            if minx is None:
-                minx, miny, maxx, maxy = bounds
-            else:
-                minx = min(minx, bounds[0])
-                miny = min(miny, bounds[1])
-                maxx = max(maxx, bounds[2])
-                maxy = max(maxy, bounds[3])
-                
-            p_mask = feature['geometry']['coordinates'][0]
+            poly, p_mask = self._extract_polygon_from_geometry(geom)
+            if poly is None:
+                continue
+            bounds = poly.bounds  # (minx, miny, maxx, maxy)
+            minx, miny, maxx, maxy = bounds
+            box = np.array([
+                minx / w,
+                miny / h,
+                (maxx - minx) / w,
+                (maxy - miny) / h
+            ], dtype=np.float32)
+            norm_mask = p_mask / np.array([w, h], dtype=np.float32)
+
             data['id_label'].append(i)
-            box = [minx, miny, maxx, maxy] 
             data['box'].append(box)
             data['mask'].append(p_mask)
             #todo restore confidence
-            data['confidence'].append(1 #outputs.boxes.conf[i].cpu().detach().numpy()
+            data['confidence'].append(1.0 #outputs.boxes.conf[i].cpu().detach().numpy()
             )
-            bin_mask, morphology = plot_mask(np.array(p_mask), image_size=(labeled_output.shape[2],labeled_output.shape[3]))
+            bin_mask, morphology = plot_mask(norm_mask, image_size=(h, w))
             data['diameter'].append(morphology['diameter'])
             data['area'].append(morphology['area'])
             data['volume'].append(morphology['volume'])
