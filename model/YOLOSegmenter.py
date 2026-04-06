@@ -16,9 +16,9 @@ from ultralytics import YOLO
 # Local application imports
 from UI.app_globals import register_model
 from model.BaseModel import BaseModel
-from model.sahi.auto_model import AutoDetectionModel
-from model.sahi.predict import get_sliced_prediction
-from model.sahi.utils.cv import read_image
+from sahi.auto_model import AutoDetectionModel
+from sahi.predict import get_sliced_prediction
+from sahi.utils.cv import read_image
 from model.utils import *
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
 
