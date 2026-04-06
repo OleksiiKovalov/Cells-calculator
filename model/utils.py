@@ -26,13 +26,32 @@ from ultralytics.engine.results import Results
 # Third-party imports
 from PyQt5.QtWidgets import QMessageBox
 
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP, CASH_DIRECTORY
+from UI.app_globals import (
+    IMAGE_FILE_NAME_DETECTION, 
+    IMAGE_FILE_NAME_GRID, 
+    IMAGE_FILE_NAME_INGFERENCE, 
+    IMAGE_FILE_NAME_TMP, 
+    CASH_DIRECTORY
+)
 
 
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'bmp', 'lsm']
 CLASSES = ['Cell']
-COLORS = [(3,177,252)]
+COLORS = [(3, 177, 252)]
+COLOR_NUMBER = {
+    "gist_rainbow": 20,
+    "tab20": 20,
+    "tab20b": 20,
+    "tab20c": 20,
+    "tab10": 10,
+    "Set1": 9,
+    "Set2": 8,
+    "Set3": 12,
+    "Paired": 12,
+    "viridis": 10,
+    "plasma": 10
+}
 
 
 def safe_image_read(img_path, color_mode='color', channel=None):
@@ -55,16 +74,14 @@ def safe_image_read(img_path, color_mode='color', channel=None):
         extension = img_path.split('.')[-1].lower()
         
         if extension == 'lsm':
-            # Handle LSM files with tifffile
-            import tifffile
-            with tifffile.TiffFile(img_path) as tif:
+            # Handle LSM files with tiffile
+            with tiffile.TiffFile(img_path) as tif:
                 image = tif.pages[0].asarray()
                 if channel is not None and len(image.shape) > 2:
                     if channel < image.shape[0]:
                         return image[channel]
-                    else:
-                        print(f"Channel {channel} not available in LSM file")
-                        return None
+                    print(f"Channel {channel} not available in LSM file")
+                    return None
                 return image
         else:
             # Handle standard image formats
@@ -151,37 +168,21 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
         print(f"Error saving image {filename}: {str(e)}")
         return False
 
-COLOR_NUMBER = {
-        "gist_rainbow": 20,
-        "tab20": 20,
-        "tab20b": 20,
-        "tab20c": 20,
-        "tab10": 10,
-        "Set1": 9,
-        "Set2": 8,
-        "Set3": 12,
-        "Paired": 12,
-        "viridis": 10,
-        "plasma": 10
-    }
-
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
     with tiffile.TiffFile(img_path) as tif:
         image = tif.pages[0].asarray()
-    if np.transpose(image, (1, 2, 0)).shape[-1] == 1:
-        return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_GRAY2RGB)
-    elif np.transpose(image, (1, 2, 0)).shape[-1] == 2:
-        img = np.transpose(image, (1, 2, 0))
-        stacked_array = np.dstack((img, np.zeros((512,512)).astype('uint8')))
+    img = np.transpose(image, (1, 2, 0))
+    if img.shape[-1] == 1:
+        return cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    if img.shape[-1] == 2:
+        stacked_array = np.dstack((img, np.zeros((512, 512), dtype='uint8')))
         return stacked_array
-    elif np.transpose(image, (1, 2, 0)).shape[-1] == 3:
-        return np.transpose(image, (1, 2, 0))
-    else:
-        img = np.transpose(image, (1, 2, 0))
-        stacked_array = np.dstack((img[cell_channel], img[nuclei_channel],
-                                   np.zeros((512,512)).astype('uint8')))
-        return stacked_array
+    if img.shape[-1] == 3:
+        return img
+    stacked_array = np.dstack((img[cell_channel], img[nuclei_channel],
+                               np.zeros((512, 512), dtype='uint8')))
+    return stacked_array
 
 def read_standard_img(img_path):
     """Reads image in grayscale jpg/png/tif/bmp which contains cells only."""
@@ -198,10 +199,7 @@ def read_standard_img(img_path):
 
 def is_image_valid(img_path: str):
     """Checks if provided image is in correct format."""
-    extension = img_path.split('.')[-1]
-    if extension.lower() in VALID_IMAGE_EXTENSIONS:
-        return True
-    return False
+    return img_path.split('.')[-1].lower() in VALID_IMAGE_EXTENSIONS
 
 def read_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads any possible image of cells (and/or nuclei)."""
@@ -242,58 +240,48 @@ def calculate_lsm(cell_counter, nuclei_counter,
 
 def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
     """
-    Draws bounding boxes on the input image based on the provided arguments.
+    Draws bounding boxes on the input image.
 
     Args:
         img (numpy.ndarray): The input image to draw the bounding box on.
-        # img_path (str): The path to input image to draw the bounding box on.
-        # class_id (int): Class ID of the detected object.
-        # confidence (float): Confidence score of the detected object.
         x (int): X-coordinate of the top-left corner of the bounding box.
         y (int): Y-coordinate of the top-left corner of the bounding box.
         x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
         y_plus_h (int): Y-coordinate of the bottom-right corner of the bounding box.
+        draw_mode (int): 0 for rectangle, other for circle.
     """
     color = COLORS[0]
-    if img.shape[0] < 800:
-        thickness = 1
-    else:
-        thickness = 2
+    thickness = 1 if img.shape[0] < 800 else 2
     if draw_mode == 0:
         cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
     else:
-        img = cv2.circle(img, (x, y), 2, color, -1)
+        cv2.circle(img, (x, y), 2, color, -1)
 
-def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512,512)) -> pd.DataFrame:
-    # NOTE: this function is deprecatedand no longer used, since we have implemented new inference pipeline
+def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512, 512)) -> pd.DataFrame:
     """
-    Filters bounding boxes based on their area.
+    [DEPRECATED] Filters bounding boxes based on their area.
+    No longer used - new inference pipeline implemented.
+    
     Bboxes of size < min_size or > max_size are removed.
     Area is measured in % of image size (between 0.0 and 1.0).
-    This filtering function is implemented in October, 2024, to reduce the amount of garbage detected as cells.
 
-    Input args:
-    - detections: pd.DataFrame of detections, including bboxes in [x1, y1, w, h] format, where x1, y1 - lower-left corner coordinates;
-    - min_size: float representing the minimal possible size of bbox;
-    - max_size: float representing the maximal possible size of bbox;
-    - img_size: tuple of size 2 representing width and height of image.
+    Args:
+    - detections: pd.DataFrame of detections with bboxes in [x1, y1, w, h] format
+    - min_size: minimal possible size of bbox
+    - max_size: maximal possible size of bbox
+    - img_size: tuple (width, height) of image
 
-    Returns np.array of filtered bboxes.
+    Returns pd.DataFrame of filtered detections.
     """
-    # assert(min_size <= max_size)
     if detections.empty:
         return detections
     img_sq = img_size[0] * img_size[1]
-    # print(type(detections['box']))
-    # print(detections.head())
-    # print(detections['box'].head())
     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
-    # filtered_detections = filtered_detections[filtered_detections['box'].apply(lambda b: (min_size <= b[2] * b[3] / img_sq <= max_size).item())]
     return filtered_detections
 
 def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
-    if store_bin_mask is False:
+    if not store_bin_mask:
         data = {
             "id_label": [],
             "box": [],
@@ -366,8 +354,8 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
                 data['diameter'].append(morphology['diameter'])
                 data['area'].append(morphology['area'])
                 data['volume'].append(morphology['volume'])
-    except:
-        print("Something wrong happenned...")
+    except Exception as e:
+        print(f"SAHI conversion failed: {e}")
     return pd.DataFrame(data)
 
 def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
@@ -451,19 +439,7 @@ def colormap_to_hex(cmap_name):
     Returns:
         List[str]: List of HEX color strings.
     """
-    color_number = {
-        "gist_rainbow": 20,
-        "tab20": 20,
-        "tab20b": 20,
-        "tab20c": 20,
-        "tab10": 10,
-        "Set1": 9,
-        "Set2": 8,
-        "Set3": 12,
-        "Paired": 12,
-        "viridis": 10,
-        "plasma": 10
-    }
+    color_number = COLOR_NUMBER
     assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
     num_colors = color_number[cmap_name]
     # Get the colormap object
@@ -530,13 +506,10 @@ def calculate_morphology(bin_mask: np.array) -> dict:
     volume = (4/3) * np.pi * radius**3
     return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
 
-def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX, total_images = None) -> np.ndarray:
-    # if any(img is None for img in images):
-    #     raise ValueError("One or more images could not be loaded.")
-    
+def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX, total_images=None) -> np.ndarray:
+    """Create a grid of images with labels."""
     # Resize all images to the same dimensions
-    #height, width = [img is not None for img in images][0].shape[:2]
-    height, width =  (next((img for img in images if img is not None), None)).shape[:2]
+    height, width = (next((img for img in images if img is not None), None)).shape[:2]
     images = [cv2.resize(img, (width, height)) for img in images]
     
     # Annotate each image with filename
@@ -571,14 +544,13 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
     grid_image = np.vstack(grid_rows)
     return grid_image            
 
-def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
+def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
     """Resize image keeping aspect ratio and pad to target size."""
     h, w = image.shape[:2]
     scale = min(target_width / w, target_height / h)
     new_w, new_h = int(w * scale), int(h * scale)
 
     resized = resize(image, (new_h, new_w), anti_aliasing=anti_aliasing, preserve_range=True)
-    #resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
     resized = resized.astype(image.dtype)
     
     top = (target_height - new_h) // 2
@@ -586,9 +558,7 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
     left = (target_width - new_w) // 2
     right = target_width - new_w - left
 
-#    padded = cv2.copyMakeBorder(resized, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
-
-    # Assuming image shape: (height, width, channels) or (height, width)
+    # Calculate padding for numpy
     pad_width = (
         (top, bottom),     # pad rows (height)
         (left, right),     # pad columns (width)
@@ -604,8 +574,8 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
     return padded
 
 
-def process_loaded_image(image, settings:OrderedDict):
-    set = settings
+def process_loaded_image(image, settings: OrderedDict):
+    """Apply a sequence of image processing operations based on settings."""
     for step in settings:
         key, value = next(iter(step.items()))    
         match key:
@@ -635,19 +605,22 @@ def process_loaded_image(image, settings:OrderedDict):
     return image
 
 def safegray2rgb(image):
+    """Convert grayscale to RGB if needed."""
     if image.ndim == 2:
         return gray2rgb(image)
-    else:
-        return image
+    return image
+
 
 def safergb2gray(image):
+    """Convert RGB to grayscale if needed."""
     if image.ndim == 3:
         image = rgb2gray(image)
         return (image * 255).astype("uint8")
-    else:
-        return image
+    return image
+
 
 def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.5):
+    """Calculate F1, precision, recall, TP, FP, FN metrics from matches."""
     tp = sum(1 for (_, _, iou) in matches if iou >= iou_threshold)
     fp = num_candidate - tp
     fn = num_ground - tp
@@ -664,10 +637,6 @@ def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.
         'Recall': recall,
         'F1': f1
     }
-    
-def safeimagesave(image, filename):
-    """Legacy wrapper for backward compatibility - use safe_image_write instead."""
-    return safe_image_write(image, filename, preserve_dtype=False)
       
 def clear_cache():
     cache_dir = CASH_DIRECTORY

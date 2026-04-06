@@ -24,7 +24,7 @@ from model.utils import (
     process_loaded_image,
     resize_and_pad_cv, 
     safegray2rgb, 
-    safeimagesave
+    safe_image_write
 )
 
 
@@ -122,7 +122,7 @@ class InstansegSegmenter(BaseModel):
             image=image,
             settings=image_preprocess_settings
         )
-        safeimagesave(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
         self.original_image = safegray2rgb(image)
 
         try:

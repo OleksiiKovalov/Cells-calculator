@@ -14,13 +14,9 @@ import pandas as pd
 # Local application imports
 from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE, set_global
 from model.BaseModel import BaseModel
-from model.utils import (
-    draw_bounding_box,
-    filter_detections,
-    safe_image_read,
-    safe_image_write,
-    safeimagesave,
-)
+from model.utils import safe_image_read, safe_image_write # змінено, раніше була функція safe_image_save
+from model.utils import draw_bounding_box, filter_detections
+from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
 
 
 CLASSES = ["Cell"]
@@ -94,7 +90,7 @@ class CellCounter(BaseModel):
             self.model.setInput(blob)
 
             set_global("image_inference", image)
-            safeimagesave(image, IMAGE_FILE_NAME_INGFERENCE)
+            safe_image_write(image, IMAGE_FILE_NAME_INGFERENCE)
 
             # Perform inference
             outputs = self.model.forward()
