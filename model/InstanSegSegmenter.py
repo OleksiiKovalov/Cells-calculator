@@ -166,8 +166,8 @@ class InstansegSegmenter(BaseModel):
             #filtered_detections = detections
 
             set_global('detections', filtered_detections)
-            set_global('image_inference', img_inference)
-            set_global('image_original', original_image)
+            set_global('image_inference', img_inference.copy())
+            set_global('image_original', original_image.copy())
             set_global('image_detections', None)
             self.prediction_image = None
 
@@ -176,9 +176,11 @@ class InstansegSegmenter(BaseModel):
                 o_h, o_w = original_image.shape[:2]
                 #if image was scaled during preprocessing - scale the original image to show. it is a wrong way
                 #todo: redo it in the correct way - we need to scale box/mask, not image
+                display_base = original_image.copy()
                 if h!=o_h or w!=o_w:
-                    original_image = resize_and_pad_cv (original_image, w, h)
-                self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(), filename=filename, colormap=colormap
+                    display_base = resize_and_pad_cv (display_base, w, h)
+                set_global('image_display_base', display_base.copy())
+                self.prediction_image = plot_predictions(display_base.copy(), filtered_detections['mask'].tolist(), filename=filename, colormap=colormap
                                                          , alpha=self.object_size.get("alpha", 0.75), color_ids=filtered_detections['id_label'].tolist())
 
             return filtered_detections

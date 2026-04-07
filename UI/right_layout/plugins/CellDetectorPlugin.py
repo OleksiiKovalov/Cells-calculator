@@ -894,8 +894,9 @@ class CellDetectorPlugin(BasePlugin):
 
         # Check if filtered_detections has 'mask' key and is valid
         if filtered_detections is not None and 'mask' in filtered_detections and filtered_detections['mask'] is not None:
+            base_image = get_global('image_display_base')
             plot_predictions(
-                get_global('image_inference'), 
+                base_image.copy(),
                 filtered_detections['mask'].tolist(), 
                 filename=IMAGE_FILE_NAME_DETECTION, 
                 colormap=self.object_size["color_map"], 
