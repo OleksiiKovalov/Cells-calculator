@@ -180,6 +180,7 @@ class InstansegSegmenter(BaseModel):
                 if h!=o_h or w!=o_w:
                     display_base = resize_and_pad_cv (display_base, w, h)
                 set_global('image_display_base', display_base.copy())
+                colormap = self.object_size.get("color_map")
                 self.prediction_image = plot_predictions(display_base.copy(), filtered_detections['mask'].tolist(), filename=filename, colormap=colormap
                                                          , alpha=self.object_size.get("alpha", 0.75), color_ids=filtered_detections['id_label'].tolist())
 
