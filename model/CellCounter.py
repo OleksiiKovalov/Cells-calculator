@@ -14,7 +14,7 @@ import pandas as pd
 # Local application imports
 from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE, set_global
 from model.BaseModel import BaseModel
-from model.utils import safe_image_read, safe_image_write # changed, before was safe_image_save
+from model.utils import safe_image_read, safe_image_write
 from model.utils import draw_bounding_box, filter_detections
 from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
 
@@ -50,7 +50,7 @@ class CellCounter(BaseModel):
 
 
     def count_x20(self, input_image, filename):
-        # # NOTE: this function is deprecated and no longer used,
+        # NOTE: this function is deprecated and no longer used,
         # because we have implemented ultralytics-based inference pipeline for simplicity
         """
         Main function to load ONNX model, perform inference, draw bounding boxes,

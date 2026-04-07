@@ -491,6 +491,29 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
     safe_image_write(image, filename)
     return image
 
+
+def plot_predictions_with_alignment(
+    original_image,
+    img_inference,
+    pred_masks,
+    filename: str = IMAGE_FILE_NAME_DETECTION,
+    colormap="tab20",
+    alpha=0.75,
+):
+    """Resize original image to inference dimensions if needed and plot masks."""
+    h, w = img_inference.shape[:2]
+    o_h, o_w = original_image.shape[:2]
+    if h != o_h or w != o_w:
+        original_image = resize_and_pad_cv(original_image, w, h)
+    return plot_predictions(
+        original_image,
+        pred_masks,
+        filename=filename,
+        colormap=colormap,
+        alpha=alpha,
+    )
+
+
 def calculate_morphology(bin_mask: np.array) -> dict:
     """
     Calculates the morphology for the given segmented object.
@@ -658,83 +681,6 @@ def clear_cache():
     if os.path.exists(cache_dir):
         shutil.rmtree(cache_dir,ignore_errors=True)
     os.makedirs(cache_dir, exist_ok=True)
-
-
-# ============================================================================
-# BEEP UTILITY FUNCTIONS
-# ============================================================================
-
-def beep_simple():
-    """Simple system beep (cross-platform)"""
-    try:
-        print('\a')  # ASCII bell character - works on most systems
-    except:
-        pass
-
-def beep_windows(sound_type="default"):
-    """Windows-specific beep sounds"""
-    try:
-        if sys.platform == "win32":
-            import winsound  # For Windows beep sounds
-            if sound_type == "error":
-                winsound.MessageBeep(winsound.MB_ICONHAND)
-            elif sound_type == "warning":
-                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
-            elif sound_type == "info":
-                winsound.MessageBeep(winsound.MB_ICONASTERISK)
-            elif sound_type == "question":
-                winsound.MessageBeep(winsound.MB_ICONQUESTION)
-            elif sound_type == "frequency":
-                # Custom frequency beep (frequency, duration_ms)
-                winsound.Beep(1000, 500)  # 1000Hz for 500ms
-            else:
-                winsound.MessageBeep()  # Default system beep
-        else:
-            beep_simple()  # Fallback for non-Windows
-    except ImportError:
-        print("winsound not available - using simple beep")
-        beep_simple()
-    except Exception as e:
-        print(f"Beep failed: {e}")
-        beep_simple()
-
-def beep_success():
-    """Success beep - pleasant sound"""
-    beep_windows("info")
-
-def beep_error():
-    """Error beep - attention-getting sound"""
-    beep_windows("error")
-
-def beep_warning():
-    """Warning beep - cautionary sound"""
-    beep_windows("warning")
-
-def beep_custom(frequency=800, duration=300):
-    """Custom frequency beep (Windows only)"""
-    try:
-        if sys.platform == "win32":
-            import winsound
-            winsound.Beep(frequency, duration)
-        else:
-            beep_simple()
-    except:
-        beep_simple()
-
-def beep_sequence(frequencies, duration=200, gap=100):
-    """Play a sequence of beeps with specified frequencies"""
-    try:
-        if sys.platform == "win32":
-            import time
-            import winsound
-            for freq in frequencies:
-                winsound.Beep(freq, duration)
-                if gap > 0:
-                    time.sleep(gap / 1000.0)  # Convert ms to seconds
-        else:
-            beep_simple()
-    except:
-        beep_simple()
 
 def show_error_message(title, message):
     """Show error message box to user"""
