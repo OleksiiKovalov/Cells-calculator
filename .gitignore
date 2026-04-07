@@ -35,3 +35,4 @@ app.log
 /packages
 /logs
 .DS_Store
+application_settings*.json
