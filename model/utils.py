@@ -483,7 +483,7 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
     for i, mask in enumerate(pred_masks):
         coords = np.array(mask)
         color = hex_colors[i % len(hex_colors)]
-        if coords.max() <= 1.0:  # checking if coordinates are normalized (xIn or xIm)
+        if coords.max() <= 1.0:  # checking if coordinates are denormalized (xIn or xIm)
             coords = denormalize_coordinates(coords, image.shape)
         coords = coords.astype(int)
         cv2.fillPoly(overlay, [coords], color)

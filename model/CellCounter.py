@@ -14,7 +14,7 @@ import pandas as pd
 # Local application imports
 from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE, set_global
 from model.BaseModel import BaseModel
-from model.utils import safe_image_read, safe_image_write # змінено, раніше була функція safe_image_save
+from model.utils import safe_image_read, safe_image_write # changed, before was safe_image_save
 from model.utils import draw_bounding_box, filter_detections
 from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
 
