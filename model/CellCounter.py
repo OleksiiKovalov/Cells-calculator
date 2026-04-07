@@ -110,9 +110,7 @@ class CellCounter(BaseModel):
             # and class IDs
             for i in range(rows):
                 classes_scores = outputs[0][i][4:]
-                (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(
-                    classes_scores
-                )
+                (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(classes_scores)
                 if maxScore >= 0.2:  # originally >= .25
                     box = [
                         outputs[0][i][0] - (0.5 * outputs[0][i][2]),
