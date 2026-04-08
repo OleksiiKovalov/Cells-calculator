@@ -26,7 +26,7 @@ from UI.app_globals import (
     IMAGE_FILE_NAME_INGFERENCE,
     IMAGE_FILE_NAME_TMP,
 )
-
+from UI.app_globals import set_global
 
 class YoloSegmenter(BaseModel):
     def init_x20_model(self, path_to_model: str):
@@ -118,6 +118,7 @@ class YoloSegmenter(BaseModel):
 
         self.prediction_image = None
         if plot is True:
+            set_global('image_inference', original_image)
             self.prediction_image = plot_predictions(
                 original_image,
                 filtered_detections['mask'].tolist(),
@@ -161,6 +162,7 @@ class YoloSegmenter(BaseModel):
 
         filtered_detections = detections
         
+        set_global('image_inference', original_image)
         self.prediction_image = None
         self.prediction_image = plot_predictions(
             original_image,
