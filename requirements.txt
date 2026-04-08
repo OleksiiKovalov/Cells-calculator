@@ -21,7 +21,7 @@ cellpose==4.0.3
 certifi==2025.4.26
 cffi==1.17.1
 charset-normalizer==3.4.2
-click==8.2.0
+click==8.2.1
 click-plugins==1.1.1
 cligj==0.7.2
 cloudpickle==3.1.1
@@ -125,6 +125,7 @@ requests==2.32.3
 rich==14.0.0
 roifile==2025.5.10
 s3fs==2025.3.2
+sahi==0.11.20
 scikit-image==0.25.2
 scikit-learn==1.5.2
 scipy==1.15.3
