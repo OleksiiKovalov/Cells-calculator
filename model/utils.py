@@ -492,28 +492,6 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
     return image
 
 
-def plot_predictions_with_alignment(
-    original_image,
-    img_inference,
-    pred_masks,
-    filename: str = IMAGE_FILE_NAME_DETECTION,
-    colormap="tab20",
-    alpha=0.75,
-):
-    """Resize original image to inference dimensions if needed and plot masks."""
-    h, w = img_inference.shape[:2]
-    o_h, o_w = original_image.shape[:2]
-    if h != o_h or w != o_w:
-        original_image = resize_and_pad_cv(original_image, w, h)
-    return plot_predictions(
-        original_image,
-        pred_masks,
-        filename=filename,
-        colormap=colormap,
-        alpha=alpha,
-    )
-
-
 def calculate_morphology(bin_mask: np.array) -> dict:
     """
     Calculates the morphology for the given segmented object.

@@ -25,7 +25,6 @@ from model.BaseModel import BaseModel
 from model.utils import (
     plot_mask,
     plot_predictions,
-    plot_predictions_with_alignment,
     process_loaded_image,
     resize_and_pad_cv,
     safe_image_read,
@@ -129,9 +128,16 @@ class CellposeSegmenter(BaseModel):
 
             self.prediction_image = None
             if plot:
-                self.prediction_image = plot_predictions_with_alignment(
+                h, w = img_inference.shape[:2]
+                o_h, o_w = original_image.shape[:2]
+                # if image was scaled during preprocessing - scale the original image to
+                # show. it is a wrong way
+                # todo: redo it in the correct way - we need to scale box/mask, not image
+                if h != o_h or w != o_w:
+                    original_image = resize_and_pad_cv(original_image, w, h)
+
+                self.prediction_image = plot_predictions(
                     original_image,
-                    img_inference,
                     filtered_detections["mask"].tolist(),
                     filename=filename,
                     colormap=colormap,
