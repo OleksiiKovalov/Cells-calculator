@@ -119,8 +119,13 @@ class YoloSegmenter(BaseModel):
         self.prediction_image = None
         if plot is True:
             set_global('image_inference', original_image)
-            self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
-                            filename=filename, colormap=colormap, alpha=self.object_size.get("alpha", 0.75))
+            self.prediction_image = plot_predictions(
+                original_image,
+                filtered_detections['mask'].tolist(),
+                filename=filename,
+                colormap=colormap,
+                alpha=self.object_size.get("alpha", 0.75)
+            )
         return filtered_detections
 
     def count_x10(
