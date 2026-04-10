@@ -36,3 +36,4 @@ app.log
 /logs
 .DS_Store
 application_settings*.json
+/.idea
