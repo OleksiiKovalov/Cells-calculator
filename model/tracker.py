@@ -7,6 +7,7 @@ This class differs a lot from an ordinary model, so we write it from scratch.
 import os
 import shutil
 from pathlib import Path
+from typing import Any, no_type_check
 
 # Third-party imports
 import cv2
@@ -30,6 +31,8 @@ class Tracker:
     The model implements tracking-by-detection approach and is built on top of
     a pre-trained YOLO11x instance segmentation model (defined as Segmenter class instance).
     """
+    results: dict[str, list[Any]]
+
     def __init__(self, path_to_model: str, size):
         self.path = path_to_model
         self.model = YoloSegmenter(path_to_model, size)
@@ -37,6 +40,7 @@ class Tracker:
         self.img_dir = self.output_dir / "frames"
         self.table_dir = self.output_dir / "tabular data"
 
+    @no_type_check
     def track(self, img_seq_folder: str, time_period: float = 15):
         """
         Tracks spheroid instances through the sequence of frames.

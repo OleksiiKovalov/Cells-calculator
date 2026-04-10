@@ -11,6 +11,8 @@ from collections import OrderedDict
 from pathlib import Path
 
 # Third-party imports
+import numpy as np
+import pandas as pd
 import torch
 
 # Local application imports
@@ -31,6 +33,9 @@ class BaseModel:
 
     Implements the necessary high-level functional utils for using the model.
     """
+    original_image: np.ndarray | None
+    detections: pd.DataFrame | None
+    image_preprocess_settings_default: object
 
     def __init__(self, path_to_model: str, object_size, model_data=None):
         """

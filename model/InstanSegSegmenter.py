@@ -3,6 +3,7 @@ import inspect
 import json
 import os
 from collections import OrderedDict
+from typing import Any
 
 # Third-party imports
 import cv2  # OpenCV for findContours
@@ -198,8 +199,8 @@ class InstansegSegmenter(BaseModel):
     def count_x10(
         self,
         input_image: str,
-        colormap='tab20',
         filename=IMAGE_FILE_NAME_DETECTION,
+        colormap='tab20',
         min_score=0.01,
         alpha=0.75,
         **kwargs,
@@ -219,7 +220,7 @@ class InstansegSegmenter(BaseModel):
 
     def instanseg_results_to_pandas(self, labeled_output) -> pd.DataFrame:
         instanseg_objects = labels_to_features(labeled_output[:, 0, :].numpy())
-        data = {
+        data: dict[str, list[Any]] = {
             'id_label': [],
             'box': [],
             'mask': [],
@@ -234,7 +235,7 @@ class InstansegSegmenter(BaseModel):
         for i, feature in enumerate(features):
             geom = shape(feature['geometry'])  # Convert to shapely geometry
             bounds = geom.bounds  # (minx, miny, maxx, maxy)
-            if minx is None:
+            if minx is None or miny is None or maxx is None or maxy is None:
                 minx, miny, maxx, maxy = bounds
             else:
                 minx = min(minx, bounds[0])

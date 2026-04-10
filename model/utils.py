@@ -4,14 +4,15 @@
 import math
 import os
 import shutil
-import sys
 from collections import OrderedDict
+from typing import Any
 
 # Third-party imports
 import cv2
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 import tiffile
 import torch
@@ -284,7 +285,7 @@ def filter_detections(
 def results_to_pandas(outputs: Results, store_bin_mask: bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
     if not store_bin_mask:
-        data = {
+        data: dict[str, list[Any]] = {
             "id_label": [],
             "box": [],
             "mask": [],
@@ -334,7 +335,7 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
     Returns:
     - pd.DataFrame of the standard form with the predictions in it.
     """
-    data = {
+    data: dict[str, list[Any]] = {
         "id_label": [],
         "box": [],
         "mask": [],
@@ -384,7 +385,7 @@ def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
                       masks=masks, probs=probs, keypoints=None, obb=None, speed=None)
     return results
 
-def compute_iou(masks_1: list, masks_2: list) -> np.array:
+def compute_iou(masks_1: list, masks_2: list) -> tuple[NDArray, list]:
     """
     Computes IoU matrix for 2 given sets of polygon masks.
     The function is used for spheroid tracjing.
@@ -408,7 +409,7 @@ def compute_iou(masks_1: list, masks_2: list) -> np.array:
             iou_matrix[i, j] = intersection / union
     return iou_matrix, mask_2_morphologies
 
-def plot_mask(in_mask: np.array, image_size=(1000, 1000)) -> np.array:
+def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]:
     """
     Plots given mask on a 1000x1000 canvas for its further processing.
     This util is used as a helper for compute_iou() function above.
@@ -425,10 +426,10 @@ def plot_mask(in_mask: np.array, image_size=(1000, 1000)) -> np.array:
     """
     if in_mask.max() > 1.0:
         in_mask = in_mask / np.array([image_size[1], image_size[0]])
-    coords = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
+    coords: NDArray = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
     coords = coords.astype(np.int32)
-    bin_mask = np.zeros(image_size, dtype=np.uint8)
-    cv2.fillPoly(bin_mask, [coords], 1)
+    bin_mask: NDArray[np.uint8] = np.zeros(image_size, dtype=np.uint8)
+    cv2.fillPoly(bin_mask, [coords], [1])
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
 
@@ -514,7 +515,7 @@ def plot_predictions_with_alignment(
     )
 
 
-def calculate_morphology(bin_mask: np.array) -> dict:
+def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     """
     Calculates the morphology for the given segmented object.
     The morphology includes: diameter, area, volume.
@@ -541,7 +542,7 @@ def create_image_grid(
 ) -> np.ndarray:
     """Create a grid of images with labels."""
     # Resize all images to the same dimensions
-    height, width = (next((img for img in images if img is not None), None)).shape[:2]
+    height, width = next(img for img in images if img is not None).shape[:2]
     images = [cv2.resize(img, (width, height)) for img in images]
     
     # Annotate each image with filename

@@ -131,8 +131,8 @@ class YoloSegmenter(BaseModel):
     def count_x10(
         self,
         input_image: str,
-        colormap="tab20",
         filename=IMAGE_FILE_NAME_DETECTION,
+        colormap="tab20",
         min_score=0.01,
         alpha=0.75,
         **kwargs
@@ -142,7 +142,7 @@ class YoloSegmenter(BaseModel):
         except FileNotFoundError:
             pass
         colormap = self.object_size['color_map']
-        if self.detections is None:
+        if self.detections is None or self.original_image is None:
             self.original_image = read_image(input_image)
             outputs = get_sliced_prediction(
                 input_image,
