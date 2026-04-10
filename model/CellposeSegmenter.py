@@ -145,8 +145,8 @@ class CellposeSegmenter(BaseModel):
     def count_x10(
         self,
         input_image: str,
-        colormap="tab20",
         filename=IMAGE_FILE_NAME_DETECTION,
+        colormap="tab20",
         min_score=0.01,
         alpha=0.75,
         **kwargs,
