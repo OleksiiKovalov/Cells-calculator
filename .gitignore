@@ -6,7 +6,6 @@
 /myenv
 /output
 *.lsm
-*.TIF
 *.ipynb
 *.npy
 *.exe
