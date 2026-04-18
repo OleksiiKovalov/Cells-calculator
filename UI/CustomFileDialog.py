@@ -21,6 +21,12 @@ class FileTableModel(QAbstractTableModel):
     """Custom table model for file listing with configurable columns"""
     
     def __init__(self, parent: Optional[Any] = None):
+        """
+        Initialize the file table model.
+        
+        Args:
+            parent: Parent object.
+        """
         super().__init__(parent)
         self.files = []
         self.current_dir = QDir.home()
@@ -203,6 +209,14 @@ class CustomFileDialog(QDialog):
     fileSelected = pyqtSignal(str)
     
     def __init__(self, parent: Optional[Any] = None, caption: str = "Select File", directory: Optional[Union[str, Path]] = None):
+        """
+        Initialize the custom file dialog.
+        
+        Args:
+            parent: Parent widget.
+            caption: Dialog window title.
+            directory: Initial directory to open.
+        """
         super().__init__(parent)
         self.setModal(True)
         self.setWindowTitle(caption)

@@ -114,7 +114,9 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str, object)
     def handle_menubar_action(self, action_name, value):
-        """Обрабатываем сигнал от menubar"""
+        """
+        Handle actions from the menubar.
+        """
         if action_name == "open_file":
             self.open_file(value)
         if action_name == "open_folder":
@@ -154,7 +156,7 @@ class MainWindow(QMainWindow):
         pass
 
     def init_value(self):
-        # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
+        # TODO: make parameters collect relative to the selected plugin
         # Initialize DataFrame to None
         
         self._update_progress(42, "Setting up object parameters...")
@@ -800,152 +802,6 @@ class MainWindow(QMainWindow):
         self.main_view.scale(self.zoom_factor, self.zoom_factor)
         self._update_zoom_status()
     
-    def _on_wheel_event(self, event):
-        """
-        Handle mouse wheel events for zooming with Ctrl key.
-        
-        Args:
-            event (QWheelEvent): The wheel event
-        """
-        # Check if Ctrl key is pressed
-        if event.modifiers() & Qt.ControlModifier:
-            # Get the wheel delta (positive for zoom in, negative for zoom out)
-            delta = event.angleDelta().y()
-            
-            if delta > 0:
-                self.zoom_in()
-            else:
-                self.zoom_out()
-                
-            # Accept the event to prevent scrolling
-            event.accept()
-        else:
-            # Call the default wheel event handler for normal scrolling
-            QGraphicsView.wheelEvent(self.main_view, event)
-    
-    def zoom_in(self):
-        """
-        Zoom in the image view.
-        """
-        if self.zoom_factor < self.max_zoom:
-            self.zoom_factor *= self.zoom_step
-            self._apply_zoom()
-    
-    def zoom_out(self):
-        """
-        Zoom out the image view.
-        """
-        if self.zoom_factor > self.min_zoom:
-            self.zoom_factor /= self.zoom_step
-            self._apply_zoom()
-    
-    def zoom_to_fit(self):
-        """
-        Reset zoom to fit the image in the view.
-        """
-        self.zoom_factor = 1.0
-        self.main_view.resetTransform()
-        
-        # If we have an image, rescale it to fit
-        if hasattr(self, 'original_image_pixmap') and self.original_image_pixmap:
-            view_rect = self.main_view.viewport().rect()
-            view_width = view_rect.width()
-            view_height = view_rect.height()
-            
-            scaled_pixmap = self._scale_pixmap_to_fit(
-                self.original_image_pixmap, view_width, view_height)
-            
-            if hasattr(self, 'current_pixmap_item') and self.current_pixmap_item:
-                self.current_pixmap_item.setPixmap(scaled_pixmap)
-                self._center_image_in_scene(scaled_pixmap, view_width, view_height)
-    
-    def _apply_zoom(self):
-        """
-        Apply the current zoom factor to the view.
-        """
-        # Reset transform and apply zoom
-        self.main_view.resetTransform()
-        self.main_view.scale(self.zoom_factor, self.zoom_factor)
-        
-        # Update status bar with zoom level
-        zoom_percentage = int(self.zoom_factor * 100)
-        if hasattr(self, 'status_processing'):
-            self.update_status(
-                message=f"Zoom: {zoom_percentage}%",
-                processing_status=f"Zoom: {zoom_percentage}%"
-            )
-    
-    def _on_mouse_press(self, event):
-        """
-        Handle mouse press events for panning.
-        
-        Args:
-            event (QMouseEvent): The mouse press event
-        """
-        if event.button() == Qt.LeftButton:
-            # Start panning mode
-            self.is_panning = True
-            self.last_pan_point = event.pos()
-            self.main_view.setCursor(Qt.ClosedHandCursor)
-            event.accept()
-        else:
-            # Call the default mouse press event handler
-            QGraphicsView.mousePressEvent(self.main_view, event)
-    
-    def _on_mouse_move(self, event):
-        """
-        Handle mouse move events for panning.
-        
-        Args:
-            event (QMouseEvent): The mouse move event
-        """
-        if self.is_panning and self.last_pan_point is not None:
-            # Calculate the delta movement
-            delta = event.pos() - self.last_pan_point
-            self.last_pan_point = event.pos()
-            
-            # Pan the view by adjusting the scrollbars
-            h_scroll = self.main_view.horizontalScrollBar()
-            v_scroll = self.main_view.verticalScrollBar()
-            
-            h_scroll.setValue(h_scroll.value() - delta.x())
-            v_scroll.setValue(v_scroll.value() - delta.y())
-            
-            event.accept()
-        else:
-            # Call the default mouse move event handler
-            QGraphicsView.mouseMoveEvent(self.main_view, event)
-    
-    def _on_mouse_release(self, event):
-        """
-        Handle mouse release events for panning.
-        
-        Args:
-            event (QMouseEvent): The mouse release event
-        """
-        if event.button() == Qt.LeftButton and self.is_panning:
-            # End panning mode
-            self.is_panning = False
-            self.last_pan_point = None
-            self.main_view.setCursor(Qt.ArrowCursor)
-            event.accept()
-        else:
-            # Call the default mouse release event handler
-            QGraphicsView.mouseReleaseEvent(self.main_view, event)
-    
-    def _update_cursor_for_zoom(self):
-        """
-        Update the cursor based on current zoom level.
-        Shows hand cursor when image is zoomed and can be panned.
-        """
-        if not self.is_panning:
-            if self.zoom_factor > 1.0 and hasattr(self, 'current_pixmap_item'):
-                # Image is zoomed in and might need panning - show open hand cursor
-                self.main_view.setCursor(Qt.OpenHandCursor)
-            else:
-                # Normal zoom level - show default cursor
-                self.main_view.setCursor(Qt.ArrowCursor)
-        
     def change_image(self):
         """
         Change displayed image. 
@@ -1107,7 +963,7 @@ class MainWindow(QMainWindow):
             if self.lsm_filesList:
                # If LSM files are present, set the LSM path and callback function for table creation
                lsm_path = self.lsm_filesList
-                #TODO переделать callback так что бы он зависил от плагина
+                #TODO refactor callback to depend on plugin
                call_back = self.plugin_list[self.current_plugin_name]["folder_callback"]
             else:
                # If no LSM files in the list, set the callback function for image change
@@ -1179,6 +1035,12 @@ class MainWindow(QMainWindow):
         return image
     
     def on_log_line_added(self, log_line):
+        """
+        Handle log line added event.
+        
+        Args:
+            log_line: The log line to display.
+        """
         # Shrink the log line to fit status bar
         shortened_line = self.shrink_text(log_line, max_length=100)
         self.update_status(shortened_line)
@@ -1234,6 +1096,13 @@ class MainWindow(QMainWindow):
         return ''.join(char for char in text if char in printable)
 
     def filter_and_draw_predictions(self, image, predictions):
+        """
+        Filter and draw predictions on the image.
+        
+        Args:
+            image: The image data.
+            predictions: The predictions to draw.
+        """
         mask_image = None
         self.add_image(mask_image)
         pass
