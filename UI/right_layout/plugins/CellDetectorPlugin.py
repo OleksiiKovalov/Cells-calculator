@@ -984,6 +984,15 @@ class CellDetectorPlugin(BasePlugin):
     def draw_bounding_box(self):
         """
         Draw bounding boxes on the main scene if the checkbox is checked.
+
+        Notes:
+        - Check if the draw bounding flag is set.
+        - If not set, return without performing any action.
+        - Clear the main scene.
+        - Check if the show boundary flag is set.
+        - If set, add an image with bounding box detections to the scene.
+        - If not set, add the original image to the scene.
+        - If an error occurs, print the traceback and show a warning dialog.
         """
         # Check if the draw bounding flag is set to 0
         if self.draw_bounding == 0:
