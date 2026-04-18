@@ -90,7 +90,7 @@ class CellCounter(BaseModel):
             self.model.setInput(blob)
 
             set_global("image_inference", image)
-            safe_image_write(image, IMAGE_FILE_NAME_INGFERENCE)
+            safe_image_write(image, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
 
             # Perform inference
             outputs = self.model.forward()

@@ -94,7 +94,7 @@ class CellposeSegmenter(BaseModel):
         img_inference = process_loaded_image(
             image=image, settings=image_preprocess_settings
         )
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
         self.original_image = safegray2rgb(image)
         channels_to_use = [0, 0]  # Adapt!
         try:

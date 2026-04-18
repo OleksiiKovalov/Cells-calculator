@@ -80,7 +80,7 @@ class StardistSegmenter(BaseModel):
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
        
         self.original_image = safegray2rgb(image)
         try:
@@ -166,7 +166,7 @@ class StardistSegmenter(BaseModel):
             "volume": []
         }
         props = regionprops(instances)
-        safe_image_write(instances, IMAGE_FILE_NAME_INSTANCES)
+        safe_image_write(instances, IMAGE_FILE_NAME_INSTANCES, preserve_dtype=False)
 
         for i, prop in enumerate(props):
             # Extract bounding box (min_row, min_col, max_row, max_col)
