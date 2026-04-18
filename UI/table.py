@@ -10,6 +10,24 @@ from typing import Dict, List
 import pandas as pd
 
 
+def _format_result_value(key, value):
+    """
+    Format result value based on key and value type.
+
+    Args:
+        key: The metric key.
+        value: The value to format.
+
+    Returns:
+        Formatted value as string.
+    """
+    if value == -100:
+        return "-"
+    if key == "%":
+        return f"{round(value, 1)}%"
+    return str(value)
+
+
 def calculate_table(
     model_dict: Dict[str, object],
     files_name: List[str],
@@ -62,26 +80,13 @@ def calculate_table(
             if result:
                 # If the method returns a result, add the values to the row dictionary
                 for key, value in result.items():
-                    if key == "%":
-                        # Check for error value before conversion
-                        if value == -100:
-                            value = "-"
-                        else:
-                            value = f"{round(value, 1)}%"
-                    else:
-                        # Nuclei and Cells columns
-                        if value == -100:
-                            value = "-"
-                        else:
-                            value = str(value)
-                    
-                    row[f"{model_name}/{key}"] = value
+                    row[f"{model_name}/{key}"] = _format_result_value(key, value)
             else:
                 # If no result is returned, mark the row with "-"
                 for i in column_list:
                     row[f"{model_name}/{i}"] = "-"
 
-            # Convert the row dictionary to a DataFrame and concatenate it with the main table
-            row_to_add = pd.DataFrame([row])
-            table = pd.concat([table, row_to_add], ignore_index=True)
-    return table
+        # Add the completed row to the list
+        rows.append(row)
+
+    return pd.DataFrame(rows, columns=columns)
