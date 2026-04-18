@@ -12,9 +12,21 @@ from UI.CustomFileDialog import CustomFileDialog
 from UI.settings_manager import get_setting, set_setting
 
 class menubar(QMenuBar):
+    """
+    Menu bar for the application with file, settings, and plugin menus.
+    """
+
     menubar_signal = pyqtSignal(str, object)
 
     def __init__(self, parent, plugin_list, current_plugin_name):
+        """
+        Initialize the menu bar.
+
+        Args:
+            parent: Parent widget.
+            plugin_list: List of available plugins.
+            current_plugin_name: Name of the current plugin.
+        """
         super().__init__()
         self.parent = parent
         self.plugin_list = plugin_list
@@ -22,6 +34,9 @@ class menubar(QMenuBar):
         self.init_menubar()
 
     def init_menubar(self):
+        """
+        Initialize the menu bar with menus and actions.
+        """
         file_menu = self.addMenu("File")
         settings_menu = self.addMenu("Settings")
         plugin_menu = self.addMenu("plugin")
@@ -55,7 +70,7 @@ class menubar(QMenuBar):
 
         self.plugin_actions = {}
 
-        # Добавляем плагины в меню
+        # Add plugins to menu
         for plugin in self.plugin_list:
             action = QAction(plugin, self, checkable=True)
             action.triggered.connect(self.select_plugin)
@@ -65,19 +80,29 @@ class menubar(QMenuBar):
                 action.setChecked(True)
 
     def select_plugin(self):
-        # Получаем действие, вызвавшее сигнал
+        """
+        Handle plugin selection from the menu.
+        """
+        # Get the action that triggered the signal
         action = self.sender()
         if action and action.isCheckable():
-            # Сбрасываем состояние всех действий
+            # Reset state of all actions
             for act in self.plugin_actions.values():
                 act.setChecked(False)
-            # Устанавливаем состояние выбранного действия
+            # Set state of selected action
             action.setChecked(True)
             self.current_plugin_name = action.text()
             self.menubar_signal.emit("change_plugin", self.current_plugin_name)
 
     @pyqtSlot(str, object)
     def handle_mainWindow_action(self, action_name, value):
+        """
+        Handle actions from the main window.
+
+        Args:
+            action_name: Name of the action.
+            value: Value associated with the action.
+        """
         if action_name == "open_lsm":
             if value:
                 self.settings_action.setEnabled(True)
@@ -98,11 +123,19 @@ class menubar(QMenuBar):
             else:
                 self.settings_action.setEnabled(False)
                 self.save_as_action.setEnabled(False)
+
         elif action_name == "error_save_as":
             self.save_as_action.setEnabled(False)
 
     @pyqtSlot(str, object)
     def handle_rightLayout_action(self, action_name, value):
+        """
+        Handle actions from the right layout.
+
+        Args:
+            action_name: Name of the action.
+            value: Value associated with the action.
+        """
         if action_name == "Open_lsm":
             self.open_lsm_action.setEnabled(value)
                  
@@ -145,6 +178,9 @@ class menubar(QMenuBar):
         return None  # Use default color
 
     def open_file(self):
+        """
+        Open file dialog for selecting an image file.
+        """
         dialog = CustomFileDialog(
             caption="Select Image File",
             directory=Path.home(),
@@ -170,6 +206,9 @@ class menubar(QMenuBar):
         dialog = None
 
     def open_folder(self):
+        """
+        Open folder dialog for selecting a directory.
+        """
         folder_path = QFileDialog.getExistingDirectory(
             caption="Open Folder", directory=""
         )
@@ -177,10 +216,19 @@ class menubar(QMenuBar):
             self.menubar_signal.emit("open_folder", folder_path)
 
     def open_settings(self):
+        """
+        Emit signal to open settings.
+        """
         self.menubar_signal.emit("open_settings", None)
 
     def save_as(self):
+        """
+        Emit signal to save as.
+        """
         self.menubar_signal.emit("save_as", None)
 
     def open_normalize(self):
+        """
+        Emit signal to open normalize dialog.
+        """
         self.menubar_signal.emit("open_normalize", None)
