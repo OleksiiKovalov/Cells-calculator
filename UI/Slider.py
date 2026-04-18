@@ -147,7 +147,7 @@ class Slider(QWidget):
         max_size = self.default_object_size['max_size']
 
         value = self.value_slider.value() / self.round_parametr_slider
-        # Check value for correctness, if out of range — set boundaries
+        # Check value for correctness, if out of range - set boundaries
         if self.key == 'min_size' and value > self.object_size['max_size']:
             value = self.object_size['max_size']
         elif self.key == 'max_size' and value < self.object_size['min_size']:
@@ -171,7 +171,7 @@ class Slider(QWidget):
         try:
             value = (float(self.value_input.text()) /
                      self.round_parametr_value_input)
-            # Check value for correctness, if out of range — set boundaries
+            # Check value for correctness, if out of range - set boundaries
             if self.key == 'min_size' and value >= self.object_size['max_size']:
                 value = self.object_size['max_size']
             elif self.key == 'max_size' and value <= self.object_size['min_size']:
