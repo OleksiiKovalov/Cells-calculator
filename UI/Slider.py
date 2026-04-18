@@ -80,8 +80,7 @@ class Slider(QWidget):
         """
         value = self.default_object_size[self.key]
         self.object_size[self.key] = value
-        self.value_input.setText(
-            f"{value * self.round_parametr_value_input:.2f}")
+        self._update_input_display(value)
         self.value_slider.setValue(int(value * self.round_parametr_slider))
 
     def initUI(self):
@@ -148,18 +147,10 @@ class Slider(QWidget):
 
         value = self.value_slider.value() / self.round_parametr_slider
         # Check value for correctness, if out of range - set boundaries
-        if self.key == 'min_size' and value > self.object_size['max_size']:
-            value = self.object_size['max_size']
-        elif self.key == 'max_size' and value < self.object_size['min_size']:
-            value = self.object_size['min_size']
-        elif value < min_size:
-            value = min_size
-        elif value > max_size:
-            value = max_size
+        value = self._clamp_value(value, min_size, max_size)
         self.value_slider.setValue(int(value * self.round_parametr_slider))
         self.object_size[self.key] = value
-        self.value_input.setText(
-            f"{value * self.round_parametr_value_input:.2f}")
+        self._update_input_display(value)
 
     def update_value_from_input(self):
         """
@@ -172,22 +163,40 @@ class Slider(QWidget):
             value = (float(self.value_input.text()) /
                      self.round_parametr_value_input)
             # Check value for correctness, if out of range - set boundaries
-            if self.key == 'min_size' and value >= self.object_size['max_size']:
-                value = self.object_size['max_size']
-            elif self.key == 'max_size' and value <= self.object_size['min_size']:
-                value = self.object_size['min_size']
-            elif value < min_size:
-                value = min_size
-            elif value > max_size:
-                value = max_size
+            value = self._clamp_value(value, min_size, max_size)
 
             self.object_size[self.key] = value
             self.value_slider.setValue(int(value * self.round_parametr_slider))
-            self.value_input.setText(
-                f"{value * self.round_parametr_value_input:.2f}")
+            self._update_input_display(value)
         except ValueError:
-            self.value_input.setText(
-                f"{self.object_size[self.key] * self.round_parametr_value_input:.2f}")
+            self._update_input_display(self.object_size[self.key])
+
+    def _clamp_value(self, value, min_size, max_size):
+        """
+        Clamp value to valid range based on key type and object sizes.
+
+        Args:
+            value: The value to clamp.
+            min_size: Minimum allowed value.
+            max_size: Maximum allowed value.
+
+        Returns:
+            The clamped value.
+        """
+        if self.key == 'min_size' and value > self.object_size['max_size']:
+            value = self.object_size['max_size']
+        elif self.key == 'max_size' and value < self.object_size['min_size']:
+            value = self.object_size['min_size']
+        return max(min_size, min(max_size, value))
+
+    def _update_input_display(self, value):
+        """
+        Update the input field display with the formatted value.
+
+        Args:
+            value: The value to display.
+        """
+        self.value_input.setText(f"{value * self.round_parametr_value_input:.2f}")
 
 
 if __name__ == '__main__':
