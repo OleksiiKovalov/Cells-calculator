@@ -61,6 +61,9 @@ class TrackerPlugin(BasePlugin):
                 self.button.setEnabled(False)
 
     def init_rightLayout(self):
+        """
+        Initialize the right layout UI components.
+        """
         plugin_label = QLabel(self.get_name())
         plugin_label.setFont(QFont("Arial", 32))
         # Create a combo box to choose models
@@ -111,15 +114,27 @@ class TrackerPlugin(BasePlugin):
         self.right_layout.addSpacing(20)
 
     def update_colormap(self, colormap):
+        """
+        Update colormap.
+        
+        Args:
+            colormap: New colormap.
+        """
         self.object_size["color_map"] = colormap
 
     def reset_detection(self):
+        """
+        Reset detection results.
+        """
         print("reset_detection")
         return
         for key, model in self.models.items():
             model.cell_counter.detections = None
 
     def calculate_button(self):
+        """
+        Calculate tracking using the selected model.
+        """
         model = self.combo_box.currentText()
         # Check if a method and file are selected
         if model == "" or self.folder_path is None:
@@ -143,9 +158,15 @@ class TrackerPlugin(BasePlugin):
             self.plugin_signal.emit("show_warning", str(e))
 
     def show_result(self, text):
+        """
+        Show result message.
+        
+        Args:
+            text: Message text.
+        """
         msgBox = QMessageBox()
 
-        # Set the icon of the message box to a warning icon
+        # Set the icon of the message box to an information icon
         msgBox.setIcon(QMessageBox.Information)
 
         # Set the text of the message box

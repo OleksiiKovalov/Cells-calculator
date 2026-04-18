@@ -106,9 +106,11 @@ class RangeSliderWrapper(QWidget):
         self.setLayout(layout)
     
     def on_range_changed(self, low, high):
+        """
+        Handle range slider value changes.
+        """
         if self.lockCount > 0:
             return  
-        """Handle range slider value changes"""
         min_value = low / self.round_parametr_slider
         max_value = high / self.round_parametr_slider
         
@@ -128,9 +130,11 @@ class RangeSliderWrapper(QWidget):
             self.apply_button.setEnabled(True)
     
     def set_default(self):
+        """
+        Set slider to default values.
+        """
         try:
             self.lockCount += 1
-            """Set slider to default values"""
             min_val = self.default_object_size['min_size']
             max_val = self.default_object_size['max_size']
         
@@ -147,7 +151,9 @@ class RangeSliderWrapper(QWidget):
             self.lockCount -= 1 
     
     def on_auto_apply_changed(self, state):
-        """Handle Auto Apply checkbox state change"""
+        """
+        Handle Auto Apply checkbox state change.
+        """
         if state == Qt.Checked:
             # Auto apply is enabled
             self.apply_button.setEnabled(False)
@@ -160,16 +166,20 @@ class RangeSliderWrapper(QWidget):
             self.apply_button.setEnabled(True)
     
     def on_apply_clicked(self):
-        """Handle Apply button click"""
+        """
+        Handle Apply button click.
+        """
         min_value = self.object_size['min_size']
         max_value = self.object_size['max_size']
         self.applyRequested.emit(min_value, max_value)
         self.apply_button.setEnabled(False)  # Disable until next change 
     
     def change_default(self, min_size, max_size):
+        """
+        Change the range and default values.
+        """
         try:
             self.lockCount += 1
-            """Change the range and default values"""
             if min_size is None:
                 min_size = 100
             if max_size is None:
@@ -192,10 +202,16 @@ class RangeSliderWrapper(QWidget):
 
 
 class CellDetectorPlugin(BasePlugin):
+    """
+    Plugin for cell detection processing.
+    """
     def get_name(self):
         return "Cell Processor"
+    
     def __init__(self, *arg):
-
+        """
+        Initialize the cell detector plugin.
+        """
         super().__init__(*arg)
         self.checked_indices = None
         self.plugin_signal.emit("Open_lsm", True)
@@ -210,6 +226,9 @@ class CellDetectorPlugin(BasePlugin):
         self.lsm_path = None
 
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
+        """
+        Initialize plugin values.
+        """
         self.show_boundry = 0
         self.draw_bounding = 0
         self.models = models
@@ -220,6 +239,9 @@ class CellDetectorPlugin(BasePlugin):
         self.lsm_filesList = None
 
     def handle_action(self, action_name, value):
+        """
+        Handle an action.
+        """
         if action_name == "reset_detection":
             self.reset_detection()
         elif action_name == "set_size":
@@ -270,6 +292,9 @@ class CellDetectorPlugin(BasePlugin):
                 self.button.setEnabled(False)
 
     def update_colormap(self, colormap):
+        """
+        Update the colormap.
+        """
         self.object_size["color_map"] = colormap
         
         # Trigger redraw with new colormap using current range slider values
@@ -278,7 +303,9 @@ class CellDetectorPlugin(BasePlugin):
         self.on_range_slider_changed(current_min, current_max)
     
     def update_alpha(self, alpha_text):
-        """Handle alpha combo box changes"""
+        """
+        Handle alpha combo box changes.
+        """
         # Convert percentage text to float value (e.g., "75%" -> 0.75)
         alpha_value = float(alpha_text.rstrip('%')) / 100.0
         self.object_size["alpha"] = alpha_value
@@ -288,19 +315,19 @@ class CellDetectorPlugin(BasePlugin):
         current_max = self.object_size['max_size']
         self.on_range_slider_changed(current_min, current_max)
     # def update_lineWidth(self):
-    #     # Получаем значение из QLineEdit
+    #     # Get value from QLineEdit
     #     input_text = self.LineWidth_edit.text()
 
-    #     # Проверяем, является ли введённое значение числом
+    #     # Check if the entered value is a number
     #     try:
-    #         # Преобразуем в число с плавающей точкой
+    #         # Convert to float
     #         line_width = float(input_text)
 
     #         self.object_size["line_width"] = round(line_width, 2)
     #         self.LineWidth_edit.setText(f"{float(input_text):.2f}")
 
     #     except ValueError:
-    #         # Если введено некорректное значение, устанавливаем стандартное значение
+    #         # If invalid value, set default
     #         size = self.object_size["line_width"]
     #         self.LineWidth_edit.setText(f"{size:.2f}") 
 
@@ -311,14 +338,21 @@ class CellDetectorPlugin(BasePlugin):
             pass
 
     def set_size(self, detection, img_size : tuple = (512,512)):
+        """
+        Set the size based on detection.
+        
+        Args:
+            detection: Detection data.
+            img_size: Image size.
+        """
         min_size, max_size = self.default_object_size["min_size"], self.default_object_size["max_size"]
         model = self.combo_box.currentText()
         if all(len(cell) >= 4 for cell in detection):
             img_sq = img_size[0] * img_size[1]
-            # Вычисляем произведения для каждого 
+            # Calculate products for each cell
             values = [cell[2] * cell[3] for cell in detection] 
             if values:
-                # Находим максимальное и минимальное произведение
+                # Find maximum and minimum product
                 min_size_from_detection = min(values) / img_sq
                 max_size_from_detection = max(values) / img_sq
                 if self.lsm_filesList or model != "All_models":
@@ -440,6 +474,15 @@ class CellDetectorPlugin(BasePlugin):
         self.draw_bounding_box()
 
     def call_inference(self, model):
+        """
+        Call inference for the given model.
+        
+        Args:
+            model: Model name.
+            
+        Returns:
+            Result of inference.
+        """
         try:
                     # Attempt to calculate the result using the selected method
             if self.model and (self.model == self.model.model_name):
@@ -493,6 +536,20 @@ class CellDetectorPlugin(BasePlugin):
         return result
 
     def calculate_single_model(self, modeltype,modelpath,object_size, image_path,model_data = None, model_name = "<not set>"):
+        """
+        Calculate for a single model.
+        
+        Args:
+            modeltype: Model type.
+            modelpath: Model path.
+            object_size: Object size.
+            image_path: Image path.
+            model_data: Model data.
+            model_name: Model name.
+            
+        Returns:
+            Tuple of images and data.
+        """
         model = None
         model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model)
         model.cell_counter.original_image_path = self.lsm_path
@@ -517,6 +574,12 @@ class CellDetectorPlugin(BasePlugin):
             return None, None, None, None
 
     def batchProcess_ProcessModelList(self,model_list):
+        """
+        Process a list of models in batch.
+        
+        Args:
+            model_list: List of model names.
+        """
         i = 1
         j = 1
         for model_name in model_list:
@@ -540,6 +603,9 @@ class CellDetectorPlugin(BasePlugin):
         return
 
     def batchProcessButton_click(self):
+        """
+        Handle batch process button click.
+        """
         self.batch_processedImages = []
         self.batch_labels = []
         try:
@@ -605,6 +671,18 @@ class CellDetectorPlugin(BasePlugin):
 
 
     def batchProcess_MultiImage(self, model_type, modepath, object_size, file_path, model_data , model_name, files):
+        """
+        Process multiple images in batch.
+        
+        Args:
+            model_type: Model type.
+            modepath: Model path.
+            object_size: Object size.
+            file_path: File path.
+            model_data: Model data.
+            model_name: Model name.
+            files: List of files.
+        """
         i = 1
         for file_path in files:
             image_name = os.path.basename(file_path)
@@ -619,6 +697,9 @@ class CellDetectorPlugin(BasePlugin):
         pass
 
     def batchProcessMultiImageButton_click(self):
+        """
+        Handle batch process multi image button click.
+        """
         try:
             savedEnabled = self.batchProcessButtonMultiImage.isEnabled()
             saved_lsm_path = self.lsm_path
@@ -690,6 +771,12 @@ class CellDetectorPlugin(BasePlugin):
             self.batchProcessButtonMultiImage.setText(f"Current model on multiple images")
         
     def print_result(self, result):
+        """
+        Print the result based on model type.
+        
+        Args:
+            result: Result data.
+        """
         model = self.combo_box.currentText()
         if model == "Detector":
             self.print_result_detector(result)
@@ -697,6 +784,18 @@ class CellDetectorPlugin(BasePlugin):
             self.print_result_segmenter(result)
 
     def _format_value(self, label, value_permyriad, value_um=None, unit_um="µm"):
+        """
+        Format value for display.
+        
+        Args:
+            label: Label for the value.
+            value_permyriad: Value in permyriad.
+            value_um: Value in micrometers.
+            unit_um: Unit for micrometers.
+            
+        Returns:
+            Formatted string.
+        """
         if value_permyriad in ("-", None):
             return f"{label}: -"
 
@@ -709,8 +808,14 @@ class CellDetectorPlugin(BasePlugin):
         return f"{label}: {value_permyriad}‱ ({value_um} {unit_um})"
 
     def print_result_detector(self, result):
+        """
+        Print result for detector model.
+        
+        Args:
+            result: Result data.
+        """
         results = []
-        # Добавить количество клеток
+        # Add number of cells
         results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
         # try:
         #     results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
@@ -728,7 +833,7 @@ class CellDetectorPlugin(BasePlugin):
         try:
             boxes = result["Cells"]["box"]
 
-            # Извлечение длины и ширины в пикселях (второй и третий элемент в массивах)
+            # Extract length and width in pixels (second and third elements in arrays)
             lengths = boxes.apply(lambda x: x[2])
             widths = boxes.apply(lambda x: x[3])
 
@@ -736,11 +841,11 @@ class CellDetectorPlugin(BasePlugin):
             image_w = self.model.cell_counter.original_image.shape[1]
             img_area = image_h * image_w
 
-            # Вычисление диагоналей (диаметры)
+            # Calculate diagonals (diameters)
             arithmetic_diameters_px = (lengths + widths) / 2
             geometric_diameters_px = (lengths * widths)**(1/2)
 
-            # Вычисление площадей
+            # Calculate areas
             areas_px2 = lengths * widths
             average_area_px2 = areas_px2.mean()
 
@@ -787,28 +892,34 @@ class CellDetectorPlugin(BasePlugin):
 
         results.append("")
 
-        # Добавить количество ядер
+        # Add number of nuclei
         if result["Nuclei"] == -100:
             results.append('Nuclei: -')
         else:
             results.append(f'Nuclei: {result["Nuclei"]}')
 
-        # Добавить процент живых
+        # Add percentage alive
         if result["%"] == -100:
             results.append('Alive: -')
         else:
             results.append(f'Alive: {result["%"]}%')
 
-        # Шрифт для всех элементов - not needed for text edit
+        # Font for all elements - not needed for text edit
         
-        # Добавляем текстовые элементы в text edit
+        # Add text elements to text edit
         result_text = "\n".join(results)
         self.results_text.setPlainText(result_text)
 
     def print_result_segmenter(self, result):
+        """
+        Print result for segmenter model.
+        
+        Args:
+            result: Result data.
+        """
         spheroid_df = result["Cells"]
 
-        # Вычисление средних значений и количества строк
+        # Calculate average values and number of rows
         try:
             avg_diameter = spheroid_df["diameter"].mean()
             avg_area = spheroid_df["area"].mean()
@@ -840,7 +951,7 @@ class CellDetectorPlugin(BasePlugin):
                 avg_area_um2 = round(avg_area_px2 * (um_per_px ** 2), 2)
                 avg_volume_um3 = round(avg_volume_px3 * (um_per_px ** 3), 2)
 
-            # Создание строк для вывода
+            # Create strings for output
             results = [
                 f"Objects detected: {num_cells}",
                 f"Duration        : {inference_duration:.2f} seconds",
@@ -859,29 +970,20 @@ class CellDetectorPlugin(BasePlugin):
         # try:
         # except AttributeError:
         #     num_cells = spheroid_df
-        #     # Создание строк для вывода
+        #     # Create strings for output
         #     results = [
         #         f"Cells detected: {num_cells}"
         #     ]
 
-        # Настройки для шрифта и отображения - not needed for text edit
+        # Settings for font and display - not needed for text edit
         
-        # Добавление строк в text edit
+        # Add strings to text edit
         result_text = "\n".join(results)
         self.results_text.setPlainText(result_text)
 
     def draw_bounding_box(self):
         """
         Draw bounding boxes on the main scene if the checkbox is checked.
-
-        Notes:
-        - Check if the draw bounding flag is set.
-        - If not set, return without performing any action.
-        - Clear the main scene.
-        - Check if the show boundary flag is set.
-        - If set, add an image with bounding box detections to the scene.
-        - If not set, add the original image to the scene.
-        - If an error occurs, print the traceback and show a warning dialog.
         """
         # Check if the draw bounding flag is set to 0
         if self.draw_bounding == 0:
@@ -924,7 +1026,7 @@ class CellDetectorPlugin(BasePlugin):
             self.show_boundry = 0
         elif selected_id == 1:  # Detections
             self.show_boundry = 1
-        elif selected_id == 2:  # 
+        elif selected_id == 2:  # Inference
             self.show_boundry = 2
             
         # Redraw with the new display mode
@@ -976,6 +1078,12 @@ class CellDetectorPlugin(BasePlugin):
         return
 
     def on_state_changed_scale(self, state):
+        """
+        Handle scale checkbox state change.
+        
+        Args:
+            state: Checkbox state.
+        """
         if state and self.x10checkbox.isEnabled():
             self.object_size["scale"] = 10
         else:
@@ -983,6 +1091,9 @@ class CellDetectorPlugin(BasePlugin):
         self.reset_detection()
 
     def currentModelChanged(self):
+        """
+        Handle model selection change.
+        """
         self.default_object_size['min_size'] = 100
         self.default_object_size['max_size'] = 0
         
@@ -996,6 +1107,9 @@ class CellDetectorPlugin(BasePlugin):
             self.x10checkbox.setEnabled("x10" in model_data)
 
     def init_rightLayout(self):
+        """
+        Initialize the right layout UI components.
+        """
         plugin_label = QLabel(self.get_name())
         plugin_label.setFont(QFont("Arial", 32))
         # Create a combo box to choose models
@@ -1145,7 +1259,7 @@ class CellDetectorPlugin(BasePlugin):
 
         self.colormaps =  self.object_size["color_map_list"]
         self.colormap_combo.addItems(self.colormaps)
-        self.colormap_combo.setCurrentText(self.object_size['color_map'])  # Установить "Viridis" по умолчанию
+        self.colormap_combo.setCurrentText(self.object_size['color_map'])  # Set "Viridis" as default
         self.colormap_combo.currentTextChanged.connect(self.update_colormap)
         
         # Create alpha combo box

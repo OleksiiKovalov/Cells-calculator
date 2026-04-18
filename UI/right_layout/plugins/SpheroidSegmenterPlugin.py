@@ -95,37 +95,47 @@ class SpheroidSegmenterPlugin(BasePlugin):
 
     #     self.object_size["color_map"] = colormap
     # def update_lineWidth(self):
-    #     # Получаем значение из QLineEdit
+    #     # Get value from QLineEdit
     #     input_text = self.LineWidth_edit.text()
 
-    #     # Проверяем, является ли введённое значение числом
+    #     # Check if the entered value is a number
     #     try:
-    #         # Преобразуем в число с плавающей точкой
+    #         # Convert to floating point number
     #         line_width = float(input_text)
 
     #         self.object_size["line_width"] = round(line_width, 2)
     #         self.LineWidth_edit.setText(f"{float(input_text):.2f}")
 
     #     except ValueError:
-    #         # Если введено некорректное значение, устанавливаем стандартное значение
+    #         # If an incorrect value is entered, set the default value
     #         size = self.object_size["line_width"]
     #         self.LineWidth_edit.setText(f"{size:.2f}")
 
     def reset_detection(self):
+        """
+        Reset detection results.
+        """
         print("reset_detection")
         return
         for key, model in self.models.items():
             model.cell_counter.detections = None
 
     def set_size(self, detection, img_size : tuple = (512,512)):
+        """
+        Set size parameters based on detection results.
+        
+        Args:
+            detection: Detection data.
+            img_size: Image size tuple.
+        """
         min_size, max_size = self.default_object_size["min_size"], self.default_object_size["max_size"]
         model = self.combo_box.currentText()
         if all(len(cell) >= 4 for cell in detection):
             img_sq = img_size[0] * img_size[1]
-            # Вычисляем произведения для каждого 
+            # Calculate products for each
             values = [cell[2] * cell[3] for cell in detection] 
 
-            # Находим максимальное и минимальное произведение
+            # Find maximum and minimum product
             min_size_from_detection = min(values) / img_sq
             max_size_from_detection = max(values) / img_sq
             if self.lsm_filesList or model != "All_models":
@@ -213,14 +223,26 @@ class SpheroidSegmenterPlugin(BasePlugin):
         self.draw_bounding_box()
 
     def print_result(self, result):
+        """
+        Print calculation results.
+        
+        Args:
+            result: Calculation result data.
+        """
         model = self.combo_box.currentText()
 
         if model == "Baseline Segmenter":
             self.print_result_segmenter(result)
 
     def print_result_segmenter(self, result):
+        """
+        Print result for segmenter model.
+        
+        Args:
+            result: Result data.
+        """
         spheroid_df = result["Cells"]
-        # Вычисление средних значений и количества строк
+        # Calculate average values and number of rows
         try:
             avg_diameter = round(spheroid_df["diameter"].mean(), 2)
             avg_area = round(spheroid_df["area"].mean(), 2)
@@ -231,7 +253,7 @@ class SpheroidSegmenterPlugin(BasePlugin):
             avg_volume = "-"
         num_cells = spheroid_df.shape[0]
 
-        # Создание строк для вывода
+        # Create strings for output
         results = [
             f"Spheroid detected: {num_cells}",
             f"Mean D: {avg_diameter}",
@@ -239,20 +261,20 @@ class SpheroidSegmenterPlugin(BasePlugin):
             f"Mean V: {avg_volume}",
         ]
 
-        # Настройки для шрифта и отображения
+        # Settings for font and display
         font = QFont('Arial', 12)
         y_offset = 0
-        line_height = 25  # Интервал между строками
+        line_height = 25  # Line spacing
 
-        # Добавление строк в сцену
+        # Add strings to scene
         for text in results:
             label = QGraphicsTextItem(text)
             label.setFont(font)
             label.setPos(0, y_offset)
             self.right_scene.addItem(label)
-            y_offset += line_height  # Сдвиг вниз для следующей строки
+            y_offset += line_height  # Shift down for next line
 
-        # Обновить вид
+        # Update view
         self.right_view.update()
     def draw_bounding_box(self):
         """
@@ -291,8 +313,7 @@ class SpheroidSegmenterPlugin(BasePlugin):
         Handle the state change of the checkbox for showing bounding boxes.
         
         Args:
-        state (int): The new state of the checkbox.
-    
+            state (int): The new state of the checkbox.
         """
         # Update the show_boundry flag with the new state of the checkbox
         self.show_boundry = state
@@ -300,6 +321,9 @@ class SpheroidSegmenterPlugin(BasePlugin):
         self.draw_bounding_box()
 
     def init_rightLayout(self):
+        """
+        Initialize the right layout UI components.
+        """
         plugin_label = QLabel(self.get_name())
         plugin_label.setFont(QFont("Arial", 32))
         # Create a combo box to choose models
