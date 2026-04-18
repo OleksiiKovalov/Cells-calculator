@@ -9,7 +9,18 @@ from PyQt5.QtWidgets import (
 )
 
 class ImageNormalizeDialog(QDialog):
+    """
+    Dialog for viewing and adjusting image normalization parameters.
+    """
+
     def __init__(self, image, parent=None):
+        """
+        Initialize the dialog.
+
+        Args:
+            image: The image to normalize.
+            parent: Parent widget.
+        """
         super().__init__(parent)
         self.setWindowTitle("Normalized Image Viewer")
         self.image_original = image.astype(np.float32)
@@ -17,6 +28,9 @@ class ImageNormalizeDialog(QDialog):
         self.resize(800, 600)
 
     def init_ui(self):
+        """
+        Initialize the user interface.
+        """
         layout = QVBoxLayout(self)
 
         # Image display label
@@ -53,6 +67,9 @@ class ImageNormalizeDialog(QDialog):
         self.update_image()
 
     def update_image(self):
+        """
+        Update the displayed image based on slider values.
+        """
         pmin = min(self.slider_start.value(), self.slider_stop.value())
         pmax = max(self.slider_start.value(), self.slider_stop.value())
 
@@ -78,5 +95,8 @@ class ImageNormalizeDialog(QDialog):
         self.image_label.setPixmap(scaled_pixmap)
 
     def resizeEvent(self, event):
+        """
+        Handle resize event to update image scaling.
+        """
         super().resizeEvent(event)
         self.update_image()

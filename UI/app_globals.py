@@ -156,42 +156,105 @@ class AppGlobals:
 app_globals = AppGlobals()
 
 def register_model(model_type: str, model_class, preload=False):
-    """Register a model instance by name."""
+    """
+    Register a model instance by name.
+    
+    Args:
+        model_type (str): The type of the model.
+        model_class: The model class.
+        preload (bool): Whether to preload the model.
+    """
     app_globals.registered_models[model_type] = {'model_type':model_type, 'model_class': model_class, 'preload': preload}
 
 def get_registered_model(name: str):
-    """Retrieve a registered model instance by name."""
+    """
+    Retrieve a registered model instance by name.
+    
+    Args:
+        name (str): The name of the model.
+        
+    Returns:
+        The registered model or None if not found.
+    """
     return app_globals.registered_models.get(name, None)
 
 def get_registered_models():
-    """Retrieve all registered model instances."""
+    """
+    Retrieve all registered model instances.
+    
+    Returns:
+        Dict of registered models.
+    """
     return app_globals.registered_models
 
     # Additional convenience functions for dictionary-based access
 def get_global(key: str, default=None):
-    """Get any global value by key name."""
+    """
+    Get any global value by key name.
+    
+    Args:
+        key (str): The key name.
+        default: Default value if key not found.
+        
+    Returns:
+        The value or default.
+    """
     return app_globals.get(key, default)
 
 def set_global(key: str, value):
-    """Set any global value by key name."""
+    """
+    Set any global value by key name.
+    
+    Args:
+        key (str): The key name.
+        value: The value to set.
+    """
     app_globals.set(key, value)
 
 def update_globals(**kwargs):
-    """Update multiple global values at once."""
+    """
+    Update multiple global values at once.
+    
+    Args:
+        **kwargs: Key-value pairs to update.
+    """
     app_globals.update(**kwargs)
 
 def has_global(key: str) -> bool:
-    """Check if a global key exists and has a non-None value."""
+    """
+    Check if a global key exists and has a non-None value.
+    
+    Args:
+        key (str): The key name.
+        
+    Returns:
+        bool: True if exists and not None.
+    """
     return app_globals.has(key)
 
 def delete_global(key: str):
-    """Delete a global key."""
+    """
+    Delete a global key.
+    
+    Args:
+        key (str): The key name to delete.
+    """
     app_globals.delete(key)
 
 def get_all_globals() -> dict:
-    """Get a copy of all global data."""
+    """
+    Get a copy of all global data.
+    
+    Returns:
+        dict: Copy of all global data.
+    """
     return app_globals.to_dict()
 
 def list_global_keys():
-    """Get list of all global keys."""
+    """
+    Get list of all global keys.
+    
+    Returns:
+        list: List of keys.
+    """
     return list(app_globals.keys())
