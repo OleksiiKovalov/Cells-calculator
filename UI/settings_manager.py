@@ -101,10 +101,11 @@ class SettingsManager:
             return Path.cwd()
     
     def _setup_logging(self, app_dir: Path):
-        """Set up logging for settings operations.
+        """
+        Set up logging for settings operations.
         
         Args:
-            app_dir: Application directory where logs should be stored
+            app_dir: Application directory where logs should be stored.
         """
         # Create logs directory if it doesn't exist
         log_dir = app_dir / "logs"
@@ -136,13 +137,17 @@ class SettingsManager:
         }
     
     def _get_backup_files(self) -> list:
-        """Get list of backup files sorted by modification time (newest first)."""
+        """
+        Get list of backup files sorted by modification time (newest first).
+        """
         backup_pattern = f"{self.settings_file.stem}.backup.*{self.settings_file.suffix}"
         backup_files = list(self.settings_file.parent.glob(backup_pattern))
         return sorted(backup_files, key=lambda x: x.stat().st_mtime, reverse=True)
     
     def _create_backup(self) -> bool:
-        """Create a backup of the current settings file."""
+        """
+        Create a backup of the current settings file.
+        """
         if not self.settings_file.exists():
             return True
         
@@ -165,7 +170,9 @@ class SettingsManager:
             return False
     
     def _cleanup_old_backups(self):
-        """Remove old backup files, keeping only the specified count."""
+        """
+        Remove old backup files, keeping only the specified count.
+        """
         try:
             backup_files = self._get_backup_files()
             if len(backup_files) > self.backup_count:
@@ -206,7 +213,9 @@ class SettingsManager:
             return False
     
     def _load_from_file(self, file_path: Path) -> Optional[Dict[str, Any]]:
-        """Load settings from a specific file."""
+        """
+        Load settings from a specific file.
+        """
         try:
             if not file_path.exists():
                 return None
@@ -229,7 +238,9 @@ class SettingsManager:
             return None
     
     def _load_settings(self):
-        """Load settings with backup recovery."""
+        """
+        Load settings with backup recovery.
+        """
         with self._lock:
             # Try to load from main file
             settings = self._load_from_file(self.settings_file)
@@ -260,7 +271,9 @@ class SettingsManager:
             self._save_to_file()
     
     def _save_to_file(self) -> bool:
-        """Save settings to file using atomic write."""
+        """
+        Save settings to file using atomic write.
+        """
         try:
             # Create backup before writing
             self._create_backup()
@@ -298,11 +311,11 @@ class SettingsManager:
         Get a setting value using dot notation.
         
         Args:
-            key: Setting key (supports dot notation like 'window.width')
-            default: Default value if key not found
+            key: Setting key (supports dot notation like 'window.width').
+            default: Default value if key not found.
             
         Returns:
-            Setting value or default
+            Setting value or default.
         """
         with self._lock:
             try:
@@ -333,11 +346,11 @@ class SettingsManager:
         Set a setting value using dot notation.
         
         Args:
-            key: Setting key (supports dot notation like 'window.width')
-            value: Value to set
+            key: Setting key (supports dot notation like 'window.width').
+            value: Value to set.
             
         Returns:
-            True if successful, False otherwise
+            True if successful, False otherwise.
         """
         with self._lock:
             try:
@@ -399,7 +412,9 @@ class SettingsManager:
                 return False
     
     def get_all_settings(self) -> Dict[str, Any]:
-        """Get a copy of all settings."""
+        """
+        Get a copy of all settings.
+        """
         with self._lock:
             return self._settings.copy()
     
@@ -457,7 +472,9 @@ _settings_instance = None
 
 
 def get_settings() -> SettingsManager:
-    """Get the global settings instance (singleton pattern)."""
+    """
+    Get the global settings instance (singleton pattern).
+    """
     global _settings_instance
     if _settings_instance is None:
         _settings_instance = SettingsManager()
@@ -466,15 +483,21 @@ def get_settings() -> SettingsManager:
 
 # Convenience functions
 def get_setting(key: str, default: Any = None) -> Any:
-    """Get a setting value (convenience function)."""
+    """
+    Get a setting value (convenience function).
+    """
     return get_settings().get(key, default)
 
 
 def set_setting(key: str, value: Any) -> bool:
-    """Set a setting value (convenience function)."""
+    """
+    Set a setting value (convenience function).
+    """
     return get_settings().set(key, value)
 
 
 def save_settings() -> bool:
-    """Save settings to file (convenience function)."""
+    """
+    Save settings to file (convenience function).
+    """
     return get_settings().save()
