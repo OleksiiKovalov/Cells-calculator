@@ -801,6 +801,77 @@ class MainWindow(QMainWindow):
         self.main_view.resetTransform()
         self.main_view.scale(self.zoom_factor, self.zoom_factor)
         self._update_zoom_status()
+
+    def _on_mouse_press(self, event):
+        """
+        Handle mouse press events for panning.
+        
+        Args:
+            event (QMouseEvent): The mouse press event
+        """
+        if event.button() == Qt.LeftButton:
+            # Start panning mode
+            self.is_panning = True
+            self.last_pan_point = event.pos()
+            self.main_view.setCursor(Qt.ClosedHandCursor)
+            event.accept()
+        else:
+            # Call the default mouse press event handler
+            QGraphicsView.mousePressEvent(self.main_view, event)
+    
+    def _on_mouse_move(self, event):
+        """
+        Handle mouse move events for panning.
+        
+        Args:
+            event (QMouseEvent): The mouse move event
+        """
+        if self.is_panning and self.last_pan_point is not None:
+            # Calculate the delta movement
+            delta = event.pos() - self.last_pan_point
+            self.last_pan_point = event.pos()
+            
+            # Pan the view by adjusting the scrollbars
+            h_scroll = self.main_view.horizontalScrollBar()
+            v_scroll = self.main_view.verticalScrollBar()
+            
+            h_scroll.setValue(h_scroll.value() - delta.x())
+            v_scroll.setValue(v_scroll.value() - delta.y())
+            
+            event.accept()
+        else:
+            # Call the default mouse move event handler
+            QGraphicsView.mouseMoveEvent(self.main_view, event)
+    
+    def _on_mouse_release(self, event):
+        """
+        Handle mouse release events for panning.
+        
+        Args:
+            event (QMouseEvent): The mouse release event
+        """
+        if event.button() == Qt.LeftButton and self.is_panning:
+            # End panning mode
+            self.is_panning = False
+            self.last_pan_point = None
+            self.main_view.setCursor(Qt.ArrowCursor)
+            event.accept()
+        else:
+            # Call the default mouse release event handler
+            QGraphicsView.mouseReleaseEvent(self.main_view, event)
+    
+    def _update_cursor_for_zoom(self):
+        """
+        Update the cursor based on current zoom level.
+        Shows hand cursor when image is zoomed and can be panned.
+        """
+        if not self.is_panning:
+            if self.zoom_factor > 1.0 and hasattr(self, 'current_pixmap_item'):
+                # Image is zoomed in and might need panning - show open hand cursor
+                self.main_view.setCursor(Qt.OpenHandCursor)
+            else:
+                # Normal zoom level - show default cursor
+                self.main_view.setCursor(Qt.ArrowCursor)
     
     def change_image(self):
         """
