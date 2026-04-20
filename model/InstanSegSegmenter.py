@@ -31,10 +31,37 @@ from model.utils import (
 
 
 class InstansegSegmenter(BaseModel):
+    """
+    Cell/nuclei segmentation using InstanSeg deep learning model.
+    
+    Provides interface to InstanSeg for instance segmentation of cells and nuclei
+    in microscopy images. Supports multiple inference methods with configurable
+    tiling strategies for large images.
+    
+    Attributes:
+        model (InstanSeg): The InstanSeg model instance
+        image_preprocess_settings_default (OrderedDict): Default preprocessing settings
+    """
     def __init__(self, path_to_model: str, object_size, model_data=None):
+        """
+        Initialize InstanSeg segmenter.
+        """
         super().__init__(path_to_model, object_size, model_data)
 
     def init_x20_model(self, path_to_model: str):
+        """
+        Initialize InstanSeg model for x20 magnification segmentation.
+        
+        Loads custom TorchScript model or built-in model with GPU support.
+        
+        Args:
+            path_to_model (str): Path to TorchScript model file, or name of built-in model
+                                ('brightfield_nuclei', 'fluorescence_nuclei_and_cells')
+            
+        Note:
+            Falls back to 'fluorescence_nuclei_and_cells' if path invalid.
+            Automatically uses GPU if available.
+        """
         self.image_preprocess_settings_default = json.loads(
             '[{"gray2rgb":""}]', object_pairs_hook=OrderedDict
         )
@@ -67,6 +94,11 @@ class InstansegSegmenter(BaseModel):
             self.model = self.model.to(device)
 
     def init_x10_model(self, path_to_model):
+        """
+        Initialize InstanSeg model for x10 magnification.
+        
+        Currently not implemented.
+        """
         pass
 
     def count_x20(
@@ -82,6 +114,35 @@ class InstansegSegmenter(BaseModel):
         x10=False,
         **kwargs,
     ):
+        """
+        Segment cells/nuclei using InstanSeg at specified magnification.
+        
+        Loads image, applies preprocessing, runs InstanSeg inference with optional
+        tiling for large images, and converts results to structured format.
+        
+        Args:
+            input_image (str): Path to input microscopy image
+            plot (bool): Whether to generate visualization. Defaults to True.
+            colormap (str): Matplotlib colormap for visualization. Defaults to 'tab20'.
+            tracking (bool): Whether in tracking mode. Defaults to False.
+            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
+            min_score (float): Minimum confidence threshold (0-1). Defaults to 0.05.
+            alpha (float): Mask overlay transparency (0-1). Defaults to 0.75.
+            store_bin_mask (bool): Whether to store binary mask arrays. Defaults to False.
+            x10 (bool): Use x10 configuration if True, else x10. Defaults to False.
+            **kwargs: Additional inference arguments
+        
+        Returns:
+            pd.DataFrame: Instance segmentation results with columns:
+                - id_label: Unique object identifier
+                - box: Bounding box coordinates
+                - mask: Polygon contour points
+                - confidence: Detection confidence score
+                - diameter, area, volume: Morphological properties
+                
+        Raises:
+            RuntimeError: If InstanSeg inference fails
+        """
         image = imread(input_image)
 
         if x10:
@@ -205,6 +266,22 @@ class InstansegSegmenter(BaseModel):
         alpha=0.75,
         **kwargs,
     ):
+        """
+        Segment cells/nuclei using InstanSeg at x10 magnification with tiling.
+        
+        Delegates to count_x20 with x10=True for tiled inference on large images.
+        
+        Args:
+            input_image (str): Path to input microscopy image
+            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
+            colormap (str): Matplotlib colormap for visualization. Defaults to 'tab20'.
+            min_score (float): Minimum confidence threshold (0-1). Defaults to 0.01.
+            alpha (float): Mask overlay transparency (0-1). Defaults to 0.75.
+            **kwargs: Additional inference arguments
+        
+        Returns:
+            pd.DataFrame: Instance segmentation results (same format as count_x20)
+        """
         return self.count_x20(
             input_image,
             plot=True,
@@ -219,6 +296,30 @@ class InstansegSegmenter(BaseModel):
         )
 
     def instanseg_results_to_pandas(self, labeled_output) -> pd.DataFrame:
+        """
+        Convert InstanSeg labeled output to standardized DataFrame format.
+        
+        Processes InstanSeg instance segmentation output (as labeled tensor) into
+        a pandas DataFrame with normalized coordinates and morphological features.
+        
+        Args:
+            labeled_output (torch.Tensor): InstanSeg output tensor of shape
+                (1, 1, height, width) containing instance labels as integers.
+                Feature information is encoded in tensor metadata.
+        
+        Returns:
+            pd.DataFrame: Standardized detection DataFrame with columns:
+                - id_label: Unique instance identifier (0-indexed)
+                - box: [x_min, y_min, x_max, y_max] bounding box
+                - mask: List of polygon contour points
+                - confidence: Detection confidence (currently set to 1.0)
+                - diameter, area, volume: Morphological measurements
+                
+        Note:
+            - All coordinates are normalized to [0, 1] range
+            - Morphology calculated assuming spherical objects
+            - Bounds computed as union of all feature bounds
+        """
         instanseg_objects = labels_to_features(labeled_output[:, 0, :].numpy())
         data: dict[str, list[Any]] = {
             'id_label': [],
