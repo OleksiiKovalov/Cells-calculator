@@ -41,6 +41,22 @@ class Model:
         model_data = None,
         model_name = None
     ):
+        """
+        Initialize the general cell analysis model.
+        
+        Sets up both cell and nuclei detection pipelines. Supports various detection
+        models specified by model_type.
+        
+        Args:
+            path (str): Path to pre-trained cell detection model. Defaults to YOLO model.
+            threshold (int): Binarization threshold for nuclei detection. Defaults to 100.
+            eps (int): DBSCAN eps parameter for nuclei clustering. Defaults to 5.
+            min_samples (int): DBSCAN min_samples for nuclei. Defaults to 10.
+            object_size (dict): Configuration dict with keys like 'scale', 'signal'. Optional.
+            model_type (str): Type of detection model (registered in config). Required.
+            model_data (dict): Model-specific configuration parameters. Optional.
+            model_name (str): Human-readable model name for reporting. Optional.
+        """
         self.nuclei_counter = NucleiCounter(
             threshold=threshold,
             eps=eps,
@@ -91,15 +107,19 @@ class Model:
 
 def calculate_standard(cell_counter, img_path : str):
     """
-    Calculates cells only on given standard image.
-    Input params are:
-    - cell_counter: CellCounter class instance;
-    - img_path: path to lsm/jpg/png/tif/bmp image.
-
-    Returns the result as a dictionary with the following fields:
-    - Nuclei: -100 (encoding for NaN);
-    - Cells: count for all the cells detected;
-    - %: -100 (encoding for NaN).
+    Analyze standard image format (JPG/PNG/TIF/BMP) for cells only.
+    
+    Runs cell detection on single-channel or RGB images without nuclei information.
+    
+    Args:
+        cell_counter (BaseModel): Instantiated cell detection model
+        img_path (str): Path to image file (JPG, PNG, TIF, or BMP)
+    
+    Returns:
+        dict: Analysis results with keys:
+            - 'Nuclei': -100 (NaN encoding - not applicable for standard images)
+            - 'Cells': int - count of detected cells
+            - '%': -100 (NaN encoding - not applicable for standard images)
     """
     cell_count = cell_counter.count_cells(img_path)
     return {'Nuclei': -100, 'Cells': cell_count, '%': -100}
