@@ -41,9 +41,10 @@ class BaseModel:
         """
         Model constructor. Slightly differs for detectors and segmenters.
 
-        Input:
-        - path_to_model: str - path to .pt YOLO model file;
-        - object_size: UI util param
+        Args:
+            path_to_model (str): Path to .pt YOLO model file
+            object_size: UI configuration object with callbacks and settings
+            model_data (dict): Model-specific configuration parameters. Optional.
         """
         self.original_image_path = None
         self.model_name = "<not specified>"
@@ -70,10 +71,7 @@ class BaseModel:
 
     def init_models(self, path_to_model: str):
         """
-        Helper function for initialization of actual YOLO model instances.
-
-        Input:
-        - path_to_model: str - path to .pt YOLO model file.
+        Helper function for initialization of actual YOLO model instances.    
         """
         self.init_x10_model(path_to_model)
         self.init_x20_model(path_to_model)
@@ -81,27 +79,26 @@ class BaseModel:
     def init_x10_model(self, path_to_model: str):
         """
         Helper function for initialization of actual YOLO model instance for x10 images processing.
-
-        Input:
-        - path_to_model: str - path to .pt YOLO model file.
         """
         pass
 
     def init_x20_model(self, path_to_model: str):
         """
         Helper function for initialization of actual YOLO model instance for x20 images processing.
-
-        Input:
-        - path_to_model: str - path to .pt YOLO model file.
         """
         pass
 
     def count_cells(self, img_path):
         """
-        By calling this method, the model class instance calculates cells on a given image.
+        Calculate cells on a given image.
+        
         This method fully relies on the self.count() method.
-        The input param is the path to RGB image of cells.
-        The output param is optimized count of cells.
+        
+        Args:
+            img_path (str): Path to RGB image of cells
+            
+        Returns:
+            int: Optimized count of cells detected
         """
         dst = IMAGE_FILE_NAME_TMP
         shutil.copy2(img_path, dst)
@@ -110,10 +107,25 @@ class BaseModel:
             return 0
         return detections
 
-    def count(self, input_image, scale: int = 20,
-              filename=IMAGE_FILE_NAME_DETECTION):
-        """General method for processing microimages of cells."""
-
+    def count(self, input_image, scale: int = 20, filename=IMAGE_FILE_NAME_DETECTION):
+        """
+        Process microimages of cells with specified magnification scale.
+        
+        Automatically switches between x10 and x20 processing pipelines based on the
+        scale parameter. Measures inference duration and updates detection count.
+        
+        Args:
+            input_image (str): Path to the image file to process
+            scale (int): Magnification scale, must be 10 or 20. Defaults to 20.
+            filename (str): Output path for processed detection image. Defaults to IMAGE_FILE_NAME_DETECTION.
+        
+        Returns:
+            pd.DataFrame | None: DataFrame with detection results or None if processing fails.
+                            Columns: class_id, class_name, confidence, box, scale
+        
+        Raises:
+            AssertionError: If scale is not 10 or 20.
+        """
         scale = self.object_size["scale"]
         assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
         self.detectionCount = -1
@@ -130,14 +142,45 @@ class BaseModel:
         return result
 
     def count_x10(self, input_image, filename):
-        """Method for processing images of x10 scale by applying sliding window approach."""
+        """
+        Process images of x10 scale by applying sliding window approach.
+        
+        Args:
+            input_image (str): Path to input image
+            filename (str): Output path for detection visualization
+            
+        Returns:
+            pd.DataFrame: Detection results
+            
+        Raises:
+            NotImplementedError: Always raised (must be implemented by subclasses)
+        """
         raise NotImplementedError
 
     def count_x20(self, input_image, filename):
-        """Method for processing images of x20 scale using single-time inference, as usual."""
+        """
+        Process images of x20 scale using single-time inference.
+        
+        Args:
+            input_image (str): Path to input image
+            filename (str): Output path for detection visualization
+            
+        Returns:
+            pd.DataFrame: Detection results
+            
+        Raises:
+            NotImplementedError: Always raised (must be implemented by subclasses)
+        """
         raise NotImplementedError
 
     def clear_cached_detections(self):
-        """Resets cached detections of needed."""
+        """
+        Reset cached detections when needed.
+        
+        Clears stored detection results to force re-processing on next inference.
+        
+        Returns:
+            None
+        """
         self.detections = None
        
