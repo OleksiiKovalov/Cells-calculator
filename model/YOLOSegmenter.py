@@ -29,10 +29,41 @@ from UI.app_globals import (
 from UI.app_globals import set_global
 
 class YoloSegmenter(BaseModel):
+    """
+    Instance segmentation using YOLO11 model.
+    
+    Provides interface to YOLOv8/YOLO11 for instance segmentation with support
+    for both single-image and tiled inference approaches. Includes:
+    - Full-image inference for x20 magnification
+    - Sliced inference with SAHI for x10 magnification
+    
+    Attributes:
+        model (YOLO): YOLOv8/YOLO11 segmentation model
+        model_x10 (AutoDetectionModel): SAHI-wrapped model for tiled inference
+    """
     def init_x20_model(self, path_to_model: str):
+        """
+        Load YOLO model for x20 magnification full-image inference.
+        
+        Args:
+            path_to_model (str): Path to YOLO .pt model weights file
+        """
         self.model = YOLO(path_to_model, task="segment")
 
     def init_x10_model(self, path_to_model):
+        """
+        Load YOLO model for x10 magnification tiled inference with SAHI.
+        
+        Uses SAHI (Sliced Aided Hyper Inference) for processing large x10 images
+        by dividing into overlapping tiles and stitching predictions.
+        
+        Args:
+            path_to_model (str): Path to YOLO .pt model weights file
+            
+        Note:
+            Confidence threshold: 0.005 (very permissive for SAHI)
+            Device: CPU (configurable in code)
+        """
         self.model_x10 = AutoDetectionModel.from_pretrained(
             model_type='yolov8',
             model_path=path_to_model,
@@ -137,6 +168,27 @@ class YoloSegmenter(BaseModel):
         alpha=0.75,
         **kwargs
     ):
+        """
+        Segment image using YOLO with SAHI tiling at x10 magnification.
+        
+        Divides large images into overlapping tiles, runs detection on each tile,
+        and merges predictions. Caches detections for reuse within same image.
+        
+        Args:
+            input_image (str): Path to input image
+            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
+            colormap (str): Matplotlib colormap. Defaults to 'tab20'.
+            min_score (float): Minimum confidence filter. Defaults to 0.01.
+            alpha (float): Mask transparency. Defaults to 0.75.
+            **kwargs: Additional arguments (unused)
+        
+        Returns:
+            pd.DataFrame: Segmentation results (same format as count_x20)
+            
+        Note:
+            Tile configuration: 144x144 with 10% overlap
+            Results are cached and reused if same image processed multiple times
+        """
         try:
             os.remove(filename)
         except FileNotFoundError:
