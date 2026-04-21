@@ -322,14 +322,12 @@ class CellDetectorPlugin(BasePlugin):
         try:
             # Full dataframe from segmentation models: use morphology area directly
             if hasattr(detection, "columns") and "area" in detection.columns:
-                print("\n\n\nUsing 'area' column from detection dataframe for range slider\n\n\n")
                 values = detection["area"].dropna().tolist()
                 if values:
                     self.range_slider.change_default(min(values), max(values))
                 else:
                     self.range_slider.change_default(0.0, 1.0)
                 return
-            print("\n\n\nUsing bounding box dimensions to calculate area for range slider\n\n\n")
 
             # Series/list of boxes
             values = []
