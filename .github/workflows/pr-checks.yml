@@ -1,0 +1,86 @@
+name: PR Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev/development2026Spring
+
+jobs:
+  check-requirements:
+    name: Check requirements.txt
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Project Requirements
+        shell: bash
+        run: |
+          pip install -r requirements.txt
+
+      - name: Verify Environment Integrity
+        shell: bash
+        run: |
+          echo "Running pip check to ensure no Dependency Hell was created..."
+          pip check
+          echo "Verifying Core Science Libraries are still intact..."
+          python -c "import numpy; print(f'NumPy: {numpy.__version__}')"
+
+      - name: Smoke Test Qt UI (Headless)
+        shell: bash
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          # Verifies that the Windows DLLs for Qt are present and working
+          python -c "from PyQt5.QtWidgets import QApplication; app = QApplication([]); print('Qt UI Initialized Successfully')"
+
+  pytest:
+    name: pytest
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: '**/requirements*.txt'
+
+      - name: Install Dev Requirements
+        shell: bash
+        run: |
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: pytest tests/
+
+  mypy:
+    name: mypy
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: '**/requirements*.txt'
+
+      - name: Install Dev Requirements
+        shell: bash
+        run: |
+          pip install -r requirements-dev.txt
+
+      - name: Run mypy
+        run: mypy model/

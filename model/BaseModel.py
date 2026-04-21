@@ -11,25 +11,39 @@ from collections import OrderedDict
 from pathlib import Path
 
 # Third-party imports
+import numpy as np
+import pandas as pd
 import torch
 
 # Local application imports
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
+from UI.app_globals import (
+    IMAGE_FILE_NAME_DETECTION,
+    IMAGE_FILE_NAME_GRID,
+    IMAGE_FILE_NAME_INGFERENCE,
+    IMAGE_FILE_NAME_TMP,
+)
+
 
 OUT_DIR = Path("cellprocesser_output")
 
-class BaseModel():
+
+class BaseModel:
     """
     Base class for general YOLO instance models.
-    Implements the neccessary high-level functional utils for using the model.
+
+    Implements the necessary high-level functional utils for using the model.
     """
-    def __init__(self, path_to_model: str, object_size,model_data = None):
+    original_image: np.ndarray | None
+    detections: pd.DataFrame | None
+    image_preprocess_settings_default: object
+
+    def __init__(self, path_to_model: str, object_size, model_data=None):
         """
         Model constructor. Slightly differs for detectors and segmenters.
 
         Input:
         - path_to_model: str - path to .pt YOLO model file;
-        - object_size: UI util param 
+        - object_size: UI util param
         """
         self.original_image_path = None
         self.model_name = "<not specified>"
@@ -40,8 +54,8 @@ class BaseModel():
             self.device = torch.device("cuda")
         else:
             self.device = torch.device("cpu")
-        self.use_gpu = self.device.type == 'cuda'
-        
+        self.use_gpu = self.device.type == "cuda"
+
         self.init_models(path_to_model)
         self.path_to_model = path_to_model
         self.object_size = object_size

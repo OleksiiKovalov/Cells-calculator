@@ -42,9 +42,9 @@ class NucleiCounter():
     def channel2points(self, channel):
         """Converts given binary channel to a set of points in 2D space."""
         indices = np.argwhere(channel > self.threshold)
-        Y_coordinates = channel.shape[0] - indices[:, 0]
-        X_coordinates = indices[:, 1]
-        return pd.DataFrame({'x': X_coordinates, 'y': Y_coordinates})
+        y_coordinates = channel.shape[0] - indices[:, 0]
+        x_coordinates = indices[:, 1]
+        return pd.DataFrame({'x': x_coordinates, 'y': y_coordinates})
 
     def groupNuclei(self, points):
         """Groups marked cell nuclei represented as points using DBSCAN clustering algorithm."""
@@ -52,7 +52,7 @@ class NucleiCounter():
         if points.shape[0] == 0:
             return 0
         cluster_labels = dbscan.fit_predict(points[['x', 'y']])
-        return np.max(cluster_labels)+1
+        return np.max(cluster_labels) + 1
 
     def countNuclei(self, img_channel):
         """Unites the functions above and calculates marked cell nuclei on a given image channel."""

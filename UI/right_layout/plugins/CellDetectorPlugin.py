@@ -322,12 +322,14 @@ class CellDetectorPlugin(BasePlugin):
         try:
             # Full dataframe from segmentation models: use morphology area directly
             if hasattr(detection, "columns") and "area" in detection.columns:
+                print("\n\n\nUsing 'area' column from detection dataframe for range slider\n\n\n")
                 values = detection["area"].dropna().tolist()
                 if values:
                     self.range_slider.change_default(min(values), max(values))
                 else:
                     self.range_slider.change_default(0.0, 1.0)
                 return
+            print("\n\n\nUsing bounding box dimensions to calculate area for range slider\n\n\n")
 
             # Series/list of boxes
             values = []
@@ -708,6 +710,18 @@ class CellDetectorPlugin(BasePlugin):
         else:
             self.print_result_segmenter(result)
 
+    def _format_value(self, label, value_permyriad, value_um=None, unit_um="µm"):
+        if value_permyriad in ("-", None):
+            return f"{label}: -"
+
+        value_permyriad = f"{float(value_permyriad):.2f}"
+
+        if value_um is None:
+            return f"{label}: {value_permyriad}‱"
+
+        value_um = f"{float(value_um):.2f}"
+        return f"{label}: {value_permyriad}‱ ({value_um} {unit_um})"
+
     def print_result_detector(self, result):
         results = []
         # Добавить количество клеток
@@ -716,33 +730,75 @@ class CellDetectorPlugin(BasePlugin):
         #     results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
         # except:
         #     results.append(f'Cells: {result["Cells"]}')
+
+        average_arithmetic_diameter_permyriad = "-"
+        average_geometric_diameters_permyriad = "-"
+        average_area_permyriad = "-"
+
+        average_arithmetic_diameter_um = None
+        average_geometrics_diameter_um = None
+        average_area_um2 = None
+
         try:
             boxes = result["Cells"]["box"]
 
-            # Извлечение длины и ширины (второй и третий элемент в массивах)
+            # Извлечение длины и ширины в пикселях (второй и третий элемент в массивах)
             lengths = boxes.apply(lambda x: x[2])
             widths = boxes.apply(lambda x: x[3])
 
-            img_area = self.model.cell_counter.original_image.shape[0] * self.model.cell_counter.original_image.shape[0]
+            image_h = self.model.cell_counter.original_image.shape[0]
+            image_w = self.model.cell_counter.original_image.shape[1]
+            img_area = image_h * image_w
 
             # Вычисление диагоналей (диаметры)
-            arithmetic_diameters = (lengths + widths) / 2
-            geometric_diameters = (lengths * widths)**(1/2)
+            arithmetic_diameters_px = (lengths + widths) / 2
+            geometric_diameters_px = (lengths * widths)**(1/2)
 
             # Вычисление площадей
-            areas = lengths * widths
+            areas_px2 = lengths * widths
+            average_area_px2 = areas_px2.mean()
 
-            average_arithmetic_diameter = arithmetic_diameters.mean() / img_area * 10000
-            average_geometric_diameters = geometric_diameters.mean() / img_area * 10000
-            average_area = areas.mean() / img_area * 10000
-        except:
-            average_arithmetic_diameter = "-"
-            average_geometric_diameters = "-"
-            average_area = "-"
+            img_linear = (image_h + image_w) / 2.0
+            average_arithmetic_diameter_permyriad = round(arithmetic_diameters_px.mean() / img_linear * 10000, 2)
+            average_geometric_diameters_permyriad = round(geometric_diameters_px.mean() / img_linear * 10000, 2)
+            average_area_permyriad = round(average_area_px2 / img_area * 10000, 2)
 
-        results.append(f"Mean S: {average_area}‱")
-        results.append(f"Mean Arithmetic D: {round(average_arithmetic_diameter, 2)}‱")
-        results.append(f"Mean Geometric D: {round(average_geometric_diameters, 2)}‱")
+            um_per_px = self.object_size.get("um_per_px")
+            if um_per_px is not None:
+                average_arithmetic_diameter_um = round(arithmetic_diameters_px.mean() * um_per_px, 2)
+                average_geometrics_diameter_um = round(geometric_diameters_px.mean() * um_per_px, 2)
+                average_area_um2 = round(average_area_px2 * (um_per_px ** 2), 2)
+
+        except Exception:
+            pass
+
+        results.append(
+            self._format_value(
+                "Mean S",
+                average_area_permyriad,
+                average_area_um2,
+                "µm²"
+            )
+        )
+
+        results.append(
+            self._format_value(
+                "Mean Arithmetic D",
+                average_arithmetic_diameter_permyriad,
+                average_arithmetic_diameter_um,
+                "µm"
+            )
+        )
+
+        results.append(
+            self._format_value(
+                "Mean Geometric D",
+                average_geometric_diameters_permyriad,
+                average_geometrics_diameter_um,
+                "µm"
+            )
+        )
+
         results.append("")
 
         # Добавить количество ядер
@@ -775,13 +831,36 @@ class CellDetectorPlugin(BasePlugin):
             inference_duration = -1
             if self.model:
                 inference_duration = self.model.inference_duration
+
+            avg_diameter_permyriad = round(avg_diameter * 10000, 3)
+            avg_area_permyriad = round(avg_area * 10000, 3)
+            avg_volume_permyriad = round(avg_volume * 10000, 3)
+
+            avg_diameter_um = None
+            avg_area_um2 = None
+            avg_volume_um3 = None
+
+            um_per_px = self.object_size.get("um_per_px")
+            if um_per_px is not None:
+                image_h = self.model.cell_counter.original_image.shape[0]
+                image_w = self.model.cell_counter.original_image.shape[1]
+
+                avg_diameter_px = avg_diameter * image_w
+                avg_area_px2 = avg_area * image_h * image_w
+                linear_scale_px = (image_h + image_w) / 2
+                avg_volume_px3 = avg_volume * (linear_scale_px ** 3)
+
+                avg_diameter_um = round(avg_diameter_px * um_per_px, 2)
+                avg_area_um2 = round(avg_area_px2 * (um_per_px ** 2), 2)
+                avg_volume_um3 = round(avg_volume_px3 * (um_per_px ** 3), 2)
+
             # Создание строк для вывода
             results = [
                 f"Objects detected: {num_cells}",
                 f"Duration        : {inference_duration:.2f} seconds",
-                f"Mean D: {round(avg_diameter*10000, 3)}‱",
-                f"Mean S: {round(avg_area*10000, 3)}‱",
-                f"Mean V: {round(avg_volume*10000, 3)}‱",
+                self._format_value("Mean D", avg_diameter_permyriad, avg_diameter_um, "µm"),
+                self._format_value("Mean S", avg_area_permyriad, avg_area_um2, "µm²"),
+                self._format_value("Mean V", avg_volume_permyriad, avg_volume_um3, "µm³"),
             ]
         except:
             results = [

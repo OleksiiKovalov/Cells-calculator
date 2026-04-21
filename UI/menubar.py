@@ -1,5 +1,5 @@
 # Standard library imports
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 from typing import Optional
 
 # Third-party imports
@@ -136,7 +136,7 @@ class menubar(QMenuBar):
 #            return QColor(100, 100, 100)  # Gray for directories
 
         if file_info.isFile():
-            filename = str(PureWindowsPath(file_info.absoluteFilePath()))
+            filename = str(Path(file_info.absoluteFilePath()))
             val = self.parent.image_mru.get(filename)
             if val is not None:
                 if val.year == 1:
@@ -165,7 +165,7 @@ class menubar(QMenuBar):
         
         if dialog.exec_() == QDialog.Accepted:
             set_setting("paths.last_opened_file", str(dialog.get_selected_file()))
-            selected_file =  str(PureWindowsPath(dialog.get_selected_file()))
+            selected_file =  str(Path(dialog.get_selected_file()))
             self.menubar_signal.emit("open_file", str(selected_file))
         dialog = None
 

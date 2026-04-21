@@ -2,61 +2,105 @@
 import json
 import os
 from typing import Optional, List, Tuple, Dict, Any
+from collections import OrderedDict
 
 # Third-party imports
 import cv2  # OpenCV for findContours
 import numpy as np
 import pandas as pd
-from cellpose import models as cp_models  # Для Cellpose
-from scipy.ndimage import find_objects  # For efficient bounding box calculation
+from cellpose import models as cp_models  # For Cellpose
+from scipy.ndimage import find_objects  # Efficient bounding box calculation
 from skimage.color import rgb2gray
 from skimage.io import imread
 
 # Local application imports
+from UI.app_globals import (
+    IMAGE_FILE_NAME_DETECTION,
+    IMAGE_FILE_NAME_GRID,
+    IMAGE_FILE_NAME_INGFERENCE,
+    IMAGE_FILE_NAME_TMP,
+)
 from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
-from model.utils import *
-from model.utils import safeimagesave, safe_image_read
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP
+from model.utils import (
+    plot_mask,
+    plot_predictions,
+    plot_predictions_with_alignment,
+    process_loaded_image,
+    resize_and_pad_cv,
+    safe_image_read,
+    safegray2rgb,
+    safe_image_write,
+)
 
 
 class CellposeSegmenter(BaseModel):
-    def __init__(self, path_to_model: str, object_size,model_data = None):
-       
-        super().__init__(path_to_model, object_size,model_data)
+    def __init__(self, path_to_model: str, object_size, model_data=None):
+        super().__init__(path_to_model, object_size, model_data)
         self.cellpose_diam = None
     
     def init_x20_model(self, path_to_model: str):
-        self.image_preprocess_settings_default = json.loads("[{\"gray2rgb\":\"\"}]", object_pairs_hook=OrderedDict)
+        self.image_preprocess_settings_default = json.loads(
+            '[{"gray2rgb":""}]', object_pairs_hook=OrderedDict
+        )
         if path_to_model and os.path.exists(path_to_model):
             print(f"Ініціалізація Cellpose з моделлю: {path_to_model}")
-            self.model = cp_models.CellposeModel(gpu=self.use_gpu, pretrained_model=path_to_model)
-        elif path_to_model in ['cyto', 'nuclei', 'cyto2', 'cyto3']:
+            self.model = cp_models.CellposeModel(
+                gpu=self.use_gpu, pretrained_model=path_to_model
+            )
+        elif path_to_model in ["cyto", "nuclei", "cyto2", "cyto3"]:
             print(f"Ініціалізація Cellpose зі стандартною моделлю: {path_to_model}")
-            self.model = cp_models.CellposeModel(gpu=self.use_gpu, model_type=path_to_model)
+            self.model = cp_models.CellposeModel(
+                gpu=self.use_gpu, model_type=path_to_model
+            )
         else:
-            default_model = 'cyto'
+            default_model = "cyto"
             if path_to_model:
-                print(f"Попередження: Шлях/назва '{path_to_model}' не валідні для Cellpose. Використовується '{default_model}'.")
+                print(
+                    f"Попередження: Шлях/назва '{path_to_model}' не валідні "
+                    f"для Cellpose. Використовується '{default_model}'."
+                )
             else:
-                print(f"Попередження: Не вказано модель Cellpose. Використовується '{default_model}'.")
-            self.model = cp_models.CellposeModel(model_type=default_model, gpu=self.use_gpu)
-            app_logger().warning(f"CellposeSegmenter: GPU Used:{self.use_gpu}")        
+                print(
+                    f"Попередження: Не вказано модель Cellpose. "
+                    f"Використовується '{default_model}'."
+                )
+            self.model = cp_models.CellposeModel(
+                model_type=default_model, gpu=self.use_gpu
+            )
+            app_logger().warning(f"CellposeSegmenter: GPU Used: {self.use_gpu}")
 
     def init_x10_model(self, path_to_model):
         pass
 
-    def count_x20(self, input_image, plot = True, colormap="tab20", tracking=False,
-              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.05,
-              alpha=0.75, store_bin_mask=False, **kwargs):
+    def count_x20(
+        self,
+        input_image,
+        plot=True,
+        colormap="tab20",
+        tracking=False,
+        filename=IMAGE_FILE_NAME_DETECTION,
+        min_score=0.05,
+        alpha=0.75,
+        store_bin_mask=False,
+        **kwargs,
+    ):
         image = imread(input_image)
-        image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
-        img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
-        safeimagesave(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        image_preprocess_settings = (
+            self.model_data["image_preprocess"]
+            if "image_preprocess" in self.model_data
+            else self.image_preprocess_settings_default
+        )
+        img_inference = process_loaded_image(
+            image=image, settings=image_preprocess_settings
+        )
+        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
         self.original_image = safegray2rgb(image)
-        channels_to_use=[0,0] # АДАПТУЙТЕ!
+        channels_to_use = [0, 0]  # Adapt!
         try:
-            masks, flows, styles = self.model.eval(img_inference, diameter=self.cellpose_diam, channels=channels_to_use)
+            masks, flows, styles = self.model.eval(
+                img_inference, diameter=self.cellpose_diam, channels=channels_to_use
+            )
             print(f"Cellpose знайшов {np.max(masks)} об'єктів.")
             cellprob = flows[2] # Cell probability map
             self.detections = self.cellpose_results_to_pandas(
@@ -65,45 +109,52 @@ class CellposeSegmenter(BaseModel):
                 image_shape_for_norm=image.shape[:2], # Or masks.shape[:2] if appropriate
                 store_bin_mask=False # Set to True if you need the binary masks in the DataFrame
             )
-            detections = self.detections[self.detections['confidence'] >= min_score]
+            detections = self.detections[self.detections["confidence"] >= min_score]
             if tracking is False:
-                self.object_size['signal']("set_size", self.detections['box'].copy())
-                self.detections[['id_label', 'confidence', 'diameter', 'area',
-                                 'volume']].to_csv(self.out_dir / f"{os.path.basename(self.original_image_path)}_{self.model_name}_cell_data.csv",
-                                                   sep=';', index=False)
+                self.object_size["signal"](
+                    "set_size", self.detections["box"].copy()
+                )
+                self.detections[
+                    ["id_label", "confidence", "diameter", "area", "volume"]
+                ].to_csv(
+                    self.out_dir
+                    / f"{os.path.basename(self.original_image_path)}_"
+                    f"{self.model_name}_cell_data.csv",
+                    sep=";",
+                    index=False,
+                )
             original_image = self.original_image.copy()
-            # if tracking is False:
-            #     filtered_detections = filter_detections(detections,
-            #                                             min_size = self.object_size['min_size'],
-            #                                             max_size= self.object_size['max_size'])
-            # else:
-            #     filtered_detections = detections
 
-            filtered_detections = detections                
-            
+            filtered_detections = detections
+
             self.prediction_image = None
-            if plot is True:
-                h, w = img_inference.shape[:2]
-                o_h, o_w = original_image.shape[:2]
-                #if image was scaled during preprocessing - scale the original image to show. it is a wrong way
-                #todo: redo it in the correct way - we need to scale box/mask, not image
-                if h!=o_h or w!=o_w:
-                    original_image = resize_and_pad_cv (original_image, w, h)
-               
-                self.prediction_image = plot_predictions(original_image, filtered_detections['mask'].tolist(),
-                                filename=filename, colormap=colormap, alpha=self.object_size.get("alpha", 0.75))
+            if plot:
+                self.prediction_image = plot_predictions_with_alignment(
+                    original_image,
+                    img_inference,
+                    filtered_detections["mask"].tolist(),
+                    filename=filename,
+                    colormap=colormap,
+                    alpha=self.object_size.get("alpha", 0.75),
+                )
             return filtered_detections
         except Exception as e:
             raise RuntimeError(f"Помилка інференсу Cellpose: {e}")
         
 
-    def count_x10(self, input_image: str, colormap="tab20",
-              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.01,
-              alpha=0.75, **kwargs):
+    def count_x10(
+        self,
+        input_image: str,
+        filename=IMAGE_FILE_NAME_DETECTION,
+        colormap="tab20",
+        min_score=0.01,
+        alpha=0.75,
+        **kwargs,
+    ):
         raise NotImplementedError
-    
-    def image_preprocess(self,image):
-        if image.ndim == 3 and image.shape[-1] == 3: # Check if likely RGB
+
+    def image_preprocess(self, image):
+        if image.ndim == 3 and image.shape[-1] == 3:  # Check if likely RGB
             print("Converting RGB image to grayscale...")
             img_gray = rgb2gray(image)
             # Ensure it's float type, rescale if needed (rgb2gray outputs 0-1 float)
@@ -116,12 +167,14 @@ class CellposeSegmenter(BaseModel):
         return img_prepared
 
     def load_image(self, image_path):
-        img_bgr = safe_image_read(image_path, color_mode='color')
+        img_bgr = safe_image_read(image_path, color_mode="color")
         if img_bgr is None:
-            raise RuntimeError(f"Помилка: Не вдалося завантажити зображення {image_path}")
-        if len(img_bgr.shape) == 2: 
+            raise RuntimeError(
+                f"Помилка: Не вдалося завантажити зображення {image_path}"
+            )
+        if len(img_bgr.shape) == 2:
             img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_GRAY2BGR)
-        elif len(img_bgr.shape) == 3 and img_bgr.shape[2] == 4: 
+        elif len(img_bgr.shape) == 3 and img_bgr.shape[2] == 4:
             img_bgr = cv2.cvtColor(img_bgr, cv2.COLOR_BGRA2BGR)
         return img_bgr
     
@@ -138,31 +191,34 @@ class CellposeSegmenter(BaseModel):
         an object detection model's output when processed into a structured format.
 
         Args:
-            masks (np.ndarray): The 2D integer array output from Cellpose, where each
-                                unique positive integer represents a segmented object
-                                (0 is typically background).
-            cellprob_map (Optional[np.ndarray]): The cell probability map from Cellpose
-                                                (often from `flows[2]` if using `model.eval()`).
-                                                Used to estimate a 'confidence' score.
-                                                Should have the same H, W dimensions as `masks`.
-            image_shape_for_norm (Optional[Tuple[int, int]]): The (height, width) of the
-                                                            original image, used for
-                                                            normalizing coordinates. If None,
-                                                            the shape of the `masks` array is used.
-            store_bin_mask (bool): If True, stores the boolean binary mask (boolean array)
-                                for each object in the DataFrame.
+            masks (np.ndarray): The 2D integer array output from Cellpose, where
+                each unique positive integer represents a segmented object
+                (0 is typically background).
+            cellprob_map (Optional[np.ndarray]): The cell probability map from
+                Cellpose (often from `flows[2]` if using `model.eval()`). Used
+                to estimate a 'confidence' score. Should have the same H, W
+                dimensions as `masks`.
+            image_shape_for_norm (Optional[Tuple[int, int]]): The (height, width)
+                of the original image, used for normalizing coordinates. If
+                None, the shape of the `masks` array is used.
+            store_bin_mask (bool): If True, stores the boolean binary mask
+                (boolean array) for each object in the DataFrame.
 
         Returns:
-            pd.DataFrame: A DataFrame where each row corresponds to a detected object.
-                        Columns include:
-                        - id_label: The unique integer ID of the object from the mask.
-                        - box: Normalized bounding box [x_min_norm, y_min_norm, width_norm, height_norm].
-                        - mask: List of normalized contour points [[x1n, y1n], [x2n, y2n], ...].
-                        - confidence: Average cell probability within the mask, or 1.0 if no map.
-                        - diameter: Equivalent diameter of a circle with the same area as the mask.
-                        - area: Area of the mask in pixels.
-                        - volume: For 2D masks, this is the same as area.
-                        - bin_mask (optional): The boolean binary mask for the object.
+            pd.DataFrame: A DataFrame where each row corresponds to a detected
+                object. Columns include:
+                - id_label: The unique integer ID of the object from the mask.
+                - box: Normalized bounding box
+                  [x_min_norm, y_min_norm, width_norm, height_norm].
+                - mask: List of normalized contour points
+                  [[x1n, y1n], [x2n, y2n], ...].
+                - confidence: Average cell probability within the mask, or 1.0 if
+                  no map.
+                - diameter: Equivalent diameter of a circle with the same area as
+                  the mask.
+                - area: Area of the mask in pixels.
+                - volume: For 2D masks, this is the same as area.
+                - bin_mask (optional): The boolean binary mask for the object.
         """
         if image_shape_for_norm is None:
             img_height, img_width = masks.shape[:2]
@@ -197,15 +253,13 @@ class CellposeSegmenter(BaseModel):
             if area == 0: # Should not happen if object_id comes from unique valid masks
                 continue
 
-            data['id_label'].append(int(object_id))
-            
+            data["id_label"].append(int(object_id))
             if store_bin_mask:
-                data['bin_mask'].append(current_bin_mask)
+                data["bin_mask"].append(current_bin_mask)
 
             # Bounding Box calculation
             # find_objects on a binary mask of a single object returns a list with one item (tuple of slices)
             slices = find_objects(current_bin_mask)
-            
             if not slices or slices[0] is None:
                 # This case is highly unlikely if area > 0. Fill with NaNs for robustness.
                 data['box'].append([np.nan, np.nan, np.nan, np.nan])
@@ -264,7 +318,8 @@ class CellposeSegmenter(BaseModel):
                     confidence = np.nan 
                     print(f"Warning: cellprob_map shape {cellprob_map.shape} "
                         f"mismatches mask shape {current_bin_mask.shape} "
-                        f"for object_id {object_id}. Confidence set to NaN.")
+                        f"for object_id {object_id}. Confidence set to NaN."
+                    )
             else:
                 confidence = 1.0 # Default if no cell probability map is provided
                 

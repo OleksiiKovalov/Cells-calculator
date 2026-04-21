@@ -167,7 +167,8 @@ class MainWindow(QMainWindow):
                    'color_map' : "viridis",
                    'color_map_list' : list(color_number.keys()),
                    'line_width' : 100.00,
-                   'scale' : 20
+                   'scale' : 20,
+                   'um_per_px' : 0.325
         }
         
         self.default_object_size = self.object_size.copy()
