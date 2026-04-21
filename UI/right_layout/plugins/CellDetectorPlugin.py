@@ -21,7 +21,7 @@ from UI.ModelsCheckList import ModelsCheckListDialog
 from UI.rangeslider import RangeSlider
 from UI.right_layout.plugins.BasePlugin import BasePlugin
 from model.Model import Model
-from model.utils import create_image_grid, draw_bounding_box, filter_detections, plot_predictions, safe_image_write
+from model.utils import create_image_grid, draw_bounding_box, filter_segmentation_detections, plot_predictions, safe_image_write
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE
 
 
@@ -131,8 +131,8 @@ class RangeSliderWrapper(QWidget):
         try:
             self.lockCount += 1
             """Set slider to default values"""
-            min_val = self.default_object_size['min_size']
-            max_val = self.default_object_size['max_size']
+            min_val = float(self.default_object_size['min_size'])
+            max_val = float(self.default_object_size['max_size'])
         
             self.object_size['min_size'] = min_val
             self.object_size['max_size'] = max_val
@@ -171,13 +171,17 @@ class RangeSliderWrapper(QWidget):
             self.lockCount += 1
             """Change the range and default values"""
             if min_size is None:
-                min_size = 100
+                min_size = 0.0
             if max_size is None:
-                max_size = 0
+                max_size = 1.0
+
+            # Keep normalized metrics within sane bounds
+            min_size = max(0.0, min(min_size, 1.0))
+            max_size = max(0.0, min(max_size, 1.0))
             
             # Update default values with some buffer
-            self.default_object_size['min_size'] = min_size - min_size / 100
-            self.default_object_size['max_size'] = max_size + max_size / 100
+            self.default_object_size['min_size'] = min_size
+            self.default_object_size['max_size'] = max_size 
         
             # Update slider range
             self.range_slider.setRange(
@@ -244,7 +248,7 @@ class CellDetectorPlugin(BasePlugin):
             # self.max_range_slider.set_default()
             # self.min_range_slider.set_default()
             # workaround for some weird bug when app crashes after opening new image after prev recognition
-            self.range_slider.change_default(100, 0)
+            self.range_slider.change_default(0.0, 1.0)
 
             self.lsm_path = value
             self.lsm_filesList = None
@@ -311,33 +315,41 @@ class CellDetectorPlugin(BasePlugin):
             pass
 
     def set_size(self, detection, img_size : tuple = (512,512)):
-        min_size, max_size = self.default_object_size["min_size"], self.default_object_size["max_size"]
-        model = self.combo_box.currentText()
-        if all(len(cell) >= 4 for cell in detection):
-            img_sq = img_size[0] * img_size[1]
-            # Вычисляем произведения для каждого 
-            values = [cell[2] * cell[3] for cell in detection] 
-            if values:
-                # Находим максимальное и минимальное произведение
-                min_size_from_detection = min(values) / img_sq
-                max_size_from_detection = max(values) / img_sq
-                if self.lsm_filesList or model != "All_models":
-                    if min_size_from_detection >= min_size:
-                        min_size = None
-                    else:
-                        min_size = min_size_from_detection
-                    if max_size_from_detection <= max_size:
-                        max_size = None
-                    else:
-                        max_size = max_size_from_detection
+        if detection is None or len(detection) == 0:
+            self.range_slider.change_default(0.0, 1.0)
+            return
+
+        try:
+            # Full dataframe from segmentation models: use morphology area directly
+            if hasattr(detection, "columns") and "area" in detection.columns:
+                values = detection["area"].dropna().tolist()
+                if values:
+                    self.range_slider.change_default(min(values), max(values))
                 else:
-                    min_size = min_size_from_detection
-                    max_size = max_size_from_detection
+                    self.range_slider.change_default(0.0, 1.0)
+                return
+
+            # Series/list of boxes
+            values = []
+            if all(len(cell) >= 4 for cell in detection):
+                for cell in detection:
+                    area = float(cell[2]) * float(cell[3])
+
+                    # If widths/heights are normalized, area is already normalized
+                    if 0.0 <= float(cell[2]) <= 1.0 and 0.0 <= float(cell[3]) <= 1.0:
+                        values.append(area)
+                    else:
+                        img_sq = img_size[0] * img_size[1]
+                        values.append(area / img_sq)
+
+            if values:
+                self.range_slider.change_default(min(values), max(values))
             else:
-                min_size = None
-                max_size = None
-        if min_size is not None and max_size is not None:
-            self.range_slider.change_default(min_size=min_size, max_size=max_size)
+                self.range_slider.change_default(0.0, 1.0)
+
+        except Exception as e:
+            app_logger().exception(e)
+            self.range_slider.change_default(0.0, 1.0)
 
     def calculate_button(self):
         """
@@ -942,16 +954,31 @@ class CellDetectorPlugin(BasePlugin):
         if detections is None:
             return
         
-        filtered_detections = filter_detections(detections, min_size=min_value, max_size=max_value)        
-        
+        if hasattr(detections, "columns") and all(c in detections.columns for c in ["area", "mask"]):
+            filtered_detections = filter_segmentation_detections(
+                detections,
+                min_size=min_value,
+                max_size=max_value,
+                size_metric=self.object_size.get("size_metric", "area")
+            )
+        else:
+            from model.utils import filter_detections
+            filtered_detections = filter_detections(
+                detections,
+                min_size=min_value,
+                max_size=max_value
+            )
+
         # Check if filtered_detections has 'mask' key and is valid
         if filtered_detections is not None and 'mask' in filtered_detections and filtered_detections['mask'] is not None:
+            base_image = get_global('image_display_base')
             plot_predictions(
-                get_global('image_inference'), 
+                base_image.copy(),
                 filtered_detections['mask'].tolist(), 
                 filename=IMAGE_FILE_NAME_DETECTION, 
                 colormap=self.object_size["color_map"], 
-                alpha=self.object_size.get("alpha", 0.75)
+                alpha=self.object_size.get("alpha", 0.75),
+                color_ids=filtered_detections['id_label'].tolist() if 'id_label' in filtered_detections else None
             )
         else:
             image = get_global('image_inference').copy()
@@ -983,8 +1010,8 @@ class CellDetectorPlugin(BasePlugin):
         self.reset_detection()
 
     def currentModelChanged(self):
-        self.default_object_size['min_size'] = 100
-        self.default_object_size['max_size'] = 0
+        self.default_object_size['min_size'] = 0.0
+        self.default_object_size['max_size'] = 1.0
         
         # Reset range slider to default values
         if hasattr(self, 'range_slider'):

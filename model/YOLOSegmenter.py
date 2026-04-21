@@ -119,12 +119,14 @@ class YoloSegmenter(BaseModel):
         self.prediction_image = None
         if plot is True:
             set_global('image_inference', original_image)
+            set_global('image_display_base', original_image.copy())
             self.prediction_image = plot_predictions(
                 original_image,
                 filtered_detections['mask'].tolist(),
                 filename=filename,
                 colormap=colormap,
-                alpha=self.object_size.get("alpha", 0.75)
+                alpha=self.object_size.get("alpha", 0.75),
+                color_ids=filtered_detections['id_label'].tolist()
             )
         return filtered_detections
 
@@ -163,6 +165,7 @@ class YoloSegmenter(BaseModel):
         filtered_detections = detections
         
         set_global('image_inference', original_image)
+        set_global('image_display_base', original_image.copy())
         self.prediction_image = None
         self.prediction_image = plot_predictions(
             original_image,
