@@ -104,7 +104,8 @@ class BaseModel:
         The output param is optimized count of cells.
         """
         dst = IMAGE_FILE_NAME_TMP
-        shutil.copy2(img_path, dst)
+        if os.path.abspath(img_path) != os.path.abspath(dst):
+            shutil.copy2(img_path, dst)
         detections = self.count(dst)
         if detections is None:
             return 0

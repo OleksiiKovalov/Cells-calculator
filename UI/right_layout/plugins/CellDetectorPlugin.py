@@ -2,6 +2,7 @@
 import os
 import time
 import traceback
+import pandas as pd
 
 # Third-party imports
 import matplotlib.pyplot as plt
@@ -830,6 +831,14 @@ class CellDetectorPlugin(BasePlugin):
             if self.model:
                 inference_duration = self.model.inference_duration
 
+            # Handle NaN values from empty DataFrame
+            if pd.isna(avg_diameter):
+                avg_diameter = 0.0
+            if pd.isna(avg_area):
+                avg_area = 0.0
+            if pd.isna(avg_volume):
+                avg_volume = 0.0
+
             avg_diameter_permyriad = round(avg_diameter * 10000, 3)
             avg_area_permyriad = round(avg_area * 10000, 3)
             avg_volume_permyriad = round(avg_volume * 10000, 3)
@@ -911,8 +920,13 @@ class CellDetectorPlugin(BasePlugin):
                 # Show the inference image (if available)
                     self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_INGFERENCE)
             elif self.show_boundry == 1:  # Detections
-                # Show the image with bounding box detections
-                self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_DETECTION)
+                # Check if there are detections before showing detection image
+                detections = get_global('detections')
+                if detections is not None and len(detections) > 0:
+                    self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_DETECTION)
+                else:
+                    # No detections - fall back to original image
+                    self.plugin_signal.emit("add_image", self.lsm_path)
             else:
                 # Default to original image
                 self.plugin_signal.emit("add_image", self.lsm_path)
