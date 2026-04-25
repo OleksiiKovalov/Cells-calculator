@@ -207,8 +207,47 @@ def read_img(img_path, cell_channel=0, nuclei_channel=1):
     elif is_image_valid(img_path):
         return read_standard_img(img_path)
 
+
+def extract_nuclei_channel(img_path, nuclei_channel=1):
+    """Extracts the channel used for dead-cell counting from any supported image."""
+    if img_path.endswith('lsm'):
+        img = read_lsm_img(img_path, nuclei_channel=nuclei_channel)
+        return img[:, :, nuclei_channel]
+
+    img = safe_image_read(img_path, color_mode='unchanged')
+    if img is None:
+        return None
+
+    if img.ndim == 2:
+        return img
+
+    if img.ndim == 3:
+        if img.shape[2] == 1:
+            return img[:, :, 0]
+        if 0 <= nuclei_channel < img.shape[2]:
+            return img[:, :, nuclei_channel]
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    return None
+
+
+def count_detected_objects(detections) -> int:
+    """Returns the number of detected objects for detector- and segmenter-style outputs."""
+    if detections is None:
+        return 0
+    if hasattr(detections, "shape"):
+        return int(detections.shape[0])
+    return int(detections)
+
+
+def calculate_alive_percentage(cell_count: int, nuclei_count: int):
+    """Calculates alive percentage, returning -100 when it cannot be computed."""
+    if cell_count <= 0:
+        return -100
+    return round((1 - nuclei_count / cell_count) * 100, 3)
+
 def calculate_lsm(cell_counter, nuclei_counter,
-                  img_path, cell_channel=0, nuclei_channel=1):
+                  img_path, cell_channel=0, nuclei_channel=1, nuclei_count=None):
     """
     Calculates the resulting target values.
     Input params are:
@@ -217,9 +256,9 @@ def calculate_lsm(cell_counter, nuclei_counter,
     - nuclei_channel: channel with stained nuclei. Default to 1.
 
     Returns the result as a dictionary with the following fields:
-    - Nuclei: count for stained nuclei detected (given lsm image only);
+    - Nuclei: count for stained nuclei detected;
     - Cells: count for all the cells detected;
-    - %: the target percentage for alive cells (given lsm image only).
+    - %: the target percentage for alive cells.
     """
     img = read_lsm_img(img_path)
 
@@ -231,9 +270,13 @@ def calculate_lsm(cell_counter, nuclei_counter,
         os.remove(tmp_path)
     except FileNotFoundError:
         pass
-    nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
-    percentage = (1 - nuclei_count / cell_count.shape[0]) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage, 3)}
+    if nuclei_count is None:
+        nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
+    percentage = calculate_alive_percentage(
+        count_detected_objects(cell_count),
+        nuclei_count
+    )
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
 
 
 

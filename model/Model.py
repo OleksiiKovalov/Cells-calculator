@@ -12,7 +12,14 @@ import os
 # Local application imports
 from UI.app_globals import get_registered_model
 from model.NucleiCounter import NucleiCounter
-from model.utils import is_image_valid, calculate_lsm, show_error_message
+from model.utils import (
+    calculate_alive_percentage,
+    calculate_lsm,
+    count_detected_objects,
+    extract_nuclei_channel,
+    is_image_valid,
+    show_error_message
+)
 
 class Model:
     """
@@ -32,6 +39,8 @@ class Model:
     - 'Cells': the number of cells detected;
     - '%': the target percentage value obtained.
     """
+    _nuclei_cache = {}
+
     def __init__(
         self, 
         path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
@@ -51,6 +60,32 @@ class Model:
         self.inference_duration = 0
         self.model_name = model_name       
         self.cell_counter.model_name = model_name
+
+    def _get_nuclei_cache_key(self, img_path, nuclei_channel):
+        """Builds a stable cache key for dead-cell counting."""
+        return (
+            os.path.abspath(img_path),
+            os.path.getmtime(img_path),
+            nuclei_channel,
+            self.nuclei_counter.threshold,
+            self.nuclei_counter.eps,
+            self.nuclei_counter.min_samples,
+        )
+
+    def get_nuclei_count(self, img_path, nuclei_channel=1):
+        """Returns cached nuclei count for the same image/channel when available."""
+        cache_key = self._get_nuclei_cache_key(img_path, nuclei_channel)
+        cached_value = self._nuclei_cache.get(cache_key)
+        if cached_value is not None:
+            return cached_value
+
+        nuclei_channel_img = extract_nuclei_channel(img_path, nuclei_channel=nuclei_channel)
+        nuclei_count = 0 if nuclei_channel_img is None else self.nuclei_counter.countNuclei(nuclei_channel_img)
+
+        if len(self._nuclei_cache) >= 32:
+            self._nuclei_cache.clear()
+        self._nuclei_cache[cache_key] = nuclei_count
+        return nuclei_count
         
     def init_counter(self, path, object_size, model_type,model_data = None):
         """
@@ -76,30 +111,42 @@ class Model:
         - nuclei_channel: channel with stained nuclei. Default to 1.
 
         Returns the result as a dictionary with the following fields:
-        - Nuclei: count for stained nuclei detected (given lsm image only);
+        - Nuclei: count for stained nuclei detected;
         - Cells: count for all the cells detected;
-        - %: the target percentage for alive cells (given lsm image only).
+        - %: the target percentage for alive cells.
         """
         if img_path.endswith('lsm'):
             self.inference_duration = -1
+            nuclei_count = self.get_nuclei_count(img_path, nuclei_channel=nuclei_channel)
             return calculate_lsm(self.cell_counter, self.nuclei_counter,
-                  img_path, cell_channel, nuclei_channel)
+                  img_path, cell_channel, nuclei_channel, nuclei_count=nuclei_count)
         elif is_image_valid(img_path):
-            result =calculate_standard(self.cell_counter, img_path)
+            result = calculate_standard(
+                self.cell_counter,
+                img_path,
+                nuclei_count=self.get_nuclei_count(img_path, nuclei_channel=nuclei_channel),
+                nuclei_channel=nuclei_channel
+            )
             self.inference_duration = self.cell_counter.inference_duration
             return result
 
-def calculate_standard(cell_counter, img_path : str):
+def calculate_standard(cell_counter, img_path: str, nuclei_count, nuclei_channel=1):
     """
-    Calculates cells only on given standard image.
+    Calculates cells, nuclei and alive percentage on a given standard image.
     Input params are:
     - cell_counter: CellCounter class instance;
     - img_path: path to lsm/jpg/png/tif/bmp image.
+    - nuclei_count: precomputed count for stained nuclei detected.
+    - nuclei_channel: channel with stained nuclei. Default to 1.
 
     Returns the result as a dictionary with the following fields:
-    - Nuclei: -100 (encoding for NaN);
+    - Nuclei: count for stained nuclei detected;
     - Cells: count for all the cells detected;
-    - %: -100 (encoding for NaN).
+    - %: the target percentage for alive cells.
     """
     cell_count = cell_counter.count_cells(img_path)
-    return {'Nuclei': -100, 'Cells': cell_count, '%': -100}
+    percentage = calculate_alive_percentage(
+        count_detected_objects(cell_count),
+        nuclei_count
+    )
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
