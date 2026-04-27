@@ -140,15 +140,20 @@ class CellCounter(BaseModel):
                 }
                 detections.append(detection)
 
-            # Perform square-based filtering of bboxes
+            # Perform square-based filtering of bboxes. Keep the expected
+            # columns even when no objects pass the detector/NMS thresholds.
             detections = pd.DataFrame(
                 detections,
-                columns=["class_id", "class_name", "confidence", "box", "scale"]
+                columns=["class_id", "class_name", "confidence", "box", "scale"],
             )
             self.detections = detections
             csv_data = self.detections.copy()
-            csv_data["width"] = csv_data["box"].apply(lambda b: b[2] / length)
-            csv_data["height"] = csv_data["box"].apply(lambda b: b[3] / length)
+            csv_data["width"] = csv_data["box"].apply(
+                lambda b: b[2] / length if b is not None else None
+            )
+            csv_data["height"] = csv_data["box"].apply(
+                lambda b: b[3] / length if b is not None else None
+            )
             csv_data["bbox_area"] = (
                 csv_data["width"] * csv_data["height"] / length**2
             )

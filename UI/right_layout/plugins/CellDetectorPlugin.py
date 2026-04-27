@@ -1,5 +1,6 @@
 # Standard library imports
 import os
+import math
 import time
 import traceback
 
@@ -42,6 +43,12 @@ class RangeSliderWrapper(QWidget):
         self.round_parametr_slider = object_size['round_parametr_slider']
         self.round_parametr_value_input = object_size['round_parametr_value_input']
         self.initUI()
+
+    def _to_slider_floor(self, value):
+        return int(math.floor(float(value) * self.round_parametr_slider))
+
+    def _to_slider_ceil(self, value):
+        return int(math.ceil(float(value) * self.round_parametr_slider))
             
     def initUI(self):
         layout = QVBoxLayout()
@@ -51,10 +58,10 @@ class RangeSliderWrapper(QWidget):
         
         # Create the range slider
         self.range_slider = RangeSlider(
-            minimum=int(self.object_size['min_size'] * self.round_parametr_slider),
-            maximum=int(self.object_size['max_size'] * self.round_parametr_slider),
-            low=int(self.object_size['min_size'] * self.round_parametr_slider),
-            high=int(self.object_size['max_size'] * self.round_parametr_slider)
+            minimum=self._to_slider_floor(self.object_size['min_size']),
+            maximum=self._to_slider_ceil(self.object_size['max_size']),
+            low=self._to_slider_floor(self.object_size['min_size']),
+            high=self._to_slider_ceil(self.object_size['max_size'])
         )
         
         # Connect signals
@@ -109,8 +116,18 @@ class RangeSliderWrapper(QWidget):
         if self.lockCount > 0:
             return  
         """Handle range slider value changes"""
-        min_value = low / self.round_parametr_slider
-        max_value = high / self.round_parametr_slider
+        slider_min = self.range_slider.minimum()
+        slider_max = self.range_slider.maximum()
+        min_value = (
+            float(self.default_object_size['min_size'])
+            if low == slider_min
+            else low / self.round_parametr_slider
+        )
+        max_value = (
+            float(self.default_object_size['max_size'])
+            if high == slider_max
+            else high / self.round_parametr_slider
+        )
         
         # Update object_size
         self.object_size['min_size'] = min_value
@@ -138,8 +155,8 @@ class RangeSliderWrapper(QWidget):
             self.object_size['max_size'] = max_val
         
             self.range_slider.setValues(
-                int(min_val * self.round_parametr_slider),
-                int(max_val * self.round_parametr_slider)
+                self._to_slider_floor(min_val),
+                self._to_slider_ceil(max_val)
             )
             self.min_label.setText(f"Min: {min_val * self.round_parametr_value_input:.2f}")
             self.max_label.setText(f"Max: {max_val * self.round_parametr_value_input:.2f}")
@@ -185,8 +202,8 @@ class RangeSliderWrapper(QWidget):
         
             # Update slider range
             self.range_slider.setRange(
-                int(self.default_object_size['min_size'] * self.round_parametr_slider),
-                int(self.default_object_size['max_size'] * self.round_parametr_slider)
+                self._to_slider_floor(self.default_object_size['min_size']),
+                self._to_slider_ceil(self.default_object_size['max_size'])
             )
         
             # Set to default values
