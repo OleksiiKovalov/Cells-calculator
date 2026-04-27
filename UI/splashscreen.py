@@ -48,31 +48,63 @@ ICON_BORDER_COLOR = QColor(25, 25, 112)  # Midnight blue
 GRADIENT_START = Qt.white
 GRADIENT_END = QColor(240, 248, 255)  # Light blue
 
-class SplashScreen(QSplashScreen):
-    """Custom splash screen with progress bar for application initialization"""
-    
-    def __init__(self, max_progress: int = 100):
-        """
-        Initialize the splash screen.
-        
-        Args:
-            max_progress: Maximum value for the progress bar
-        """
-        self.max_progress = max_progress
-        self._current_progress = 0
-        
-        # Create and customize the splash pixmap
-        splash_pixmap = self._create_splash_pixmap()
-        
-        super().__init__(splash_pixmap, Qt.WindowStaysOnTopHint)
-        
-        # Setup UI components
-        self._setup_progress_bar()
-        self._setup_status_label()
+# Styles
+PROGRESS_BAR_STYLE = """
+    QProgressBar {
+        border: 2px solid #4682B4;
+        border-radius: 12px;
+        background-color: #F0F8FF;
+        text-align: center;
+        font-weight: bold;
+        color: #191970;
+    }
+    QProgressBar::chunk {
+        background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
+            stop: 0 #87CEEB, stop: 1 #4682B4);
+        border-radius: 10px;
+        margin: 1px;
+    }
+"""
 
-        self.logger = app_logger()
+STATUS_LABEL_STYLE = """
+    color: #191970; 
+    font-size: 13px; 
+    font-weight: bold;
+    background: transparent;
+"""
+
+ERROR_STATUS_STYLE = """
+    color: #8B0000; 
+    font-size: 13px; 
+    font-weight: bold;
+    background: transparent;
+"""
+
+ERROR_PROGRESS_STYLE = """
+    QProgressBar {
+        border: 2px solid #8B0000;
+        border-radius: 12px;
+        background-color: #FFE4E1;
+        text-align: center;
+        font-weight: bold;
+        color: #8B0000;
+    }
+    QProgressBar::chunk {
+        background-color: #CD5C5C;
+        border-radius: 10px;
+        margin: 1px;
+    }
+"""
+
+class SplashPixmapPainter:
+    """Helper class for painting the splash screen pixmap."""
     
-    def _create_splash_pixmap(self) -> QPixmap:
+    __slots__ = ('logger',)
+    
+    def __init__(self, logger: logging.Logger):
+        self.logger = logger
+    
+    def create_pixmap(self) -> QPixmap:
         """Create the splash screen pixmap with background and content."""
         pixmap = QPixmap(WINDOW_WIDTH, WINDOW_HEIGHT)
         pixmap.fill(Qt.white)
@@ -137,6 +169,32 @@ class SplashScreen(QSplashScreen):
         subtitle_font = QFont("Arial", 12)
         painter.setFont(subtitle_font)
         painter.drawText(0, 175, WINDOW_WIDTH, 25, Qt.AlignCenter, "Advanced Cell Analysis Tool")
+
+
+class SplashScreen(QSplashScreen):
+    """Custom splash screen with progress bar for application initialization"""
+    
+    __slots__ = ('max_progress', '_current_progress', 'logger', 'progress_bar', 'status_label')
+    
+    def __init__(self, max_progress: int = 100):
+        """
+        Initialize the splash screen.
+        
+        Args:
+            max_progress: Maximum value for the progress bar
+        """
+        self.max_progress = max_progress
+        self._current_progress = 0
+        
+        self.logger = app_logger()
+        painter = SplashPixmapPainter(self.logger)
+        splash_pixmap = painter.create_pixmap()
+        
+        super().__init__(splash_pixmap, Qt.WindowStaysOnTopHint)
+        
+        # Setup UI components
+        self._setup_progress_bar()
+        self._setup_status_label()
     
     def _setup_progress_bar(self) -> None:
         """Setup the progress bar widget."""
@@ -144,7 +202,7 @@ class SplashScreen(QSplashScreen):
         self.progress_bar.setRange(0, self.max_progress)
         self.progress_bar.setValue(0)
         self.progress_bar.setFixedSize(PROGRESS_BAR_WIDTH, PROGRESS_BAR_HEIGHT)
-        self.progress_bar.setStyleSheet(self._get_progress_style())
+        self.progress_bar.setStyleSheet(PROGRESS_BAR_STYLE)
         
         self.progress_bar.setParent(self)
         self.progress_bar.move(50, 260)
@@ -154,40 +212,12 @@ class SplashScreen(QSplashScreen):
         """Setup the status label widget."""
         self.status_label = QLabel("Initializing...")
         self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet(self._get_status_style())
+        self.status_label.setStyleSheet(STATUS_LABEL_STYLE)
         
         self.status_label.setParent(self)
         self.status_label.move(50, 230)
         self.status_label.resize(PROGRESS_BAR_WIDTH, STATUS_LABEL_HEIGHT)
         self.status_label.show()
-    
-    def _get_progress_style(self) -> str:
-        """Get the progress bar stylesheet."""
-        return """
-            QProgressBar {
-                border: 2px solid #4682B4;
-                border-radius: 12px;
-                background-color: #F0F8FF;
-                text-align: center;
-                font-weight: bold;
-                color: #191970;
-            }
-            QProgressBar::chunk {
-                background-color: qlineargradient(x1: 0, y1: 0, x2: 1, y2: 0,
-                    stop: 0 #87CEEB, stop: 1 #4682B4);
-                border-radius: 10px;
-                margin: 1px;
-            }
-        """
-    
-    def _get_status_style(self) -> str:
-        """Get the status label stylesheet."""
-        return """
-            color: #191970; 
-            font-size: 13px; 
-            font-weight: bold;
-            background: transparent;
-        """
     
     def update_progress(self, value: int, message: str = "") -> None:
         """
@@ -197,11 +227,12 @@ class SplashScreen(QSplashScreen):
             value: New progress value
             message: Status message to display
         """
-        self._current_progress = value
-        self.progress_bar.setValue(value)
+        clamped_value = max(0, min(self.max_progress, value))
+        self._current_progress = clamped_value
+        self.progress_bar.setValue(clamped_value)
         if message:
             self.status_label.setText(message)
-            self.logger.info(f"SplashScreen:{value}: {message}")
+            self.logger.info(f"SplashScreen:{clamped_value}: {message}")
         QApplication.processEvents()
     
     def show_error(self, error_message: str) -> None:
@@ -212,38 +243,21 @@ class SplashScreen(QSplashScreen):
             error_message: Error message to display
         """
         self.status_label.setText(f"Error: {error_message}")
-        self.status_label.setStyleSheet("""
-            color: #8B0000; 
-            font-size: 13px; 
-            font-weight: bold;
-            background: transparent;
-        """)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid #8B0000;
-                border-radius: 12px;
-                background-color: #FFE4E1;
-                text-align: center;
-                font-weight: bold;
-                color: #8B0000;
-            }
-            QProgressBar::chunk {
-                background-color: #CD5C5C;
-                border-radius: 10px;
-                margin: 1px;
-            }
-        """)
+        self.status_label.setStyleSheet(ERROR_STATUS_STYLE)
+        self.progress_bar.setStyleSheet(ERROR_PROGRESS_STYLE)
         QApplication.processEvents()
 
 
 class SplashScreenManager:
     """Manager class for splash screen to avoid global variables."""
     
+    __slots__ = ('_splash', '_progress')
+    
     def __init__(self):
         self._splash: Optional[SplashScreen] = None
         self._progress = 0
     
-    def init_splash(self, max_progress: int = 33) -> None:
+    def init_splash(self, max_progress: int = 100) -> None:
         """Initialize and show the splash screen."""
         if self._splash is None:
             self._progress = 0
@@ -260,8 +274,7 @@ class SplashScreenManager:
     def update_splash(self, value: int, message: str = "") -> None:
         """Update splash screen progress."""
         if self._splash is not None:
-            self._progress += 1
-            value = self._progress
+            self._progress = value
             self._splash.update_progress(value, message)
     
     def show_error(self, message: str) -> None:
@@ -274,15 +287,15 @@ class SplashScreenManager:
 splash_manager = SplashScreenManager()
 
 # Backward compatibility functions
-def init_splash():
+def init_splash() -> None:
     splash_manager.init_splash()
 
-def close_splash():
+def close_splash() -> None:
     splash_manager.close_splash()
 
-def update_splash(value, message=""):
+def update_splash(value: int, message: str = "") -> None:
     splash_manager.update_splash(value, message)
 
-def show_splash_error(message):
+def show_splash_error(message: str) -> None:
     splash_manager.show_error(message)        
         
