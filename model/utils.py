@@ -232,8 +232,10 @@ def calculate_lsm(cell_counter, nuclei_counter,
     except FileNotFoundError:
         pass
     nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
-    percentage = (1 - nuclei_count / cell_count.shape[0]) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage, 3)}
+    cell_count_value = cell_count.shape[0] if hasattr(cell_count, "shape") else int(cell_count or 0)
+    percentage = -100 if cell_count_value == 0 else (1 - nuclei_count / cell_count_value) * 100
+    percentage = percentage if percentage == -100 else round(percentage, 3)
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
 
 
 
@@ -534,7 +536,8 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
     if not pred_masks:
         print("No masks found.")
-        return
+        safe_image_write(image, filename)
+        return image
     overlay = image.copy()
     for i, mask in enumerate(pred_masks):
         coords = np.asarray(mask, dtype=np.float32).reshape(-1, 2)
