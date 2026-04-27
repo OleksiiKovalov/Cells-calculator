@@ -102,7 +102,8 @@ class YoloSegmenter(BaseModel):
         )
 
         if tracking is False:
-            self.object_size['signal']("set_size", self.detections['box'].copy())
+            # Keep slider calibration aligned with morphology-based filtering.
+            self.object_size['signal']("set_size", self.detections.copy())
             self.detections[['id_label', 'confidence', 'diameter', 'area', 'volume']].to_csv(
                 self.out_dir / "cell_data.csv",
                 sep=';',
@@ -111,7 +112,7 @@ class YoloSegmenter(BaseModel):
 
         detections = self.detections[self.detections['confidence'] >= min_score]
         if tracking is False:
-            self.object_size['signal']("set_size", self.detections['box'].copy())
+            self.object_size['signal']("set_size", self.detections.copy())
         original_image = self.original_image.copy()
 
         filtered_detections = detections
@@ -156,7 +157,7 @@ class YoloSegmenter(BaseModel):
             ).to_coco_predictions()
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
-            self.object_size['signal']("set_size", self.detections['box'].copy())
+            self.object_size['signal']("set_size", self.detections.copy())
 
         detections = self.detections[self.detections['confidence'] >= min_score]
 

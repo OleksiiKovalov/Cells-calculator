@@ -534,7 +534,8 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
     if not pred_masks:
         print("No masks found.")
-        return
+        safe_image_write(image, filename)
+        return image
     overlay = image.copy()
     for i, mask in enumerate(pred_masks):
         coords = np.asarray(mask, dtype=np.float32).reshape(-1, 2)
