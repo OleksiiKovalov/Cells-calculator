@@ -52,24 +52,27 @@ def load_model(model_path: str, model_type: str, **kwargs):
     
     elif model_type == "cellpose":
         from model.CellposeSegmenter import CellposeSegmenter
-        model = CellposeSegmenter(model_path, object_size={})
+        # Добавили model_data={}
+        model = CellposeSegmenter(model_path, object_size={}, model_data={}) 
         return model
     
     elif model_type == "instanseg":
         from model.InstanSegSegmenter import InstansegSegmenter
-        model = InstansegSegmenter(model_path, object_size={})
+        # Добавили model_data={}
+        model = InstansegSegmenter(model_path, object_size={}, model_data={})
         return model
     
     elif model_type == "stardist":
         from model.StardistSegmenter import StardistSegmenter
-        model = StardistSegmenter(model_path, object_size={})
+        # Добавили model_data={}
+        model = StardistSegmenter(model_path, object_size={}, model_data={})
         return model
     
     elif model_type == "cellcounter":
         from model.CellCounter import CellCounter
-        model = CellCounter(model_path, object_size={})
+        # Добавили model_data={}
+        model = CellCounter(model_path, object_size={}, model_data={})
         return model
-    
     else:
         raise ValueError(f"Unsupported model type: {model_type}. "
                         f"Supported types: yolo, cellpose, instanseg, stardist, cellcounter")
@@ -140,7 +143,15 @@ def run_model_on_image(model_path: str, image_path: str, model_type: str = "yolo
         
         elif model_type in ["cellpose", "instanseg", "stardist", "cellcounter"]:
             
-            results = model.predict(image_path, **inference_kwargs)
+            if hasattr(model, 'predict'):
+                results = model.predict(image_path, **inference_kwargs)
+            elif hasattr(model, 'calculate'):
+                results = model.calculate(image_path)
+            elif hasattr(model, 'count_x20'):
+                results = model.count_x20(input_image=image_path, tracking=True, plot=False)
+            else:
+                raise AttributeError(f"Класс {type(model).__name__} не имеет методов 'predict', 'calculate' или 'count_x20'")
+                
             return {
                 'success': True,
                 'results': results,

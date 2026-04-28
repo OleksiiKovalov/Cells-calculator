@@ -166,17 +166,30 @@ class LoggerWriter:
             self.logger.log(self.level, message.strip())
         
         # Also write to original stdout/stderr for console visibility
-        if self.level == logging.INFO:
-            sys.__stdout__.write(message)
-        else:
-            sys.__stderr__.write(message)
+        # Check if sys.__stdout__/sys.__stderr__ are available
+        try:
+            if self.level == logging.INFO:
+                if sys.__stdout__ is not None:
+                    sys.__stdout__.write(message)
+            else:
+                if sys.__stderr__ is not None:
+                    sys.__stderr__.write(message)
+        except (AttributeError, OSError):
+            # If stdout/stderr is not available or invalid, skip writing
+            pass
 
     def flush(self):
         # Flush the original streams
-        if self.level == logging.INFO:
-            sys.__stdout__.flush()
-        else:
-            sys.__stderr__.flush()
+        try:
+            if self.level == logging.INFO:
+                if sys.__stdout__ is not None:
+                    sys.__stdout__.flush()
+            else:
+                if sys.__stderr__ is not None:
+                    sys.__stderr__.flush()
+        except (AttributeError, OSError):
+            # If stdout/stderr is not available or invalid, skip flushing
+            pass
 
 def setup_console_logging():
     """
