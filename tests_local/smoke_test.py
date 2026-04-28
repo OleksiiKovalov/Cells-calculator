@@ -3,29 +3,73 @@
 This test ensures that models don't crash when running on various test images.
 """
 
-import sys
 import pytest
 from pathlib import Path
 
-# Redirect output before importing pytest
-if "pytest" in sys.modules:
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
+from model.YOLOSegmenter import YoloSegmenter
+from model.CellposeSegmenter import CellposeSegmenter
+from model.InstanSegSegmenter import InstansegSegmenter
+from model.StardistSegmenter import StardistSegmenter
+from model.CellCounter import CellCounter
 
-# Add parent directory to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
+def load_model(model_path: str, model_type: str):
+    if not Path(model_path).exists():
+        raise FileNotFoundError(f"Model file not found: {model_path}")
 
-# Initialize PyQt5 before importing UI modules
-from PyQt5.QtWidgets import QApplication
+    object_size = {
+        'min_size': 100,
+        'max_size': 0.000,
+        'signal': lambda *args, **kwargs: None,
+        'round_parametr_slider': 10**6,
+        'round_parametr_value_input': 10**4,
+        'color_map': "viridis",
+        'color_map_list': [],
+        'line_width': 100.00,
+        'scale': 20,
+        'um_per_px': 0.325,
+    }
+    match model_type.lower():
+        case "yolo":
+            return YoloSegmenter(model_path, object_size=object_size, model_data={})
+        case "cellpose":
+            return CellposeSegmenter(model_path, object_size=object_size, model_data={})
+        case "instanseg":
+            return InstansegSegmenter(model_path, object_size=object_size, model_data={})
+        case "stardist":
+            return StardistSegmenter(model_path, object_size=object_size, model_data={})
+        case "cellcounter":
+            return CellCounter(model_path, object_size=object_size, model_data={})
+        case _:
+            raise ValueError(f"Unsupported model type: {model_type}. "
+                            f"Supported types: yolo, cellpose, instanseg, stardist, cellcounter")
 
-app = QApplication.instance()
-if app is None:
-    sys.argv.extend(["--platform", "offscreen"])
-    app = QApplication(sys.argv)
+def run_model_on_image(model_path: str, image_path: str, model_type: str = "yolo"):
+    if not Path(image_path).exists():
+        return {
+            'success': False,
+            'results': None,
+            'message': f'Image file not found: {image_path}',
+            'model': None,
+            'error': f'Image file not found: {image_path}'
+        }
 
-# Import model factory from main_2
-from main_2 import run_model_on_image
+    model = load_model(model_path, model_type)
 
+    if hasattr(model, 'predict'):
+        results = model.predict(image_path)
+    elif hasattr(model, 'calculate'):
+        results = model.calculate(image_path)
+    elif hasattr(model, 'count_x20'):
+        results = model.count_x20(input_image=image_path, tracking=True, plot=False)
+    else:
+        raise AttributeError(f"Класс {type(model).__name__} не имеет методов 'predict', 'calculate' или 'count_x20'")
+    return {
+        'success': True,
+        'results': results,
+        'message': f'Inference completed successfully on {image_path}',
+        'model': model,
+        'error': None
+    }
 
 # ============================================================================
 # Hardcoded Lists
@@ -69,18 +113,10 @@ def test_smoke(model_name, model_type, model_path, test_image):
     """
     project_root = Path(__file__).parent.parent
     full_model_path = project_root / model_path
-    
-    # Skip test if model doesn't exist
-    if not full_model_path.exists():
-        pytest.skip(f"Model not found: {model_path}")
-    
+
     # Test model with each test image
     full_image_path = project_root / test_image  
-        
-        # Skip if test image doesn't exist
-    if not full_image_path.exists():
-        pytest.skip(f"Test image not found: {test_image}")
-    
+
     # Run model on image - should not raise exceptions
     result = run_model_on_image(
         model_path=str(full_model_path),
