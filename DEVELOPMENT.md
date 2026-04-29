@@ -11,12 +11,12 @@ This installs `mypy` and `pytest` libraries and binaries,
 and other dependencies required by them.
 This will also automatically install everything from `requirements.txt`.
 
-##### Running
+#### Running
 ```commandline
 python main.py
 ```
 
-##### Type Checking
+#### Type Checking
 
 ```commandline
 mypy .
@@ -26,7 +26,37 @@ To check only specific folder, run
 mypy model/
 ```
 
-##### Running tests
+#### Running tests
+Tests inside `tests` directory are run on CI for every PR.
+You can run them locally with this command:
 ```commandline
-pytest tests
+pytest -v tests
+```
+
+Tests inside `tests_local` require models (which are not part of the repo)
+and can take a long time,
+thus they aren't running on PRs.
+Run them locally with this command:
+```commandline
+pytest -v tests_local
+```
+
+## Visual Studio Code
+
+#### Running tests
+
+You can run tests from the "Testing" panel in VS Code.
+Make sure to set `pytest` as the testing framework for the project.
+To run both `tests` and `local_tests`,
+make sure both directories are present in `.vscode/settings.json`.
+It should look something like this:
+```json
+{
+    "python.testing.pytestArgs": [
+        "tests",
+        "tests_local"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}
 ```
