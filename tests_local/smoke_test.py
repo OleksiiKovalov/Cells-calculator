@@ -62,7 +62,7 @@ def run_model_on_image(model_path: str, image_path: str, model_type: str = "yolo
     elif hasattr(model, 'count_x20'):
         results = model.count_x20(input_image=image_path, tracking=True, plot=False)
     else:
-        raise AttributeError(f"Класс {type(model).__name__} не имеет методов 'predict', 'calculate' или 'count_x20'")
+        raise AttributeError(f"Class {type(model).__name__} doesn't have methods 'predict', 'calculate' or 'count_x20'")
     return {
         'success': True,
         'results': results,
