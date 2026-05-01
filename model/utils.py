@@ -207,6 +207,7 @@ def read_img(img_path, cell_channel=0, nuclei_channel=1):
     elif is_image_valid(img_path):
         return read_standard_img(img_path)
 
+
 def extract_nuclei_channel(img_path, nuclei_channel=1):
     """Extracts the channel used for dead-cell counting from any supported image."""
     if img_path.endswith('lsm'):
@@ -237,9 +238,10 @@ def count_detected_objects(detections) -> int:
         return int(detections.shape[0])
     return int(detections)
 
+
 def calculate_alive_percentage(cell_count: int, nuclei_count: int):
     """Calculates alive percentage, returning -100 when it cannot be computed."""
-    if cell_count <= 0:
+    if cell_count <= 0 or nuclei_count == -100:
         return -100
     return round((1 - nuclei_count / cell_count) * 100, 3)
 
@@ -274,6 +276,8 @@ def calculate_lsm(cell_counter, nuclei_counter,
         nuclei_count
     )
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
+
+
 
 def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
     """
@@ -592,6 +596,7 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
     safe_image_write(image, filename)
     return image
 
+
 def plot_predictions_with_alignment(
     original_image,
     img_inference,
@@ -615,6 +620,7 @@ def plot_predictions_with_alignment(
         alpha=alpha,
         color_ids=color_ids
     )
+
 
 def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     """
@@ -707,6 +713,7 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
         
     return padded
 
+
 def process_loaded_image(image, settings: OrderedDict):
     """Apply a sequence of image processing operations based on settings."""
     for step in settings:
@@ -749,12 +756,14 @@ def safegray2rgb(image):
         return gray2rgb(image)
     return image
 
+
 def safergb2gray(image):
     """Convert RGB to grayscale if needed."""
     if image.ndim == 3:
         image = rgb2gray(image)
         return (image * 255).astype("uint8")
     return image
+
 
 def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.5):
     """Calculate F1, precision, recall, TP, FP, FN metrics from matches."""

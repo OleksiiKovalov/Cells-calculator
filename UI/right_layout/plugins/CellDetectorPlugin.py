@@ -879,18 +879,6 @@ class CellDetectorPlugin(BasePlugin):
         # Настройки для шрифта и отображения - not needed for text edit
         
         # Добавление строк в text edit
-        results.append("")
-
-        if result["Nuclei"] == -100:
-            results.append('Nuclei: -')
-        else:
-            results.append(f'Nuclei: {result["Nuclei"]}')
-
-        if result["%"] == -100:
-            results.append('Alive: -')
-        else:
-            results.append(f'Alive: {result["%"]}%')
-
         result_text = "\n".join(results)
         self.results_text.setPlainText(result_text)
 

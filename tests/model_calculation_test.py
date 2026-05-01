@@ -4,12 +4,16 @@ import cv2
 import numpy as np
 import pandas as pd
 
+import model.Model as model_module
+from model import BaseModel as base_model_module
 from model.Model import Model, calculate_standard
 from model.utils import calculate_alive_percentage
 
 
 class StubCellCounter:
     """Minimal stub that mimics detector-style output."""
+
+    inference_duration = 0
 
     def count_cells(self, img_path):
         return pd.DataFrame({"box": [np.array([0, 0, 1, 1]) for _ in range(4)]})
@@ -29,6 +33,13 @@ class StubNucleiCounter:
         return 1
 
 
+class StubBaseModel(base_model_module.BaseModel):
+    """Small BaseModel subclass for exercising count_cells."""
+
+    def count_x20(self, input_image, filename):
+        return pd.DataFrame({"box": [np.array([0, 0, 1, 1])]})
+
+
 def test_calculate_alive_percentage_returns_sentinel_when_no_cells():
     assert calculate_alive_percentage(0, 3) == -100
 
@@ -42,8 +53,7 @@ def test_calculate_standard_fills_nuclei_and_alive_for_regular_images(tmp_path):
     result = calculate_standard(
         StubCellCounter(),
         str(image_path),
-        nuclei_count=1,
-        nuclei_channel=1
+        nuclei_count=1
     )
 
     assert result["Nuclei"] == 1
@@ -51,7 +61,33 @@ def test_calculate_standard_fills_nuclei_and_alive_for_regular_images(tmp_path):
     assert result["%"] == 75.0
 
 
-def test_get_nuclei_count_uses_cache_for_same_image(tmp_path):
+def test_count_cells_allows_input_that_is_already_temp_path(tmp_path, monkeypatch):
+    temp_image_path = tmp_path / "cell_tmp_img.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    assert cv2.imwrite(str(temp_image_path), image)
+
+    monkeypatch.setattr(base_model_module, "IMAGE_FILE_NAME_TMP", str(temp_image_path))
+    model = StubBaseModel.__new__(StubBaseModel)
+    model.object_size = {"scale": 20}
+
+    result = model.count_cells(str(temp_image_path))
+
+    assert result.shape[0] == 1
+
+
+def test_calculate_standard_omits_nuclei_metrics_when_not_provided(tmp_path):
+    image_path = tmp_path / "cells.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    assert cv2.imwrite(str(image_path), image)
+
+    result = calculate_standard(StubCellCounter(), str(image_path))
+
+    assert result["Nuclei"] == -100
+    assert result["Cells"].shape[0] == 4
+    assert result["%"] == -100
+
+
+def test_get_nuclei_count_does_not_cache_for_same_image(tmp_path):
     image_path = tmp_path / "stained.png"
     image = np.zeros((16, 16, 3), dtype=np.uint8)
     image[:, :, 1] = 255
@@ -59,11 +95,60 @@ def test_get_nuclei_count_uses_cache_for_same_image(tmp_path):
 
     model = Model.__new__(Model)
     model.nuclei_counter = StubNucleiCounter()
-    Model._nuclei_cache.clear()
 
     first = model.get_nuclei_count(str(image_path), nuclei_channel=1)
     second = model.get_nuclei_count(str(image_path), nuclei_channel=1)
 
     assert first == 1
     assert second == 1
-    assert model.nuclei_counter.calls == 1
+    assert model.nuclei_counter.calls == 2
+
+
+def test_calculate_skips_nuclei_count_for_segmenter_model(tmp_path):
+    image_path = tmp_path / "stained.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    image[:, :, 1] = 255
+    assert cv2.imwrite(str(image_path), image)
+
+    model = Model.__new__(Model)
+    model.model_type = "yolo"
+    model.cell_counter = StubCellCounter()
+    model.nuclei_counter = StubNucleiCounter()
+
+    result = model.calculate(str(image_path), nuclei_channel=1)
+
+    assert result["Nuclei"] == -100
+    assert result["%"] == -100
+    assert model.nuclei_counter.calls == 0
+
+
+def test_calculate_lsm_skips_nuclei_count_for_segmenter_model(tmp_path, monkeypatch):
+    image_path = tmp_path / "stained.lsm"
+    image_path.write_bytes(b"placeholder")
+
+    def fake_calculate_lsm(
+        cell_counter,
+        nuclei_counter,
+        img_path,
+        cell_channel=0,
+        nuclei_channel=1,
+        nuclei_count=None
+    ):
+        return {
+            "Nuclei": nuclei_count,
+            "Cells": cell_counter.count_cells(img_path),
+            "%": calculate_alive_percentage(1, nuclei_count),
+        }
+
+    monkeypatch.setattr(model_module, "calculate_lsm", fake_calculate_lsm)
+
+    model = Model.__new__(Model)
+    model.model_type = "instanseg"
+    model.cell_counter = StubCellCounter()
+    model.nuclei_counter = StubNucleiCounter()
+
+    result = model.calculate(str(image_path), nuclei_channel=1)
+
+    assert result["Nuclei"] == -100
+    assert result["%"] == -100
+    assert model.nuclei_counter.calls == 0
