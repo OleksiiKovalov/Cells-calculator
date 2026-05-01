@@ -124,13 +124,12 @@ class CellCounter(BaseModel):
 
             # Apply NMS (Non-maximum suppression)
             result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)  # score, nms thresholds
-            boxes_to_filter = np.array(boxes)[result_boxes,:]
+            result_boxes = np.array(result_boxes).flatten()
 
             detections = []
 
             # Iterate through NMS results to draw bounding boxes and labels
-            for i, _ in enumerate(result_boxes):
-                index = result_boxes[i]
+            for index in result_boxes:
                 box = boxes[index]
                 detection = {
                     "class_id": class_ids[index],
@@ -142,7 +141,10 @@ class CellCounter(BaseModel):
                 detections.append(detection)
 
             # Perform square-based filtering of bboxes
-            detections = pd.DataFrame(detections)
+            detections = pd.DataFrame(
+                detections,
+                columns=["class_id", "class_name", "confidence", "box", "scale"]
+            )
             self.detections = detections
             csv_data = self.detections.copy()
             csv_data["width"] = csv_data["box"].apply(lambda b: b[2] / length)

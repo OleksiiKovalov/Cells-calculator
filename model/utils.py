@@ -53,6 +53,37 @@ COLOR_NUMBER = {
 }
 
 
+def read_lsm_array(img_path):
+    """Reads the primary LSM/TIFF series as an array."""
+    with tiffile.TiffFile(img_path) as tif:
+        try:
+            return tif.series[0].asarray()
+        except (IndexError, ValueError):
+            return tif.pages[0].asarray()
+
+
+def lsm_to_channels_last(image):
+    """Normalizes LSM arrays to (height, width, channels)."""
+    image = np.asarray(image)
+    if image.ndim == 2:
+        return image[:, :, np.newaxis]
+
+    image = np.squeeze(image)
+    if image.ndim == 2:
+        return image[:, :, np.newaxis]
+
+    if image.ndim > 3:
+        image = image.reshape((-1, image.shape[-2], image.shape[-1]))
+
+    if image.ndim != 3:
+        raise ValueError(f"Unsupported LSM image shape: {image.shape}")
+
+    if image.shape[-1] <= 8 and image.shape[0] > 8 and image.shape[1] > 8:
+        return image
+
+    return np.transpose(image, (1, 2, 0))
+
+
 def safe_image_read(img_path, color_mode='color', channel=None):
     """
     Standardized image reading function that handles various formats and edge cases.
@@ -74,14 +105,14 @@ def safe_image_read(img_path, color_mode='color', channel=None):
         
         if extension == 'lsm':
             # Handle LSM files with tiffile
-            with tiffile.TiffFile(img_path) as tif:
-                image = tif.pages[0].asarray()
-                if channel is not None and len(image.shape) > 2:
-                    if channel < image.shape[0]:
-                        return image[channel]
-                    print(f"Channel {channel} not available in LSM file")
-                    return None
-                return image
+            image = read_lsm_array(img_path)
+            if channel is not None:
+                image = lsm_to_channels_last(image)
+                if 0 <= channel < image.shape[-1]:
+                    return image[:, :, channel]
+                print(f"Channel {channel} not available in LSM file")
+                return None
+            return image
         else:
             # Handle standard image formats
             if color_mode == 'unchanged':
@@ -169,18 +200,19 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
 
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
-    with tiffile.TiffFile(img_path) as tif:
-        image = tif.pages[0].asarray()
-    img = np.transpose(image, (1, 2, 0))
+    img = lsm_to_channels_last(read_lsm_array(img_path))
     if img.shape[-1] == 1:
-        return cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        return cv2.cvtColor(img[:, :, 0], cv2.COLOR_GRAY2RGB)
     if img.shape[-1] == 2:
-        stacked_array = np.dstack((img, np.zeros((512, 512), dtype='uint8')))
+        stacked_array = np.dstack((img, np.zeros(img.shape[:2], dtype=img.dtype)))
         return stacked_array
     if img.shape[-1] == 3:
         return img
-    stacked_array = np.dstack((img[cell_channel], img[nuclei_channel],
-                               np.zeros((512, 512), dtype='uint8')))
+
+    empty_channel = np.zeros(img.shape[:2], dtype=img.dtype)
+    cell = img[:, :, cell_channel] if 0 <= cell_channel < img.shape[-1] else img[:, :, 0]
+    nuclei = img[:, :, nuclei_channel] if 0 <= nuclei_channel < img.shape[-1] else empty_channel
+    stacked_array = np.dstack((cell, nuclei, empty_channel))
     return stacked_array
 
 def read_standard_img(img_path):
@@ -211,8 +243,10 @@ def read_img(img_path, cell_channel=0, nuclei_channel=1):
 def extract_nuclei_channel(img_path, nuclei_channel=1):
     """Extracts the channel used for dead-cell counting from any supported image."""
     if img_path.endswith('lsm'):
-        img = read_lsm_img(img_path, nuclei_channel=nuclei_channel)
-        return img[:, :, nuclei_channel]
+        img = lsm_to_channels_last(read_lsm_array(img_path))
+        if 0 <= nuclei_channel < img.shape[-1]:
+            return img[:, :, nuclei_channel]
+        return None
 
     img = safe_image_read(img_path, color_mode='unchanged')
     if img is None:

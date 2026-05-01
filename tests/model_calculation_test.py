@@ -3,11 +3,17 @@
 import cv2
 import numpy as np
 import pandas as pd
+import tiffile
 
 import model.Model as model_module
 from model import BaseModel as base_model_module
+from model.CellCounter import CellCounter
 from model.Model import Model, calculate_standard
-from model.utils import calculate_alive_percentage
+from model.utils import (
+    calculate_alive_percentage,
+    extract_nuclei_channel,
+    read_lsm_img,
+)
 
 
 class StubCellCounter:
@@ -38,6 +44,16 @@ class StubBaseModel(base_model_module.BaseModel):
 
     def count_x20(self, input_image, filename):
         return pd.DataFrame({"box": [np.array([0, 0, 1, 1])]})
+
+
+class EmptyDnn:
+    """DNN stub that returns no detector rows."""
+
+    def setInput(self, blob):
+        self.blob = blob
+
+    def forward(self):
+        return np.zeros((1, 5, 1), dtype=np.float32)
 
 
 def test_calculate_alive_percentage_returns_sentinel_when_no_cells():
@@ -73,6 +89,25 @@ def test_count_cells_allows_input_that_is_already_temp_path(tmp_path, monkeypatc
     result = model.count_cells(str(temp_image_path))
 
     assert result.shape[0] == 1
+
+
+def test_cellcounter_returns_empty_dataframe_when_nms_has_no_boxes(tmp_path):
+    image_path = tmp_path / "cells.png"
+    output_path = tmp_path / "detections.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    assert cv2.imwrite(str(image_path), image)
+
+    counter = CellCounter.__new__(CellCounter)
+    counter.detections = None
+    counter.model = EmptyDnn()
+    counter.object_size = {"signal": lambda *args, **kwargs: None}
+    counter.out_dir = tmp_path
+
+    result = counter.count_x20(str(image_path), filename=str(output_path))
+
+    assert list(result.columns) == ["class_id", "class_name", "confidence", "box", "scale"]
+    assert result.empty
+    assert output_path.exists()
 
 
 def test_calculate_standard_omits_nuclei_metrics_when_not_provided(tmp_path):
@@ -152,3 +187,28 @@ def test_calculate_lsm_skips_nuclei_count_for_segmenter_model(tmp_path, monkeypa
     assert result["Nuclei"] == -100
     assert result["%"] == -100
     assert model.nuclei_counter.calls == 0
+
+
+def test_read_lsm_img_handles_single_channel_2d_series(tmp_path):
+    image_path = tmp_path / "single_channel.lsm"
+    image = np.zeros((16, 24), dtype=np.uint8)
+    tiffile.imwrite(str(image_path), image)
+
+    result = read_lsm_img(str(image_path))
+
+    assert result.shape == (16, 24, 3)
+    assert extract_nuclei_channel(str(image_path), nuclei_channel=1) is None
+
+
+def test_read_lsm_img_uses_series_shape_for_multichannel_lsm(tmp_path):
+    image_path = tmp_path / "two_channel.lsm"
+    image = np.zeros((2, 20, 30), dtype=np.uint8)
+    image[1, :, :] = 255
+    tiffile.imwrite(str(image_path), image, metadata={"axes": "CYX"})
+
+    result = read_lsm_img(str(image_path), nuclei_channel=1)
+    nuclei = extract_nuclei_channel(str(image_path), nuclei_channel=1)
+
+    assert result.shape == (20, 30, 3)
+    assert nuclei.shape == (20, 30)
+    assert nuclei.max() == 255
