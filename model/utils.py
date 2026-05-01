@@ -560,7 +560,7 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     if coords.shape[0] < 3:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
     
-    cv2.fillPoly(bin_mask, [coords], 1)
+    cv2.fillPoly(bin_mask, [coords], (1,))
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
 
