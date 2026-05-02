@@ -111,15 +111,10 @@ class Model:
             return calculate_lsm(self.cell_counter, self.nuclei_counter,
                   img_path, cell_channel, nuclei_channel, nuclei_count=nuclei_count)
         elif is_image_valid(img_path):
-            nuclei_count = (
-                self.get_nuclei_count(img_path, nuclei_channel=nuclei_channel)
-                if include_nuclei
-                else NO_NUCLEI_METRIC
-            )
             result = calculate_standard(
                 self.cell_counter,
                 img_path,
-                nuclei_count=nuclei_count
+                nuclei_count=NO_NUCLEI_METRIC
             )
             self.inference_duration = self.cell_counter.inference_duration
             return result

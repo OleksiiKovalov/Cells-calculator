@@ -122,6 +122,24 @@ def test_calculate_standard_omits_nuclei_metrics_when_not_provided(tmp_path):
     assert result["%"] == -100
 
 
+def test_calculate_skips_nuclei_count_for_regular_images(tmp_path):
+    image_path = tmp_path / "stained.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    image[:, :, 1] = 255
+    assert cv2.imwrite(str(image_path), image)
+
+    model = Model.__new__(Model)
+    model.model_type = "cellcounter"
+    model.cell_counter = StubCellCounter()
+    model.nuclei_counter = StubNucleiCounter()
+
+    result = model.calculate(str(image_path), nuclei_channel=1)
+
+    assert result["Nuclei"] == -100
+    assert result["%"] == -100
+    assert model.nuclei_counter.calls == 0
+
+
 def test_get_nuclei_count_does_not_cache_for_same_image(tmp_path):
     image_path = tmp_path / "stained.png"
     image = np.zeros((16, 16, 3), dtype=np.uint8)
