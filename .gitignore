@@ -5,7 +5,6 @@
 /.cache
 /myenv
 /output
-*.lsm
 *.ipynb
 *.npy
 *.exe
