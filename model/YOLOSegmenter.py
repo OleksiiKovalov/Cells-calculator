@@ -11,6 +11,7 @@ import os
 
 # Third-party imports
 import numpy as np
+import pandas as pd
 from ultralytics import YOLO
 
 # Local application imports
@@ -29,6 +30,16 @@ from UI.app_globals import (
 from UI.app_globals import set_global
 
 class YoloSegmenter(BaseModel):
+    DETECTION_COLUMNS = [
+        "id_label",
+        "box",
+        "mask",
+        "confidence",
+        "diameter",
+        "area",
+        "volume",
+    ]
+
     def init_x20_model(self, path_to_model: str):
         self.model = YOLO(path_to_model, task="segment")
 
@@ -93,10 +104,27 @@ class YoloSegmenter(BaseModel):
             **kwargs
         )[0]
         self.original_image = outputs.orig_img
-        if outputs.masks is None:
-            return None
-        self.detections = results_to_pandas(outputs, store_bin_mask)
         self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
+        set_global('image_inference', self.original_image.copy())
+        set_global('image_display_base', self.original_image.copy())
+        if outputs.masks is None:
+            self.detections = pd.DataFrame(columns=self.DETECTION_COLUMNS)
+            self.object_size['signal']("set_size", self.detections['box'].copy())
+            self.detections[['id_label', 'confidence', 'diameter', 'area', 'volume']].to_csv(
+                self.out_dir / "cell_data.csv",
+                sep=';',
+                index=False
+            )
+            self.prediction_image = self.original_image.copy()
+            plot_predictions(
+                self.prediction_image,
+                [],
+                filename=filename,
+                colormap=colormap,
+                alpha=self.object_size.get("alpha", 0.75),
+            )
+            return self.detections
+        self.detections = results_to_pandas(outputs, store_bin_mask)
         self.detections['box'] = self.detections['box'].apply(
             lambda b: b * np.array([self.w, self.h, self.w, self.h])
         )

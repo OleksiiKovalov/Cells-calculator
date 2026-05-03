@@ -257,14 +257,6 @@ class InstansegSegmenter(BaseModel):
             x10=True,
             **kwargs,
         )
-
-    
-    def count_x10(self, input_image: str, colormap="tab20",
-              filename=IMAGE_FILE_NAME_DETECTION, min_score=0.01,
-              alpha=0.75, **kwargs):
-        return self.count_x20(input_image, plot = True, colormap=colormap, tracking=False,
-              filename=filename, min_score=min_score,       alpha=alpha, store_bin_mask=False,x10=True, **kwargs)
-
     def _extract_polygon_from_geometry(self, geometry):
         geom = shape(geometry)
 

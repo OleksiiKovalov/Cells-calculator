@@ -34,7 +34,13 @@ from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugi
 from UI.right_layout.right_layout import right_layout
 from UI.SettingsWindow import SettingsWindow
 from UI.table import calculate_table
-from model.utils import COLOR_NUMBER as color_number, clear_cache, safergb2gray
+from model.utils import (
+    COLOR_NUMBER as color_number,
+    clear_cache,
+    lsm_to_channels_last,
+    read_lsm_array,
+    safergb2gray,
+)
 
 
 class MainWindow(QMainWindow):
@@ -553,18 +559,7 @@ class MainWindow(QMainWindow):
                 
                 elif lsm_file.lower().endswith('.lsm'):
                     # Handle LSM files
-                    with tifffile.TiffFile(lsm_file) as tif:
-                        lsm_array = tif.pages[0].asarray()
-                    
-                    # Check if we have enough channels
-                    if lsm_array.shape[0] <= self.parametrs['Cell']:
-                        return self.create_no_image_qimage()
-                    
-                    # Create QImage from selected channel
-                    channel_data = lsm_array[self.parametrs['Cell']]
-                    return QImage(channel_data.data, channel_data.shape[1], 
-                                channel_data.shape[0], channel_data.strides[0], 
-                                QImage.Format_Grayscale8)
+                    return self._create_lsm_qimage(read_lsm_array(lsm_file))
                 
                 else:
                     # Handle regular image files (png, jpg, bmp, tif)
@@ -575,18 +570,10 @@ class MainWindow(QMainWindow):
                 if isinstance(lsm_file, np.ndarray):
                     if len(lsm_file.shape) >= 3:
                         # Multi-channel array (LSM data)
-                        if lsm_file.shape[0] <= self.parametrs['Cell']:
-                            return self.create_no_image_qimage()
-                        
-                        channel_data = lsm_file[self.parametrs['Cell']]
-                        return QImage(channel_data.data, channel_data.shape[1], 
-                                    channel_data.shape[0], channel_data.strides[0], 
-                                    QImage.Format_Grayscale8)
+                        return self._create_lsm_qimage(lsm_file)
                     else:
                         # Single channel 2D array
-                        return QImage(lsm_file.data, lsm_file.shape[1], 
-                                    lsm_file.shape[0], lsm_file.strides[0], 
-                                    QImage.Format_Grayscale8)
+                        return self._create_grayscale_qimage(lsm_file)
                 else:
                     # Unknown type - return placeholder
                     return self.create_no_image_qimage()
@@ -595,6 +582,34 @@ class MainWindow(QMainWindow):
             # If any error occurs during image creation, return placeholder
             print(f"Error creating image: {e}")
             return self.create_no_image_qimage()
+
+    def _create_lsm_qimage(self, lsm_array):
+        channels_last = lsm_to_channels_last(lsm_array)
+        cell_channel = self.parametrs['Cell']
+        if channels_last.shape[-1] <= cell_channel:
+            cell_channel = 0
+
+        return self._create_grayscale_qimage(channels_last[:, :, cell_channel])
+
+    def _create_grayscale_qimage(self, image_array):
+        image_array = np.asarray(image_array)
+        if image_array.ndim != 2:
+            return self.create_no_image_qimage()
+
+        if image_array.dtype != np.uint8:
+            max_value = np.max(image_array) if image_array.size else 0
+            if max_value > 0:
+                image_array = image_array.astype(np.float32) / max_value * 255
+            image_array = image_array.astype(np.uint8)
+
+        image_array = np.ascontiguousarray(image_array)
+        return QImage(
+            image_array.data,
+            image_array.shape[1],
+            image_array.shape[0],
+            image_array.strides[0],
+            QImage.Format_Grayscale8,
+        ).copy()
     
     def _add_image_to_scene(self, image):
         """

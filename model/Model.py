@@ -12,7 +12,17 @@ import os
 # Local application imports
 from UI.app_globals import get_registered_model
 from model.NucleiCounter import NucleiCounter
-from model.utils import is_image_valid, calculate_lsm, show_error_message
+from model.utils import (
+    calculate_alive_percentage,
+    calculate_lsm,
+    count_detected_objects,
+    extract_nuclei_channel,
+    is_image_valid,
+    show_error_message
+)
+
+DETECTOR_MODEL_TYPE = "cellcounter"
+NO_NUCLEI_METRIC = -100
 
 class Model:
     """
@@ -47,10 +57,20 @@ class Model:
             min_samples=min_samples
         )
         self.path = path
+        self.model_type = model_type
         self.init_counter(path, object_size,model_type,model_data)
         self.inference_duration = 0
         self.model_name = model_name       
         self.cell_counter.model_name = model_name
+
+    def get_nuclei_count(self, img_path, nuclei_channel=1):
+        """Counts stained nuclei for detector-based cell counting."""
+        nuclei_channel_img = extract_nuclei_channel(img_path, nuclei_channel=nuclei_channel)
+        return 0 if nuclei_channel_img is None else self.nuclei_counter.countNuclei(nuclei_channel_img)
+
+    def _uses_detector_metrics(self):
+        """Returns True when nuclei and alive metrics are meaningful for this model."""
+        return self.model_type == DETECTOR_MODEL_TYPE
         
     def init_counter(self, path, object_size, model_type,model_data = None):
         """
@@ -76,30 +96,48 @@ class Model:
         - nuclei_channel: channel with stained nuclei. Default to 1.
 
         Returns the result as a dictionary with the following fields:
-        - Nuclei: count for stained nuclei detected (given lsm image only);
+        - Nuclei: count for stained nuclei detected;
         - Cells: count for all the cells detected;
-        - %: the target percentage for alive cells (given lsm image only).
+        - %: the target percentage for alive cells.
         """
+        include_nuclei = self._uses_detector_metrics()
         if img_path.endswith('lsm'):
             self.inference_duration = -1
+            nuclei_count = (
+                self.get_nuclei_count(img_path, nuclei_channel=nuclei_channel)
+                if include_nuclei
+                else NO_NUCLEI_METRIC
+            )
             return calculate_lsm(self.cell_counter, self.nuclei_counter,
-                  img_path, cell_channel, nuclei_channel)
+                  img_path, cell_channel, nuclei_channel, nuclei_count=nuclei_count)
         elif is_image_valid(img_path):
-            result =calculate_standard(self.cell_counter, img_path)
+            result = calculate_standard(
+                self.cell_counter,
+                img_path,
+                nuclei_count=NO_NUCLEI_METRIC
+            )
             self.inference_duration = self.cell_counter.inference_duration
             return result
 
-def calculate_standard(cell_counter, img_path : str):
+def calculate_standard(cell_counter, img_path: str, nuclei_count=NO_NUCLEI_METRIC):
     """
-    Calculates cells only on given standard image.
+    Calculates cells, nuclei and alive percentage on a given standard image.
     Input params are:
     - cell_counter: CellCounter class instance;
     - img_path: path to lsm/jpg/png/tif/bmp image.
+    - nuclei_count: precomputed count for stained nuclei detected.
 
     Returns the result as a dictionary with the following fields:
-    - Nuclei: -100 (encoding for NaN);
+    - Nuclei: count for stained nuclei detected;
     - Cells: count for all the cells detected;
-    - %: -100 (encoding for NaN).
+    - %: the target percentage for alive cells.
     """
     cell_count = cell_counter.count_cells(img_path)
-    return {'Nuclei': -100, 'Cells': cell_count, '%': -100}
+    if nuclei_count == NO_NUCLEI_METRIC:
+        percentage = NO_NUCLEI_METRIC
+    else:
+        percentage = calculate_alive_percentage(
+            count_detected_objects(cell_count),
+            nuclei_count
+        )
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
