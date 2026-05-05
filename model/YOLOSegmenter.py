@@ -11,6 +11,7 @@ import os
 
 # Third-party imports
 import numpy as np
+import pandas as pd
 from ultralytics import YOLO
 
 # Local application imports
@@ -41,6 +42,16 @@ class YoloSegmenter(BaseModel):
         model (YOLO): YOLOv8/YOLO11 segmentation model
         model_x10 (AutoDetectionModel): SAHI-wrapped model for tiled inference
     """
+    DETECTION_COLUMNS = [
+        "id_label",
+        "box",
+        "mask",
+        "confidence",
+        "diameter",
+        "area",
+        "volume",
+    ]
+
     def init_x20_model(self, path_to_model: str):
         """
         Load YOLO model for x20 magnification full-image inference.
@@ -124,16 +135,34 @@ class YoloSegmenter(BaseModel):
             **kwargs
         )[0]
         self.original_image = outputs.orig_img
-        if outputs.masks is None:
-            return None
-        self.detections = results_to_pandas(outputs, store_bin_mask)
         self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
+        set_global('image_inference', self.original_image.copy())
+        set_global('image_display_base', self.original_image.copy())
+        if outputs.masks is None:
+            self.detections = pd.DataFrame(columns=self.DETECTION_COLUMNS)
+            self.object_size['signal']("set_size", self.detections['box'].copy())
+            self.detections[['id_label', 'confidence', 'diameter', 'area', 'volume']].to_csv(
+                self.out_dir / "cell_data.csv",
+                sep=';',
+                index=False
+            )
+            self.prediction_image = self.original_image.copy()
+            plot_predictions(
+                self.prediction_image,
+                [],
+                filename=filename,
+                colormap=colormap,
+                alpha=self.object_size.get("alpha", 0.75),
+            )
+            return self.detections
+        self.detections = results_to_pandas(outputs, store_bin_mask)
         self.detections['box'] = self.detections['box'].apply(
             lambda b: b * np.array([self.w, self.h, self.w, self.h])
         )
 
         if tracking is False:
-            self.object_size['signal']("set_size", self.detections['box'].copy())
+            # Keep slider calibration aligned with morphology-based filtering.
+            self.object_size['signal']("set_size", self.detections.copy())
             self.detections[['id_label', 'confidence', 'diameter', 'area', 'volume']].to_csv(
                 self.out_dir / "cell_data.csv",
                 sep=';',
@@ -142,7 +171,7 @@ class YoloSegmenter(BaseModel):
 
         detections = self.detections[self.detections['confidence'] >= min_score]
         if tracking is False:
-            self.object_size['signal']("set_size", self.detections['box'].copy())
+            self.object_size['signal']("set_size", self.detections.copy())
         original_image = self.original_image.copy()
 
         filtered_detections = detections
@@ -150,12 +179,14 @@ class YoloSegmenter(BaseModel):
         self.prediction_image = None
         if plot is True:
             set_global('image_inference', original_image)
+            set_global('image_display_base', original_image.copy())
             self.prediction_image = plot_predictions(
                 original_image,
                 filtered_detections['mask'].tolist(),
                 filename=filename,
                 colormap=colormap,
-                alpha=self.object_size.get("alpha", 0.75)
+                alpha=self.object_size.get("alpha", 0.75),
+                color_ids=filtered_detections['id_label'].tolist()
             )
         return filtered_detections
 
@@ -206,7 +237,7 @@ class YoloSegmenter(BaseModel):
             ).to_coco_predictions()
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
-            self.object_size['signal']("set_size", self.detections['box'].copy())
+            self.object_size['signal']("set_size", self.detections.copy())
 
         detections = self.detections[self.detections['confidence'] >= min_score]
 
@@ -215,6 +246,7 @@ class YoloSegmenter(BaseModel):
         filtered_detections = detections
         
         set_global('image_inference', original_image)
+        set_global('image_display_base', original_image.copy())
         self.prediction_image = None
         self.prediction_image = plot_predictions(
             original_image,

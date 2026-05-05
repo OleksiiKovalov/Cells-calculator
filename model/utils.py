@@ -24,6 +24,7 @@ from skimage.transform import resize
 from ultralytics.engine.results import Results
 
 # Local application imports
+from UI.app_globals import set_global
 from UI.app_globals import (
     IMAGE_FILE_NAME_DETECTION,
     IMAGE_FILE_NAME_GRID,
@@ -52,6 +53,37 @@ COLOR_NUMBER = {
 }
 
 
+def read_lsm_array(img_path):
+    """Reads the primary LSM/TIFF series as an array."""
+    with tiffile.TiffFile(img_path) as tif:
+        try:
+            return tif.series[0].asarray()
+        except (IndexError, ValueError):
+            return tif.pages[0].asarray()
+
+
+def lsm_to_channels_last(image):
+    """Normalizes LSM arrays to (height, width, channels)."""
+    image = np.asarray(image)
+    if image.ndim == 2:
+        return image[:, :, np.newaxis]
+
+    image = np.squeeze(image)
+    if image.ndim == 2:
+        return image[:, :, np.newaxis]
+
+    if image.ndim > 3:
+        image = image.reshape((-1, image.shape[-2], image.shape[-1]))
+
+    if image.ndim != 3:
+        raise ValueError(f"Unsupported LSM image shape: {image.shape}")
+
+    if image.shape[-1] <= 8 and image.shape[0] > 8 and image.shape[1] > 8:
+        return image
+
+    return np.transpose(image, (1, 2, 0))
+
+
 def safe_image_read(img_path, color_mode='color', channel=None):
     """
     Standardized image reading function that handles various formats and edge cases.
@@ -73,14 +105,14 @@ def safe_image_read(img_path, color_mode='color', channel=None):
         
         if extension == 'lsm':
             # Handle LSM files with tiffile
-            with tiffile.TiffFile(img_path) as tif:
-                image = tif.pages[0].asarray()
-                if channel is not None and len(image.shape) > 2:
-                    if channel < image.shape[0]:
-                        return image[channel]
-                    print(f"Channel {channel} not available in LSM file")
-                    return None
-                return image
+            image = read_lsm_array(img_path)
+            if channel is not None:
+                image = lsm_to_channels_last(image)
+                if 0 <= channel < image.shape[-1]:
+                    return image[:, :, channel]
+                print(f"Channel {channel} not available in LSM file")
+                return None
+            return image
         else:
             # Handle standard image formats
             if color_mode == 'unchanged':
@@ -168,18 +200,19 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
 
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
-    with tiffile.TiffFile(img_path) as tif:
-        image = tif.pages[0].asarray()
-    img = np.transpose(image, (1, 2, 0))
+    img = lsm_to_channels_last(read_lsm_array(img_path))
     if img.shape[-1] == 1:
-        return cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        return cv2.cvtColor(img[:, :, 0], cv2.COLOR_GRAY2RGB)
     if img.shape[-1] == 2:
-        stacked_array = np.dstack((img, np.zeros((512, 512), dtype='uint8')))
+        stacked_array = np.dstack((img, np.zeros(img.shape[:2], dtype=img.dtype)))
         return stacked_array
     if img.shape[-1] == 3:
         return img
-    stacked_array = np.dstack((img[cell_channel], img[nuclei_channel],
-                               np.zeros((512, 512), dtype='uint8')))
+
+    empty_channel = np.zeros(img.shape[:2], dtype=img.dtype)
+    cell = img[:, :, cell_channel] if 0 <= cell_channel < img.shape[-1] else img[:, :, 0]
+    nuclei = img[:, :, nuclei_channel] if 0 <= nuclei_channel < img.shape[-1] else empty_channel
+    stacked_array = np.dstack((cell, nuclei, empty_channel))
     return stacked_array
 
 def read_standard_img(img_path):
@@ -206,8 +239,48 @@ def read_img(img_path, cell_channel=0, nuclei_channel=1):
     elif is_image_valid(img_path):
         return read_standard_img(img_path)
 
+
+def extract_nuclei_channel(img_path, nuclei_channel=1):
+    """Extracts the channel used for dead-cell counting from any supported image."""
+    if img_path.endswith('lsm'):
+        img = lsm_to_channels_last(read_lsm_array(img_path))
+        if 0 <= nuclei_channel < img.shape[-1]:
+            return img[:, :, nuclei_channel]
+        return None
+
+    img = safe_image_read(img_path, color_mode='unchanged')
+    if img is None:
+        return None
+
+    if img.ndim == 2:
+        return img
+
+    if img.ndim == 3:
+        if img.shape[2] == 1:
+            return img[:, :, 0]
+        if 0 <= nuclei_channel < img.shape[2]:
+            return img[:, :, nuclei_channel]
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    return None
+
+def count_detected_objects(detections) -> int:
+    """Returns the number of detected objects for detector- and segmenter-style outputs."""
+    if detections is None:
+        return 0
+    if hasattr(detections, "shape"):
+        return int(detections.shape[0])
+    return int(detections)
+
+
+def calculate_alive_percentage(cell_count: int, nuclei_count: int):
+    """Calculates alive percentage, returning -100 when it cannot be computed."""
+    if cell_count <= 0 or nuclei_count == -100:
+        return -100
+    return round((1 - nuclei_count / cell_count) * 100, 3)
+
 def calculate_lsm(cell_counter, nuclei_counter,
-                  img_path, cell_channel=0, nuclei_channel=1):
+                  img_path, cell_channel=0, nuclei_channel=1, nuclei_count=None):
     """
     Calculates the resulting target values.
     Input params are:
@@ -216,9 +289,9 @@ def calculate_lsm(cell_counter, nuclei_counter,
     - nuclei_channel: channel with stained nuclei. Default to 1.
 
     Returns the result as a dictionary with the following fields:
-    - Nuclei: count for stained nuclei detected (given lsm image only);
+    - Nuclei: count for stained nuclei detected;
     - Cells: count for all the cells detected;
-    - %: the target percentage for alive cells (given lsm image only).
+    - %: the target percentage for alive cells.
     """
     img = read_lsm_img(img_path)
 
@@ -230,9 +303,13 @@ def calculate_lsm(cell_counter, nuclei_counter,
         os.remove(tmp_path)
     except FileNotFoundError:
         pass
-    nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
-    percentage = (1 - nuclei_count / cell_count.shape[0]) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage, 3)}
+    if nuclei_count is None:
+        nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
+    percentage = calculate_alive_percentage(
+        count_detected_objects(cell_count),
+        nuclei_count
+    )
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
 
 
 
@@ -282,7 +359,36 @@ def filter_detections(
     filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
     return filtered_detections
 
-def results_to_pandas(outputs: Results, store_bin_mask: bool = False) -> pd.DataFrame:
+def filter_segmentation_detections(
+    detections: pd.DataFrame,
+    min_size: float = 0.0,
+    max_size: float = 1.0,
+    size_metric: str = "area"
+) -> pd.DataFrame:
+    """
+    Filters segmentation detections using morphology-based metrics.
+    
+    Supported metrics:
+    - area: relative object area / image area
+    - diameter: relative object diameter / sqrt(image area)
+    - volume: relative object volume / image volume surrogate
+    """
+    if detections is None or detections.empty:
+        return detections
+
+    metric = size_metric if size_metric in detections.columns else "area"
+
+    min_size = 0.0 if min_size is None else float(min_size)
+    max_size = 1.0 if max_size is None else float(max_size)
+
+    if min_size > max_size:
+        min_size, max_size = max_size, min_size
+
+    values = pd.to_numeric(detections[metric], errors="coerce")
+    keep = values.notna() & (values >= min_size) & (values <= max_size)
+    return detections.loc[keep].copy()
+
+def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
     if not store_bin_mask:
         data: dict[str, list[Any]] = {
@@ -426,8 +532,9 @@ def compute_iou(masks_1: list, masks_2: list) -> tuple[NDArray, list]:
 
 def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]:
     """
-    Plots given mask on a 1000x1000 canvas for its further processing.
-    This util is used as a helper for compute_iou() function above.
+    Rasterizes a polygon mask safely and calculates morphology.
+    Handles normalized and denormalized coordinates.
+    Guards against degenerate contours and out-of-bounds points.
 
     Input params:
     - in_mask: np.array - np.array of contour points in ultralytics.engine.Results.Masks.xyn format;
@@ -445,6 +552,30 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     coords = coords.astype(np.int32)
     bin_mask: NDArray[np.uint8] = np.zeros(image_size, dtype=np.uint8)
     cv2.fillPoly(bin_mask, [coords], [1])
+    bin_mask = np.zeros(image_size, dtype=np.uint8)
+    if in_mask is None:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
+    coords = np.asarray(in_mask, dtype=np.float32).reshape(-1, 2)
+
+    if coords.shape[0] < 3:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
+    if coords.max() > 1.0:
+        coords = coords / np.array([image_size[1], image_size[0]], dtype=np.float32)
+
+    coords = coords * np.array([image_size[1], image_size[0]], dtype=np.float32)
+
+    coords[:, 0] = np.clip(coords[:, 0], 0, image_size[1] - 1)
+    coords[:, 1] = np.clip(coords[:, 1], 0, image_size[0] - 1)
+
+    coords = np.round(coords).astype(np.int32)
+
+    coords = np.unique(coords, axis=0)
+    if coords.shape[0] < 3:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
+    cv2.fillPoly(bin_mask, [coords], (1,))
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
 
@@ -489,19 +620,27 @@ def denormalize_coordinates(coords, image_shape):
     return coords * np.array([image_shape[1], image_shape[0]])
 
 def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=0.75, colormap="tab20"):
+                     alpha=0.75, colormap="tab20", color_ids=None):
     """Draws predicted masks on the image."""
     hex_colors = hex_to_bgr(colormap_to_hex(colormap))
     if not pred_masks:
         print("No masks found.")
-        return
+        safe_image_write(image, filename)
+        return image
     overlay = image.copy()
     for i, mask in enumerate(pred_masks):
-        coords = np.array(mask)
-        color = hex_colors[i % len(hex_colors)]
-        if coords.max() <= 1.0:  # checking if coordinates are denormalized (xIn or xIm)
+        coords = np.asarray(mask, dtype=np.float32).reshape(-1, 2)
+        if coords.shape[0] < 3:
+            continue
+        color_index = i if color_ids is None else int(color_ids[i])
+        color = hex_colors[color_index % len(hex_colors)]
+        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
             coords = denormalize_coordinates(coords, image.shape)
-        coords = coords.astype(int)
+        coords[:, 0] = np.clip(coords[:, 0], 0, image.shape[1] - 1)
+        coords[:, 1] = np.clip(coords[:, 1], 0, image.shape[0] - 1)
+        coords = np.round(coords).astype(np.int32)
+        if len(np.unique(coords, axis=0)) < 3:
+            continue
         cv2.fillPoly(overlay, [coords], color)
     cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
     safe_image_write(image, filename)
@@ -515,6 +654,7 @@ def plot_predictions_with_alignment(
     filename: str = IMAGE_FILE_NAME_DETECTION,
     colormap="tab20",
     alpha=0.75,
+    color_ids=None
 ):
     """
     Plot predictions with automatic dimension alignment.
@@ -538,12 +678,14 @@ def plot_predictions_with_alignment(
     o_h, o_w = original_image.shape[:2]
     if h != o_h or w != o_w:
         original_image = resize_and_pad_cv(original_image, w, h)
+    set_global('image_display_base', original_image.copy())
     return plot_predictions(
         original_image,
         pred_masks,
         filename=filename,
         colormap=colormap,
         alpha=alpha,
+        color_ids=color_ids
     )
 
 

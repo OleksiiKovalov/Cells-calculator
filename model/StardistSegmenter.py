@@ -141,7 +141,7 @@ class StardistSegmenter(BaseModel):
             )
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
-                self.object_size['signal']("set_size", self.detections['box'].copy())
+                self.object_size['signal']("set_size", self.detections.copy())
                 self.detections[
                     ['id_label', 'confidence', 'diameter', 'area', 'volume']
                 ].to_csv(
