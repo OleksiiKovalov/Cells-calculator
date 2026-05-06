@@ -1,3 +1,16 @@
+"""
+Logging and error handling utilities for the application.
+
+Provides custom logging handlers, error message formatting, and
+event-driven log emission. Includes LogEventEmitter for PyQt5
+integration and EventFileHandler for file-based logging.
+
+Key components:
+- LogEventEmitter: PyQt5 signals for log events
+- EventFileHandler: File handler that emits log signals
+- app_logger: Central logging utility function
+"""
+
 # Standard library imports
 import glob
 import logging
