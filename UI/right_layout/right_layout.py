@@ -1,3 +1,11 @@
+"""
+Right layout module for managing plugin display and lifecycle.
+
+This module provides the right-side layout container used in the application UI.
+It handles plugin switching, layout clearing, and recursive cleanup of widgets
+and nested layouts.
+"""
+
 # Third-party imports
 from PyQt5.QtCore import pyqtSignal, pyqtSlot
 from PyQt5.QtWidgets import QVBoxLayout
