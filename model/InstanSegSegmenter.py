@@ -1,3 +1,19 @@
+"""
+InstanSeg-based cell/nuclei segmentation utilities.
+
+This module defines the `InstansegSegmenter` class, which wraps the
+InstanSeg model for instance segmentation of cells and nuclei in microscopy
+images. It provides model initialization, configurable preprocessing,
+inference methods for x20/x10 magnification, and conversion of labeled
+segmentation outputs into a standardized pandas DataFrame.
+
+Key responsibilities:
+- initialize InstanSeg with a custom TorchScript model or built-in model
+- load and preprocess microscopy images for inference
+- run tiled or untiled inference depending on configuration
+- generate normalized detection results with morphology and bounding box data
+"""
+
 # Standard library imports
 import inspect
 import json
@@ -335,6 +351,18 @@ class InstansegSegmenter(BaseModel):
             **kwargs,
         )
     def _extract_polygon_from_geometry(self, geometry):
+        """
+        Extract the primary polygon and coordinate array from geometry.
+
+        Args:
+            geometry: GeoJSON-like geometry object or shapely-compatible geometry.
+
+        Returns:
+            tuple: (Polygon, np.ndarray) where the polygon is the primary polygon
+            geometry and the ndarray contains the exterior coordinates.
+            Returns (None, None) when geometry is empty, invalid, non-polygonal,
+            or does not contain a valid polygon with at least 3 points.
+        """
         geom = shape(geometry)
 
         if geom.is_empty:
