@@ -1,3 +1,10 @@
+"""
+Base plugin module providing the shared plugin interface.
+
+Defines BasePlugin, the parent class for right-layout plugins. It standardizes
+signal handling, initialization behavior, and required plugin methods.
+"""
+
 # Third-party imports
 from PyQt5.QtCore import QObject, pyqtSignal
 
