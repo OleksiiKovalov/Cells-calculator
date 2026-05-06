@@ -1,3 +1,10 @@
+"""
+Tracker plugin module for sequential image tracking.
+
+This module provides TrackerPlugin, the plugin responsible for tracking
+cellular spheroids across a folder of sequential images.
+"""
+
 # Standard library imports
 import os
 import traceback
