@@ -1,3 +1,19 @@
+"""
+Range slider widget with dual handles for min/max value selection.
+
+Provides a PyQt5 widget implementing a horizontal slider with two
+independent handles for selecting a range of values. Supports keyboard
+navigation, mouse control, and customizable range constraints.
+
+Key components:
+- RangeSlider: Main widget implementing dual-handle range selection
+
+Features:
+- Signals for value changes: valueChanged, lowValueChanged, highValueChanged
+- Keyboard support: arrow keys, page up/down, home/end
+- Configurable minimum range constraint between handles
+"""
+
 # -*- coding: utf-8 -*-
 
 # Third-party imports
