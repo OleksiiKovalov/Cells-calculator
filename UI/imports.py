@@ -1,3 +1,16 @@
+"""
+Centralized module imports with progress feedback.
+
+Handles sequential loading of all application dependencies with
+progress bar updates through the splash screen. Organizes imports
+by category (system, path handling, data structures, GUI, etc.) to
+provide clear visibility into initialization state.
+
+Usage:
+    Import this module early in application startup to ensure all
+    dependencies are loaded with user feedback.
+"""
+
 from UI.app_globals import get_registered_model
 from  UI.splashscreen import update_splash
 curpc = 25
