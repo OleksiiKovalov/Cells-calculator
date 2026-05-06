@@ -1,3 +1,14 @@
+"""
+Image normalization dialog for previewing and adjusting image preprocessing.
+
+Provides a PyQt5 dialog for loading an image and interactively
+adjusting normalization parameters (percentile bounds, scaling).
+Displays real-time preview of normalized image output.
+
+Key components:
+- ImageNormalizeDialog: Main dialog for image normalization adjustment
+"""
+
 # Third-party imports
 import numpy as np
 from csbdeep.utils import normalize
