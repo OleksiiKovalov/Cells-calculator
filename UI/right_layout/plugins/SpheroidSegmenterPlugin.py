@@ -1,3 +1,11 @@
+"""
+Plugin module for spheroid segmentation in a single image.
+
+Defines SpheroidSegmenterPlugin, which configures UI actions and behavior for
+segmenting a single spheroid image. This plugin is currently not used in the
+application workflow.
+"""
+
 # Standard library imports
 import os
 import traceback
