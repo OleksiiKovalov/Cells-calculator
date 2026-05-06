@@ -1,3 +1,15 @@
+"""
+Application menu bar with file, settings, and plugin menus.
+
+Defines the menubar class which provides the main menu bar for the
+application with standard menus (File, Settings) and dynamic plugin
+selection. Emits signals for menu actions to communicate with the
+main application window.
+
+Key components:
+- menubar: QMenuBar subclass with customized menus and actions
+"""
+
 # Standard library imports
 from pathlib import Path
 from typing import Optional
