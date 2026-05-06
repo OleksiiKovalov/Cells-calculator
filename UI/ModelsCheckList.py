@@ -1,3 +1,14 @@
+"""
+Dialog for selecting models from a checklist.
+
+Provides a PyQt5 dialog for user selection of ground truth and available
+models using checkboxes and combo boxes. Allows configuration of which
+models to enable for processing.
+
+Key components:
+- ModelsCheckListDialog: Dialog with model selection widgets
+"""
+
 # Third-party imports
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
