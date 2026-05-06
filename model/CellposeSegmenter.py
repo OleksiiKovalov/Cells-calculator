@@ -1,3 +1,21 @@
+"""
+Cellpose-based cell segmentation utilities.
+
+This module provides a wrapper around the Cellpose model for cell
+segmentation in microscopy images. It defines the `CellposeSegmenter`
+class, which handles model initialization, image preprocessing,
+segmentation inference, and conversion of Cellpose outputs into a
+structured pandas DataFrame.
+
+Key responsibilities:
+- initialize Cellpose with a custom or standard model type
+- load microscopy images and normalize/preprocess them for inference
+- run Cellpose segmentation and produce mask, bounding box,
+  confidence, and morphology outputs
+- export detection results in a format compatible with the
+  application pipeline
+"""
+
 # Standard library imports
 import json
 import os
