@@ -1,3 +1,16 @@
+"""
+Custom file dialog widget with advanced file selection features.
+
+Provides a customizable file selection dialog with table-based file
+listing, directory navigation, file preview, and filtering capabilities.
+Includes FileTableModel for managing file data and CustomFileDialog
+for user interaction.
+
+Key components:
+- FileTableModel: Abstract table model for dynamic file data display
+- CustomFileDialog: Main dialog for file selection with preview
+"""
+
 # Standard library imports
 import re
 import sys
