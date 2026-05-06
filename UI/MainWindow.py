@@ -120,7 +120,9 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot(str, object)
     def handle_menubar_action(self, action_name, value):
-        """Обрабатываем сигнал от menubar"""
+        """
+        Handle actions from the menubar.
+        """
         if action_name == "open_file":
             self.open_file(value)
         if action_name == "open_folder":
@@ -144,6 +146,13 @@ class MainWindow(QMainWindow):
     
     @pyqtSlot(str, object)
     def handle_rightLayout_action(self, action_name, value):
+        """
+        Handle actions emitted from the right-side layout plugins.
+
+        Args:
+            action_name (str): The name of the action to handle.
+            value (object): Associated value for the action.
+        """
         if action_name == "show_warning":
             self.show_warning_dialog(value)
         elif action_name == "add_image":
@@ -153,6 +162,12 @@ class MainWindow(QMainWindow):
         pass
     
     def open_normalize(self):
+        """
+        Open the image normalization dialog for the current image.
+
+        Loads the currently selected image file, converts it to grayscale if needed,
+        and opens the normalization dialog for user adjustments.
+        """
         image = imread(self.lsm_path)
         image = safergb2gray(image)
         dlg = ImageNormalizeDialog(image)
@@ -160,7 +175,13 @@ class MainWindow(QMainWindow):
         pass
 
     def init_value(self):
-        # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
+        """
+        Initialize shared application values, objects, and plugin configuration.
+
+        Sets up default object size parameters, model collections, plugin definitions,
+        and initial application state variables used by the main window and plugins.
+        """
+        # TODO: make parameters collect relative to the selected plugin
         # Initialize DataFrame to None
         
         self._update_progress(42, "Setting up object parameters...")
@@ -584,6 +605,15 @@ class MainWindow(QMainWindow):
             return self.create_no_image_qimage()
 
     def _create_lsm_qimage(self, lsm_array):
+        """
+        Convert an LSM array to a grayscale QImage using the selected cell channel.
+
+        Args:
+            lsm_array (numpy.ndarray): Raw LSM image data with channel-first layout.
+
+        Returns:
+            QImage: Grayscale image for display.
+        """
         channels_last = lsm_to_channels_last(lsm_array)
         cell_channel = self.parametrs['Cell']
         if channels_last.shape[-1] <= cell_channel:
@@ -592,6 +622,15 @@ class MainWindow(QMainWindow):
         return self._create_grayscale_qimage(channels_last[:, :, cell_channel])
 
     def _create_grayscale_qimage(self, image_array):
+        """
+        Convert a 2D grayscale array into a QImage.
+
+        Args:
+            image_array (numpy.ndarray): A 2D array containing grayscale pixel values.
+
+        Returns:
+            QImage: The converted grayscale image, or a placeholder image if the input is invalid.
+        """
         image_array = np.asarray(image_array)
         if image_array.ndim != 2:
             return self.create_no_image_qimage()
@@ -795,7 +834,12 @@ class MainWindow(QMainWindow):
                 self._center_image_in_scene(scaled_pixmap, view_width, view_height)
 
     def _update_zoom_status(self):
-        # Update cursor based on zoom level - show hand cursor when image is larger than view
+        """
+        Update visual state and status bar text for the current zoom level.
+
+        Updates the mouse cursor depending on whether zooming and panning is active,
+        then writes the current zoom percentage to the status bar.
+        """
         self._update_cursor_for_zoom()
         # Update status bar with zoom level
         zoom_percentage = int(self.zoom_factor * 100)
@@ -814,82 +858,7 @@ class MainWindow(QMainWindow):
         self.main_view.resetTransform()
         self.main_view.scale(self.zoom_factor, self.zoom_factor)
         self._update_zoom_status()
-    
-    def _on_wheel_event(self, event):
-        """
-        Handle mouse wheel events for zooming with Ctrl key.
-        
-        Args:
-            event (QWheelEvent): The wheel event
-        """
-        # Check if Ctrl key is pressed
-        if event.modifiers() & Qt.ControlModifier:
-            # Get the wheel delta (positive for zoom in, negative for zoom out)
-            delta = event.angleDelta().y()
-            
-            if delta > 0:
-                self.zoom_in()
-            else:
-                self.zoom_out()
-                
-            # Accept the event to prevent scrolling
-            event.accept()
-        else:
-            # Call the default wheel event handler for normal scrolling
-            QGraphicsView.wheelEvent(self.main_view, event)
-    
-    def zoom_in(self):
-        """
-        Zoom in the image view.
-        """
-        if self.zoom_factor < self.max_zoom:
-            self.zoom_factor *= self.zoom_step
-            self._apply_zoom()
-    
-    def zoom_out(self):
-        """
-        Zoom out the image view.
-        """
-        if self.zoom_factor > self.min_zoom:
-            self.zoom_factor /= self.zoom_step
-            self._apply_zoom()
-    
-    def zoom_to_fit(self):
-        """
-        Reset zoom to fit the image in the view.
-        """
-        self.zoom_factor = 1.0
-        self.main_view.resetTransform()
-        
-        # If we have an image, rescale it to fit
-        if hasattr(self, 'original_image_pixmap') and self.original_image_pixmap:
-            view_rect = self.main_view.viewport().rect()
-            view_width = view_rect.width()
-            view_height = view_rect.height()
-            
-            scaled_pixmap = self._scale_pixmap_to_fit(
-                self.original_image_pixmap, view_width, view_height)
-            
-            if hasattr(self, 'current_pixmap_item') and self.current_pixmap_item:
-                self.current_pixmap_item.setPixmap(scaled_pixmap)
-                self._center_image_in_scene(scaled_pixmap, view_width, view_height)
-    
-    def _apply_zoom(self):
-        """
-        Apply the current zoom factor to the view.
-        """
-        # Reset transform and apply zoom
-        self.main_view.resetTransform()
-        self.main_view.scale(self.zoom_factor, self.zoom_factor)
-        
-        # Update status bar with zoom level
-        zoom_percentage = int(self.zoom_factor * 100)
-        if hasattr(self, 'status_processing'):
-            self.update_status(
-                message=f"Zoom: {zoom_percentage}%",
-                processing_status=f"Zoom: {zoom_percentage}%"
-            )
-    
+
     def _on_mouse_press(self, event):
         """
         Handle mouse press events for panning.
@@ -960,7 +929,7 @@ class MainWindow(QMainWindow):
             else:
                 # Normal zoom level - show default cursor
                 self.main_view.setCursor(Qt.ArrowCursor)
-        
+    
     def change_image(self):
         """
         Change displayed image. 
@@ -1122,7 +1091,7 @@ class MainWindow(QMainWindow):
             if self.lsm_filesList:
                # If LSM files are present, set the LSM path and callback function for table creation
                lsm_path = self.lsm_filesList
-                #TODO переделать callback так что бы он зависил от плагина
+                #TODO refactor callback to depend on plugin
                call_back = self.plugin_list[self.current_plugin_name]["folder_callback"]
             else:
                # If no LSM files in the list, set the callback function for image change
@@ -1194,6 +1163,12 @@ class MainWindow(QMainWindow):
         return image
     
     def on_log_line_added(self, log_line):
+        """
+        Handle log line added event.
+        
+        Args:
+            log_line: The log line to display.
+        """
         # Shrink the log line to fit status bar
         shortened_line = self.shrink_text(log_line, max_length=100)
         self.update_status(shortened_line)
@@ -1243,12 +1218,27 @@ class MainWindow(QMainWindow):
         # Combine with separator
         return start_part + separator + end_part
 
-    def remove_non_printable(self,text):
-        """Remove non-printable characters using string.printable"""
+    def remove_non_printable(self, text):
+        """
+        Remove non-printable characters from text.
+
+        Args:
+            text (str): Input text to sanitize.
+
+        Returns:
+            str: Text containing only printable characters.
+        """
         printable = set(string.printable)
         return ''.join(char for char in text if char in printable)
 
     def filter_and_draw_predictions(self, image, predictions):
+        """
+        Filter and draw predictions on the image.
+        
+        Args:
+            image: The image data.
+            predictions: The predictions to draw.
+        """
         mask_image = None
         self.add_image(mask_image)
         pass

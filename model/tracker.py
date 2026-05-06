@@ -34,6 +34,16 @@ class Tracker:
     results: dict[str, list[Any]]
 
     def __init__(self, path_to_model: str, size):
+        """
+        Initialize the spheroid tracking system.
+        
+        Sets up a YOLO segmentation model for spheroid detection and creates
+        output directories for results.
+        
+        Args:
+            path_to_model (str): Path to YOLO segmentation model weights
+            size (dict): UI configuration with color_map, signal callback, etc.
+        """
         self.path = path_to_model
         self.model = YoloSegmenter(path_to_model, size)
         self.output_dir = Path("tracker_output")
@@ -43,20 +53,41 @@ class Tracker:
     @no_type_check
     def track(self, img_seq_folder: str, time_period: float = 15):
         """
-        Tracks spheroid instances through the sequence of frames.
-        Uses Segmenter segmentation model for segmenting given frames.
-        Afterwards, it saves the results in the tracker_output folder.
-        The obtained saved results include:
-        - all processed frames with masks visualized above;
-        - general CSV table of all spheroid instances and their size params at all frames;
-        - individual CSV tables for each spheroid instance with its size params at each frame.
-
-        Input params include:
-        - img_seq_folder: str - directory containing sequence of frames;
-        - time_period: time period (presumably, in seconds) between frame shots. Default to 15.
-
-        Output:
-        - None
+        Track spheroid instances across image sequence using detection-based tracking.
+        
+        Implements tracking-by-detection approach: segments spheroids in each frame using
+        YOLO, then associates instances across frames based on IoU (Intersection over Union).
+        First frame assignments are used as reference for subsequent frame matching.
+        
+        Processing includes:
+        - Segmenting each frame independently
+        - Computing IoU matrix between consecutive frames
+        - Resolving ID conflicts (multiple new detections matching same reference)
+        - Saving individual CSV per spheroid + global tracking table
+        
+        Args:
+            img_seq_folder (str): Directory containing image sequence (sorted by filename)
+            time_period (float): Time interval between frames in seconds. Used for reporting.
+                                Defaults to 15 seconds.
+        
+        Returns:
+            None
+        
+        Output Files Created:
+            tracker_output/
+                frames/
+                    frame_000.png, frame_001.png, ...  # Annotated frames with masks
+                tabular_data/
+                    spheroid_00.csv  # Per-spheroid temporal series
+                    spheroid_01.csv
+                    ...
+                    general_t_series_data.csv  # All spheroids merged
+        
+        Note:
+            - Output directory is recreated (previous results deleted)
+            - Frames are processed sequentially, zero_frame handled specially
+            - Masks of length 0 are filtered out
+            - ID assignment uses maximum IoU matching with conflict resolution
         """
 
         try:

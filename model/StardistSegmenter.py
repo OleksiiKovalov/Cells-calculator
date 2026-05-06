@@ -1,3 +1,18 @@
+"""
+StarDist-based cell segmentation utilities.
+
+This module provides a wrapper around the StarDist 2D model for cell
+segmentation in microscopy images. It handles model initialization,
+image preprocessing, inference, and conversion of predictions into
+a standardized pandas DataFrame format with morphological metrics.
+
+Key responsibilities:
+- initialize StarDist2D model with custom or default configuration
+- load and preprocess microscopy images for inference
+- run StarDist segmentation and extract polygonal predictions
+- compute morphological properties from segmentation masks
+"""
+
 # Standard library imports
 import json
 import os
@@ -40,11 +55,37 @@ from UI.app_globals import (
 
 
 class StardistSegmenter(BaseModel):
+    """
+    Cell/nuclei segmentation using StarDist deep learning model.
+    
+    StarDist performs instance segmentation via star-convex polygons. Supports
+    both pre-trained models and custom fine-tuned models with configurable
+    preprocessing pipelines.
+    
+    Attributes:
+        model (StarDist2D): The StarDist model instance
+        is_custom_model (bool): Whether model is custom-trained vs. pre-trained
+        image_preprocess_settings_default (OrderedDict): Default preprocessing config
+    """
     def __init__(self, path_to_model: str, object_size, model_data=None):
+        """
+        Initialize StarDist segmenter.
+        """
         self.is_custom_model = False
         super().__init__(path_to_model, object_size,model_data)
     
     def init_x20_model(self, path_to_model: str):
+        """
+        Load StarDist model for x20 magnification segmentation.
+        
+        Args:
+            path_to_model (str): Path to custom model directory or name of built-in model
+                                ('2D_versatile_fluo', '2D_versatile_he', '2D_paper_dsb2018')
+            
+        Note:
+            Pre-trained models use 'gray2rgb' preprocessing.
+            Custom models use 'rgb2gray' preprocessing.
+        """
         app_logger().warning(
             f"Stardist: Num GPUs Available:{len(tf.config.list_physical_devices('GPU'))}"
         )        
@@ -77,10 +118,31 @@ class StardistSegmenter(BaseModel):
         store_bin_mask=False,
         **kwargs
     ):
+        """
+        Segment objects using StarDist at x20 magnification.
+        
+        Args:
+            input_image (str): Path to input microscopy image
+            plot (bool): Whether to generate visualization. Defaults to True.
+            colormap (str): Colormap for visualization. Defaults to 'tab20'.
+            tracking (bool): Whether in tracking mode. Defaults to False.
+            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
+            min_score (float): Minimum confidence score threshold. Defaults to 0.05.
+            alpha (float): Mask transparency (0-1). Defaults to 0.75.
+            store_bin_mask (bool): Whether to store binary masks. Defaults to False.
+            **kwargs: Additional arguments for compatibility
+        
+        Returns:
+            pd.DataFrame: Instance segmentation results with columns:
+                id_label, box, mask, confidence, diameter, area, volume
+                
+        Raises:
+            RuntimeError: If StarDist inference fails
+        """
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
        
         self.original_image = safegray2rgb(image)
         try:
@@ -132,13 +194,54 @@ class StardistSegmenter(BaseModel):
         alpha=0.75,
         **kwargs
     ):
+        """
+        Segment objects using StarDist at x10 magnification.
+        
+        Not implemented.
+        
+        Args:
+            input_image (str): Path to input image
+            filename (str): Output path (unused)
+            colormap (str): Colormap (unused)
+            min_score (float): Minimum score (unused)
+            alpha (float): Transparency (unused)
+            **kwargs: Additional arguments (unused)
+        
+        Raises:
+            NotImplementedError: Always raised
+        """
         raise NotImplementedError
     
     def image_preprocess(self,image):
+        """
+        Preprocess image for StarDist inference.
+        
+        Converts BGR to RGB color space.
+        
+        Args:
+            image (np.ndarray): Input image in BGR format
+            
+        Returns:
+            np.ndarray: Image in RGB format
+        """
         img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)        
         return img_rgb
 
     def load_image(self, image_path):
+        """
+        Load and prepare image for processing.
+        
+        Reads image, converts to BGR format, handles different channel counts.
+        
+        Args:
+            image_path (str): Path to image file
+            
+        Returns:
+            np.ndarray: Image in BGR format
+            
+        Raises:
+            RuntimeError: If image cannot be loaded
+        """
         img_bgr = safe_image_read(image_path, color_mode='color')
         if img_bgr is None:
             raise RuntimeError(f"Unable to load image {image_path}")
@@ -156,6 +259,28 @@ class StardistSegmenter(BaseModel):
         original_shape=None,
         inference_shape=None
     ) -> pd.DataFrame:
+        """
+        Convert StarDist instance segmentation output to standardized DataFrame.
+        
+        Processes StarDist labeled instances into normalized coordinates with
+        morphological features. Handles resizing if inference dimensions differ
+        from original image dimensions.
+        
+        Args:
+            instances (np.ndarray): 2D integer array with unique labels per instance
+            scores (np.ndarray): Confidence scores for each instance. Optional.
+            labels (np.ndarray): Alternative label array (currently unused). Optional.
+            original_shape (tuple): (height, width) of original image. Used for normalization.
+            inference_shape (tuple): (height, width) of image used for inference.
+        
+        Returns:
+            pd.DataFrame: Standardized detections with columns:
+                - id_label: Instance identifier
+                - box: [x_min, y_min, x_max, y_max] bounding box
+                - mask: Polygon contour points (cv2 format)
+                - confidence: Instance confidence score
+                - diameter, area, volume: Morphological properties
+        """
         data: Dict[str, List[Any]] = {
             "id_label": [],
             "box": [],
@@ -166,7 +291,7 @@ class StardistSegmenter(BaseModel):
             "volume": []
         }
         props = regionprops(instances)
-        safe_image_write(instances, IMAGE_FILE_NAME_INSTANCES)
+        safe_image_write(instances, IMAGE_FILE_NAME_INSTANCES, preserve_dtype=False)
 
         for i, prop in enumerate(props):
             # Extract bounding box (min_row, min_col, max_row, max_col)

@@ -1,3 +1,21 @@
+"""
+Cellpose-based cell segmentation utilities.
+
+This module provides a wrapper around the Cellpose model for cell
+segmentation in microscopy images. It defines the `CellposeSegmenter`
+class, which handles model initialization, image preprocessing,
+segmentation inference, and conversion of Cellpose outputs into a
+structured pandas DataFrame.
+
+Key responsibilities:
+- initialize Cellpose with a custom or standard model type
+- load microscopy images and normalize/preprocess them for inference
+- run Cellpose segmentation and produce mask, bounding box,
+  confidence, and morphology outputs
+- export detection results in a format compatible with the
+  application pipeline
+"""
+
 # Standard library imports
 import json
 import os
@@ -35,11 +53,29 @@ from model.utils import (
 
 
 class CellposeSegmenter(BaseModel):
+    """
+    Cell segmentation using the Cellpose deep learning model.
+    
+    This class wraps the Cellpose segmentation model for detecting and segmenting
+    cells in microscopy images. Supports both pre-trained and custom models with
+    flexible preprocessing pipelines.
+    
+    Attributes:
+        model (cellpose.models.CellposeModel): The Cellpose model instance
+        cellpose_diam (float | None): Expected cell diameter for inference tuning
+        image_preprocess_settings_default (OrderedDict): Default preprocessing config
+    """
     def __init__(self, path_to_model: str, object_size, model_data=None):
+        """
+        Initialize Cellpose segmenter.
+        """
         super().__init__(path_to_model, object_size, model_data)
         self.cellpose_diam = None
     
     def init_x20_model(self, path_to_model: str):
+        """
+        Initialize Cellpose model for x20 magnification segmentation.
+        """
         self.image_preprocess_settings_default = json.loads(
             '[{"gray2rgb":""}]', object_pairs_hook=OrderedDict
         )
@@ -71,6 +107,11 @@ class CellposeSegmenter(BaseModel):
             app_logger().warning(f"CellposeSegmenter: GPU Used: {self.use_gpu}")
 
     def init_x10_model(self, path_to_model):
+        """
+        Initialize Cellpose model for x10 magnification.
+        
+        Currently not implemented.
+        """
         pass
 
     def count_x20(
@@ -85,6 +126,36 @@ class CellposeSegmenter(BaseModel):
         store_bin_mask=False,
         **kwargs,
     ):
+        """
+        Segment cells in image using Cellpose at x20 magnification.
+        
+        Loads image, applies preprocessing, runs Cellpose segmentation, converts
+        results to structured format, and optionally visualizes segmentations.
+        
+        Args:
+            input_image (str): Path to input microscopy image
+            plot (bool): Whether to generate visualization image. Defaults to True.
+            colormap (str): Matplotlib colormap for mask visualization. Defaults to 'tab20'.
+            tracking (bool): Whether in tracking mode (affects CSV output). Defaults to False.
+            filename (str): Output path for visualization. Defaults to IMAGE_FILE_NAME_DETECTION.
+            min_score (float): Minimum confidence score (0-1) to keep detections. Defaults to 0.05.
+            alpha (float): Transparency for mask overlay (0-1). Defaults to 0.75.
+            store_bin_mask (bool): Whether to store binary masks in DataFrame. Defaults to False.
+            **kwargs: Additional arguments (unused, for API compatibility)
+        
+        Returns:
+            pd.DataFrame: Segmentation results with columns:
+                - id_label: Unique cell identifier
+                - box: [x_min_norm, y_min_norm, width_norm, height_norm] (normalized)
+                - mask: List of contour points (normalized coordinates)
+                - confidence: Cell probability from model
+                - diameter: Equivalent cell diameter (normalized)
+                - area: Cell area (normalized to image area)
+                - volume: Cell volume assuming spherical shape
+                
+        Raises:
+            RuntimeError: If Cellpose inference fails
+        """
         image = imread(input_image)
         image_preprocess_settings = (
             self.model_data["image_preprocess"]
@@ -94,7 +165,7 @@ class CellposeSegmenter(BaseModel):
         img_inference = process_loaded_image(
             image=image, settings=image_preprocess_settings
         )
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
         self.original_image = safegray2rgb(image)
         channels_to_use = [0, 0]  # Adapt!
         try:
@@ -151,9 +222,36 @@ class CellposeSegmenter(BaseModel):
         alpha=0.75,
         **kwargs,
     ):
+        """
+        Segment cells using Cellpose at x10 magnification.
+        
+        Not implemented.
+        
+        Args:
+            input_image (str): Path to input image
+            filename (str): Output path (unused)
+            colormap (str): Colormap (unused)
+            min_score (float): Minimum score (unused)
+            alpha (float): Transparency (unused)
+            **kwargs: Additional arguments (unused)
+            
+        Raises:
+            NotImplementedError: Always raised
+        """
         raise NotImplementedError
 
     def image_preprocess(self, image):
+        """
+        Preprocess image for Cellpose inference.
+        
+        Converts RGB images to grayscale if needed.
+        
+        Args:
+            image (np.ndarray): Input image array
+            
+        Returns:
+            np.ndarray: Preprocessed image (grayscale)
+        """
         if image.ndim == 3 and image.shape[-1] == 3:  # Check if likely RGB
             print("Converting RGB image to grayscale...")
             img_gray = rgb2gray(image)
@@ -167,6 +265,20 @@ class CellposeSegmenter(BaseModel):
         return img_prepared
 
     def load_image(self, image_path):
+        """
+        Load and prepare image for processing.
+        
+        Reads image, converts to BGR format, handles different channel counts.
+        
+        Args:
+            image_path (str): Path to image file
+            
+        Returns:
+            np.ndarray: Image in BGR format
+            
+        Raises:
+            RuntimeError: If image cannot be loaded
+        """
         img_bgr = safe_image_read(image_path, color_mode="color")
         if img_bgr is None:
             raise RuntimeError(

@@ -40,30 +40,68 @@ class CellCounter(BaseModel):
     #     super().__init__(path, object_size)
 
     def init_x20_model(self, path_to_model: str):
+        """
+        Initialize ONNX model for x20 magnification inference.
+        
+        Loads an ONNX model from the specified path for cell detection
+        at 20x magnification.
+        
+        Args:
+            path_to_model (str): Path to the ONNX model file.
+            
+        Raises:
+            FileNotFoundError: If the model file does not exist.
+        """
         self.model = cv2.dnn.readNetFromONNX(path_to_model)
 
     def init_x10_model(self, path_to_model):
+        """
+        Initialize model for x10 magnification.
+        
+        Currently not implemented.
+        """
         self.model_x10 = None
 
     def count_x10(self, input_image, filename):
+        """
+        Count cells at x10 magnification.
+        
+        Delegates to count_x20 method.
+        
+        Args:
+            input_image (str): Path to input image
+            filename (str): Output path for detection visualization
+            
+        Returns:
+            pd.DataFrame: Detection results
+        """
         return self.count_x20(input_image, filename)
 
 
     def count_x20(self, input_image, filename):
-        # NOTE: this function is deprecated and no longer used,
-        # because we have implemented ultralytics-based inference pipeline for simplicity
         """
-        Main function to load ONNX model, perform inference, draw bounding boxes,
-        and display the output image.
-
+        Perform inference on x20 magnification image using ONNX model.
+        
+        ---WARNING---: This function is deprecated and no longer used. The application now uses
+        an ultralytics-based inference pipeline for improved performance and simplicity.
+        
+        Loads image, preprocesses for model input, runs ONNX inference, applies NMS,
+        and saves results both as visualization and CSV data.
+        
         Args:
-            onnx_model (str): Path to the ONNX model.
-            input_image (str): Path to the input image.
-            filename (str): Path to save the output image.
-
+            input_image (str): Path to input microscopy image
+            filename (str): Output path for detection visualization
+        
         Returns:
-            list: List of dictionaries containing detection information such as class_id,
-            class_name, confidence, etc.
+            pd.DataFrame: Detection results with columns:
+                - class_id, class_name, confidence
+                - box: [x, y, width, height]
+                - scale: normalization factor
+        
+        Note:
+            - Images are padded to square before inference (512x512)
+            - NMS thresholds: score=0.25, iou=0.6
+            - Confidence threshold: 0.2
         """
         # Read the input image
         if self.detections is None:
@@ -90,7 +128,7 @@ class CellCounter(BaseModel):
             self.model.setInput(blob)
 
             set_global("image_inference", image)
-            safe_image_write(image, IMAGE_FILE_NAME_INGFERENCE)
+            safe_image_write(image, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
 
             # Perform inference
             outputs = self.model.forward()

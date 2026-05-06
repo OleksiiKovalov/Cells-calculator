@@ -1,3 +1,17 @@
+"""
+Model conversion utility for InstanSeg.
+
+Converts InstanSeg PyTorch model weights to TorchScript format for optimized
+inference. This is a one-off script to prepare trained models for deployment.
+
+Usage:
+    1. Place model weights and experiment_log.csv in instanseg/<model_name>
+    2. Update model_name variable at top of script
+    3. Run: python convert_instanseg_model.py
+    4. Converted model will be saved to trainedmodels/
+    5. Register model in modelconfig.json
+"""
+
 # set model name
 model_name = "Instanseg-Neuroblastoma-v4.pth"
 # place new files (experiment_log.csv and model_weights_best.pth) under Cells-calculator\instanseg\<model_name> folder

@@ -19,7 +19,7 @@ Features:
 
 # Standard library imports
 import time
-from typing import Callable
+from typing import Callable, Optional
 
 # Third-party imports
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
@@ -30,6 +30,58 @@ from PyQt5.QtWidgets import (
 
 # Local application imports
 from UI.settings_manager import get_setting, set_setting
+
+# Constants
+ANIMATION_INTERVAL_MS = 500
+DURATION_UPDATE_INTERVAL_MS = 100
+EVENT_PROCESS_INTERVAL_MS = 50
+THREAD_WAIT_TIMEOUT_MS = 1000
+
+# Stylesheets
+WAIT_WINDOW_STYLE = """
+    QDialog {
+        background-color: #f8f9fa;
+        border: 2px solid #dee2e6;
+        border-radius: 10px;
+    }
+    QLabel {
+        color: #495057;
+    }
+    QPushButton {
+        background-color: #6c757d;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        font-weight: bold;
+    }
+    QPushButton:hover {
+        background-color: #5a6268;
+    }
+    QPushButton:pressed {
+        background-color: #545b62;
+    }
+    QFrame {
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        background-color: white;
+        margin: 5px;
+        padding: 10px;
+    }
+"""
+
+ANIMATED_LABEL_STYLE = """
+    QLabel {
+        color: #2c3e50;
+        font-size: 16px;
+        font-weight: bold;
+        padding: 10px;
+    }
+"""
+
+INFO_LABEL_STYLE = "font-size: 12px; margin: 5px;"
+DURATION_LABEL_STYLE = "font-size: 14px; font-weight: bold; color: #007bff;"
+LAST_DURATION_LABEL_STYLE = "font-size: 12px; color: #6c757d;"
 
 
 class WorkerThread(QThread):
@@ -42,7 +94,7 @@ class WorkerThread(QThread):
     finished = pyqtSignal(object)     # For completion with result
     error_occurred = pyqtSignal(str)  # For error handling
     
-    def __init__(self, target_function, *args, **kwargs):
+    def __init__(self, target_function: Callable, *args, **kwargs):
         super().__init__()
         self.target_function = target_function
         self.args = args
@@ -60,9 +112,14 @@ class WorkerThread(QThread):
             self.result = self.target_function(*self.args, **self.kwargs)
             if not self.cancelled:
                 self.finished.emit(self.result)
-        except Exception as e:
+        except KeyboardInterrupt:
+            # Handle user cancellation specifically
             if not self.cancelled:
-                self.error_occurred.emit(str(e))
+                self.error_occurred.emit("Operation cancelled by user")
+        except Exception as e:
+            # Log and emit other exceptions
+            if not self.cancelled:
+                self.error_occurred.emit(f"Unexpected error: {str(e)}")
     
     def emit_progress(self, message: str):
         """Emit progress update signal"""
@@ -73,7 +130,7 @@ class WorkerThread(QThread):
         """Cancel the operation"""
         self.cancelled = True
         self.quit()
-        self.wait(1000)  # Wait up to 1 second for thread to finish
+        self.wait(THREAD_WAIT_TIMEOUT_MS)  # Wait up to 1 second for thread to finish
 
 
 class AnimatedWaitLabel(QLabel):
@@ -84,7 +141,6 @@ class AnimatedWaitLabel(QLabel):
         self.animation_frame = 0
         self.animation_timer = QTimer()
         self.animation_timer.timeout.connect(self.update_animation)
-        self.animation_timer.start(500)  # Update every 500ms
         
         # Animation styles
         self.dots_style = ["Wait", "Wait.", "Wait..", "Wait..."]
@@ -92,14 +148,7 @@ class AnimatedWaitLabel(QLabel):
         self.current_style = self.dots_style
         
         # Styling
-        self.setStyleSheet("""
-            QLabel {
-                color: #2c3e50;
-                font-size: 16px;
-                font-weight: bold;
-                padding: 10px;
-            }
-        """)
+        self.setStyleSheet(ANIMATED_LABEL_STYLE)
     
     def update_animation(self):
         """Update animation frame"""
@@ -116,7 +165,7 @@ class AnimatedWaitLabel(QLabel):
     
     def start_animation(self):
         """Start the animation"""
-        self.animation_timer.start(500)
+        self.animation_timer.start(ANIMATION_INTERVAL_MS)
     
     def stop_animation(self):
         """Stop the animation"""
@@ -137,8 +186,8 @@ class WaitWindow(QDialog):
     # Signal emitted when process fails
     process_failed = pyqtSignal(str)
     
-    def __init__(self, title="Processing", info_text="Processing, please wait...", 
-                 cancellable=True, parent=None):
+    def __init__(self, title: str = "Processing", info_text: str = "Processing, please wait...", 
+                 cancellable: bool = True, parent=None):
         super().__init__(parent)
         
         # Window properties
@@ -147,12 +196,12 @@ class WaitWindow(QDialog):
         self.setModal(True)
         
         # Time tracking
-        self.start_time = None
+        self.start_time: Optional[float] = None
         self.last_duration_key = f"last_duration_{title.lower().replace(' ', '_')}"
-        self.cancel_callback = None
+        self.cancel_callback: Optional[Callable] = None
         
         # Worker thread for non-blocking operations
-        self.worker_thread = None
+        self.worker_thread: Optional[WorkerThread] = None
         
         # Timer for duration counter
         self.duration_timer = QTimer()
@@ -169,37 +218,7 @@ class WaitWindow(QDialog):
         self.load_last_duration()
         
         # Styling
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #f8f9fa;
-                border: 2px solid #dee2e6;
-                border-radius: 10px;
-            }
-            QLabel {
-                color: #495057;
-            }
-            QPushButton {
-                background-color: #6c757d;
-                color: white;
-                border: none;
-                padding: 8px 16px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #5a6268;
-            }
-            QPushButton:pressed {
-                background-color: #545b62;
-            }
-            QFrame {
-                border: 1px solid #dee2e6;
-                border-radius: 5px;
-                background-color: white;
-                margin: 5px;
-                padding: 10px;
-            }
-        """)
+        self.setStyleSheet(WAIT_WINDOW_STYLE)
     
     def process_events(self):
         """Process Qt events to keep UI responsive"""
@@ -227,7 +246,7 @@ class WaitWindow(QDialog):
         self.start_wait()
         self.worker_thread.start()
     
-    def run_blocking_process_responsive(self, target_function, *args, **kwargs):
+    def run_blocking_process_responsive(self, target_function: Callable, *args, **kwargs):
         """
         Run a blocking function while keeping the UI responsive.
         This method processes Qt events periodically during execution.
@@ -243,11 +262,11 @@ class WaitWindow(QDialog):
         self.start_wait()
         
         # Start event processing timer to keep UI responsive
-        self.event_timer.start(50)  # Process events every 50ms
+        self.event_timer.start(EVENT_PROCESS_INTERVAL_MS)  # Process events every 50ms
         
         try:
             # Add progress callback if supported
-            def progress_callback(message):
+            def progress_callback(message: str):
                 self.set_info_text(message)
                 QApplication.processEvents()  # Process events immediately on progress
             
@@ -297,7 +316,7 @@ class WaitWindow(QDialog):
         self.info_label = QLabel(info_text)
         self.info_label.setAlignment(Qt.AlignCenter)
         self.info_label.setWordWrap(True)
-        self.info_label.setStyleSheet("font-size: 12px; margin: 5px;")
+        self.info_label.setStyleSheet(INFO_LABEL_STYLE)
         content_layout.addWidget(self.info_label)
         
         # Time information frame
@@ -308,13 +327,13 @@ class WaitWindow(QDialog):
         # Duration counter
         self.duration_label = QLabel("Elapsed: 00:00")
         self.duration_label.setAlignment(Qt.AlignCenter)
-        self.duration_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #007bff;")
+        self.duration_label.setStyleSheet(DURATION_LABEL_STYLE)
         time_layout.addWidget(self.duration_label)
         
         # Last duration label
         self.last_duration_label = QLabel("Estimated: Unknown")
         self.last_duration_label.setAlignment(Qt.AlignCenter)
-        self.last_duration_label.setStyleSheet("font-size: 12px; color: #6c757d;")
+        self.last_duration_label.setStyleSheet(LAST_DURATION_LABEL_STYLE)
         time_layout.addWidget(self.last_duration_label)
         
         content_layout.addWidget(time_frame)
@@ -362,7 +381,7 @@ class WaitWindow(QDialog):
         self.duration_timer.start(100)  # Update every 100ms for smooth counter
         self.show()
     
-    def stop_wait(self, save_duration=True):
+    def stop_wait(self, save_duration: bool = True):
         """Stop the wait process"""
         if self.start_time and save_duration:
             elapsed = time.time() - self.start_time
@@ -373,7 +392,7 @@ class WaitWindow(QDialog):
         self.close()
     
     def update_duration(self):
-        """Update the duration counter"""
+        """Update the duration counter display"""
         if self.start_time:
             elapsed = time.time() - self.start_time
             minutes = int(elapsed // 60)
@@ -381,7 +400,7 @@ class WaitWindow(QDialog):
             self.duration_label.setText(f"Elapsed: {minutes:02d}:{seconds:02d}")
     
     def load_last_duration(self):
-        """Load last duration from settings"""
+        """Load last duration from settings and display estimated time"""
         last_duration = get_setting(self.last_duration_key, None)
         if last_duration:
             minutes = int(last_duration // 60)
@@ -504,7 +523,7 @@ def create_wait_context(title="Processing", info_text="Processing, please wait..
             result = my_process(progress_callback=wait.set_info_text)
     """
     class ResponsiveWaitContext:
-        def __init__(self, title, info_text, cancellable, parent, threaded):
+        def __init__(self, title: str, info_text: str, cancellable: bool, parent, threaded: bool):
             self.wait_window = WaitWindow(title, info_text, cancellable, parent)
             self.threaded = threaded
         
@@ -512,12 +531,13 @@ def create_wait_context(title="Processing", info_text="Processing, please wait..
             if not self.threaded:
                 self.wait_window.start_wait()
                 # Start event processing for responsiveness
-                self.wait_window.event_timer.start(50)
+                self.wait_window.event_timer.start(EVENT_PROCESS_INTERVAL_MS)
             return self.wait_window
         
         def __exit__(self, exc_type, exc_val, exc_tb):
             if not self.threaded:
                 self.wait_window.event_timer.stop()
+            # Always stop wait, even if exception occurred
             self.wait_window.stop_wait()
     
     return ResponsiveWaitContext(title, info_text, cancellable, parent, threaded)

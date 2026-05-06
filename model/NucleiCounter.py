@@ -24,12 +24,33 @@ class NucleiCounter():
     Output value is the number of marked nuclei detected.
     """
     def __init__(self, threshold=100, eps=2, min_samples=5):
+        """
+        Initialize nuclei counter with DBSCAN parameters.
+        
+        Args:
+            threshold (int): Binary threshold for nuclei channel binarization. Defaults to 100.
+            eps (float): DBSCAN epsilon parameter for clustering radius. Defaults to 2.
+            min_samples (int): DBSCAN minimum samples per cluster. Defaults to 5.
+        """
         self.threshold = threshold
         self.eps = eps
         self.min_samples = min_samples
 
     def preprocess(self, channel, kernel_size=4, threshold=30):
-        """Eliminates noise and structures binary component."""
+        """
+        Preprocess nuclei channel to remove noise and enhance structures.
+        
+        Applies binary thresholding followed by morphological opening and closing
+        operations to eliminate noise while preserving nuclei structure.
+        
+        Args:
+            channel (np.ndarray): Input channel image (2D grayscale array)
+            kernel_size (int): Size of morphological structuring element. Defaults to 4.
+            threshold (int): Threshold value for binarization. Defaults to 30.
+        
+        Returns:
+            np.ndarray: Preprocessed binary image with same shape as input
+        """
         _, img = cv2.threshold(channel,
                                np.median(channel[channel > threshold]), 255, cv2.THRESH_BINARY)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
@@ -40,14 +61,37 @@ class NucleiCounter():
         return eroded_img
 
     def channel2points(self, channel):
-        """Converts given binary channel to a set of points in 2D space."""
+        """
+        Convert binary channel to point cloud in 2D space.
+        
+        Extracts coordinates of all foreground pixels (> threshold) and returns
+        as a 2D point cloud for clustering. Y-coordinates are inverted to match
+        standard image coordinate system.
+        
+        Args:
+            channel (np.ndarray): Binary or grayscale image (2D array)
+        
+        Returns:
+            pd.DataFrame: Point coordinates with columns ['x', 'y']
+        """
         indices = np.argwhere(channel > self.threshold)
         y_coordinates = channel.shape[0] - indices[:, 0]
         x_coordinates = indices[:, 1]
         return pd.DataFrame({'x': x_coordinates, 'y': y_coordinates})
 
     def groupNuclei(self, points):
-        """Groups marked cell nuclei represented as points using DBSCAN clustering algorithm."""
+        """
+        Cluster nuclei points using DBSCAN algorithm.
+        
+        Groups foreground pixels into distinct nuclei clusters using density-based
+        spatial clustering. Noise points are ignored.
+        
+        Args:
+            points (pd.DataFrame): 2D points with columns ['x', 'y']
+        
+        Returns:
+            int: Count of distinct nuclei clusters detected (noise not counted)
+        """
         dbscan = DBSCAN(eps=self.eps, min_samples=self.min_samples)
         if points.shape[0] == 0:
             return 0
@@ -55,6 +99,16 @@ class NucleiCounter():
         return np.max(cluster_labels) + 1
 
     def countNuclei(self, img_channel):
-        """Unites the functions above and calculates marked cell nuclei on a given image channel."""
+        """
+        Count marked cell nuclei in an image channel.
+        
+        Orchestrates the complete pipeline: preprocess -> point extraction -> clustering.
+        
+        Args:
+            img_channel (np.ndarray): Channel containing stained nuclei (2D grayscale)
+        
+        Returns:
+            int: Total count of distinct nuclei detected
+        """
         return self.groupNuclei(self.channel2points(self.preprocess(img_channel)))
     

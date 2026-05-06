@@ -468,7 +468,22 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
     return pd.DataFrame(data)
 
 def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
-    """Converts pandas DataFrame instance to ultralytics Results for easier plotting."""
+    """
+    Convert detection DataFrame to ultralytics Results object for visualization.
+    
+    Transforms pandas DataFrame with detection columns into ultralytics Results
+    format for easy plotting and further processing.
+    
+    Args:
+        df (pd.DataFrame): Detection dataframe with columns:
+            ['confidence', 'id_label', 'box', 'bin_mask']
+        original_image (np.ndarray): Original RGB/BGR image array
+        path (str): File path for the results object
+        frame_num (int): Frame number for tracking context. Defaults to 0.
+    
+    Returns:
+        Results | None: ultralytics Results object or None if empty
+    """
     names = {}
     for n in range(100):
         names[n] = str(n)
@@ -641,7 +656,24 @@ def plot_predictions_with_alignment(
     alpha=0.75,
     color_ids=None
 ):
-    """Resize original image to inference dimensions if needed and plot masks."""
+    """
+    Plot predictions with automatic dimension alignment.
+    
+    Resizes original image to match inference dimensions if needed, then
+    overlays predicted masks. Useful when inference uses different image
+    size than original.
+    
+    Args:
+        original_image (np.ndarray): Original input image
+        img_inference (np.ndarray): Image dimensions used for inference
+        pred_masks (list): List of mask contours (normalized coordinates)
+        filename (str): Output image path. Defaults to IMAGE_FILE_NAME_DETECTION.
+        colormap (str): Matplotlib colormap. Defaults to 'tab20'.
+        alpha (float): Mask transparency (0-1). Defaults to 0.75.
+    
+    Returns:
+        np.ndarray: Image with overlaid masks
+    """
     h, w = img_inference.shape[:2]
     o_h, o_w = original_image.shape[:2]
     if h != o_h or w != o_w:
@@ -720,7 +752,21 @@ def create_image_grid(
     return grid_image            
 
 def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
-    """Resize image keeping aspect ratio and pad to target size."""
+    """
+    Resize image maintaining aspect ratio and pad to target dimensions.
+    
+    Scales image to fit within target dimensions while preserving aspect ratio,
+    then zero-pads to exactly match target size (centered).
+    
+    Args:
+        image (np.ndarray): Input image (2D or 3D array)
+        target_width (int): Target image width in pixels
+        target_height (int): Target image height in pixels
+        anti_aliasing (bool): Apply Gaussian filter before downsampling. Defaults to True.
+    
+    Returns:
+        np.ndarray: Resized and padded image with shape (target_height, target_width, ...)
+    """
     h, w = image.shape[:2]
     scale = min(target_width / w, target_height / h)
     new_w, new_h = int(w * scale), int(h * scale)
@@ -750,7 +796,29 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
 
 
 def process_loaded_image(image, settings: OrderedDict):
-    """Apply a sequence of image processing operations based on settings."""
+    """
+    Apply sequence of preprocessing operations to image.
+    
+    Executes ordered preprocessing steps specified in settings OrderedDict.
+    Supports operations: resize, resizeandpad, gray2rgb, rgb2gray, normalize, clip.
+    
+    Args:
+        image (np.ndarray): Input image array
+        settings (OrderedDict): Ordered dict of preprocessing steps.
+            Each step is {'operation': 'parameters'}. Supported:
+            - {'resize': 'WIDTH:HEIGHT'}
+            - {'resizeandpad': 'WIDTH:HEIGHT'}
+            - {'gray2rgb': ''}
+            - {'rgb2gray': ''}
+            - {'normalize': 'PMIN,PMAX'} (percentiles)
+            - {'clip': 'MIN,MAX'} (value ranges)
+    
+    Returns:
+        np.ndarray: Processed image
+        
+    Raises:
+        RuntimeError: If unknown operation specified
+    """
     for step in settings:
         key, value = next(iter(step.items()))    
         match key:
@@ -786,14 +854,30 @@ def process_loaded_image(image, settings: OrderedDict):
     return image
 
 def safegray2rgb(image):
-    """Convert grayscale to RGB if needed."""
+    """
+    Convert grayscale to RGB if needed, otherwise return unchanged.
+    
+    Args:
+        image (np.ndarray): Input image array
+        
+    Returns:
+        np.ndarray: RGB image if input was grayscale, otherwise unchanged
+    """
     if image.ndim == 2:
         return gray2rgb(image)
     return image
 
 
 def safergb2gray(image):
-    """Convert RGB to grayscale if needed."""
+    """
+    Convert RGB to grayscale if needed, otherwise return unchanged.
+    
+    Args:
+        image (np.ndarray): Input image array
+        
+    Returns:
+        np.ndarray: Grayscale image if input was RGB, otherwise unchanged
+    """
     if image.ndim == 3:
         image = rgb2gray(image)
         return (image * 255).astype("uint8")
@@ -801,7 +885,24 @@ def safergb2gray(image):
 
 
 def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.5):
-    """Calculate F1, precision, recall, TP, FP, FN metrics from matches."""
+    """
+    Calculate F1, precision, recall, TP, FP, FN metrics from matches.
+    
+    Args:
+        matches (list): List of (ground_idx, candidate_idx, iou) tuples
+        num_ground (int): Total number of ground truth objects
+        num_candidate (int): Total number of candidate detections
+        iou_threshold (float): IoU threshold for considering match valid. Defaults to 0.5.
+    
+    Returns:
+        dict: Metrics dictionary with keys:
+            - 'TP': True positives
+            - 'FP': False positives  
+            - 'FN': False negatives
+            - 'Precision': Precision score
+            - 'Recall': Recall score
+            - 'F1': F1 score
+    """
     tp = sum(1 for (_, _, iou) in matches if iou >= iou_threshold)
     fp = num_candidate - tp
     fn = num_ground - tp
@@ -820,13 +921,25 @@ def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.
     }
       
 def clear_cache():
+    """
+    Remove and recreate application cache directory.
+    """
     cache_dir = CASH_DIRECTORY
     if os.path.exists(cache_dir):
         shutil.rmtree(cache_dir,ignore_errors=True)
     os.makedirs(cache_dir, exist_ok=True)
 
 def show_error_message(title, message):
-    """Show error message box to user"""
+    """
+    Display error dialog to user with title and message.
+    
+    Args:
+        title (str): Dialog window title
+        message (str): Error message text
+        
+    Returns:
+        None
+    """
     msg_box = QMessageBox()
     msg_box.setIcon(QMessageBox.Critical)
     msg_box.setWindowTitle(title)

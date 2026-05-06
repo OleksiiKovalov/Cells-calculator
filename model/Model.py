@@ -51,6 +51,22 @@ class Model:
         model_data = None,
         model_name = None
     ):
+        """
+        Initialize the general cell analysis model.
+        
+        Sets up both cell and nuclei detection pipelines. Supports various detection
+        models specified by model_type.
+        
+        Args:
+            path (str): Path to pre-trained cell detection model. Defaults to YOLO model.
+            threshold (int): Binarization threshold for nuclei detection. Defaults to 100.
+            eps (int): DBSCAN eps parameter for nuclei clustering. Defaults to 5.
+            min_samples (int): DBSCAN min_samples for nuclei. Defaults to 10.
+            object_size (dict): Configuration dict with keys like 'scale', 'signal'. Optional.
+            model_type (str): Type of detection model (registered in config). Required.
+            model_data (dict): Model-specific configuration parameters. Optional.
+            model_name (str): Human-readable model name for reporting. Optional.
+        """
         self.nuclei_counter = NucleiCounter(
             threshold=threshold,
             eps=eps,

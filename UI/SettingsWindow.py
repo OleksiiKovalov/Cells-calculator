@@ -16,25 +16,9 @@ from PyQt5.QtWidgets import (
 )
 
 
-def has_duplicates(lst):
-    """
-    Check if a list contains duplicate elements.
-
-    Args:
-    lst (list): The list to be checked.
-
-    Returns:
-    bool: True if the list contains duplicates, False otherwise.
-    """
-    seen = set()
-    for item in lst:
-        if item in seen:
-            return True
-        seen.add(item)
-    return False
 class SettingsWindow(QMainWindow):
     """
-    The DialogWindow class represents the dialog window for selecting channels
+    The SettingsWindow class represents the dialog window for selecting channels
     in the Cells Calculator application.
 
     Args:
@@ -69,11 +53,11 @@ class SettingsWindow(QMainWindow):
         # Check if it's the first warning and a callback function is defined
         if self.first_warning and self.call_back:
             self.first_warning = 0
-            self.show_warning_dialog("If you have problem to choose Channel press Cancel\
-                                     \n\n It will calculate with standart parameters")
+            self.show_warning_dialog("If you have problem to choose Channel press Cancel"
+                                     "\n\n It will calculate with standard parameters")
     def __init__(self, parametrs: dict, lsm_path: str, parent=None, call_back=None):
         """
-        Initialize the DialogWindow.
+        Initialize the SettingsWindow.
 
         Args:
             parametrs (dict): Dictionary containing parameters.
@@ -152,21 +136,7 @@ class SettingsWindow(QMainWindow):
         right_layout = QVBoxLayout()
         self.combo_box_dict = None
 
-        try:
-            self.add_images()
-        except:
-            traceback.print_exc()
-            
-            # Handle error during layout image
-            if self.warning_count == 0:
-                # self.show_warning_dialog("Error during layout images\n\nUse Next button")
-                self.show_warning_dialog(msg)
-                self.warning_count = 1
-            if not self.call_back and self.warning_count == 0:
-                self.show_warning_dialog("Error during layout images")
-                self.warning_count = 1
-            self.num_channels = 5
-            self.scene.clear()
+        self._safe_add_images_with_fallback("Error during layout images\n\nUse Next button")
 
         options = list(self.parametrs.keys())
 
@@ -178,15 +148,7 @@ class SettingsWindow(QMainWindow):
 
         # Create combo boxes for channel selection
         for option in options:
-            label = QLabel(option)
-            combo_box = QComboBox()
-            combo_box.addItems([f'Channel {i + 1}' for i in range(self.num_channels)])
-            combo_box.setCurrentText(f"Channel {self.parametrs[option] + 1}")
-            self.combo_box_dict[option] = combo_box
-            label_combo_layout = QHBoxLayout()
-            label_combo_layout.addWidget(label)
-            label_combo_layout.addWidget(combo_box)
-            right_layout.addLayout(label_combo_layout)
+            self._create_channel_selector(option, self.num_channels, right_layout)
 
         # Create layout for buttons
         buttons_layout = QHBoxLayout()
@@ -239,12 +201,12 @@ class SettingsWindow(QMainWindow):
         options_list = []
         for option, combo_box in self.combo_box_dict.items():
             options_list.append(int(combo_box.currentText()[len("Channel "):]) - 1)
-        if has_duplicates(options_list):
+        if len(options_list) != len(set(options_list)):
             self.show_warning_dialog("Channels cannot be duplicated")
             return
         for option, combo_box in self.combo_box_dict.items():
             self.parametrs[option] = int(combo_box.currentText()[len("Channel "):]) - 1
-        #For recalculation
+        # For recalculation
         self.parent_.mainWindow_signal.emit("reset_detection", None)
         if self.call_back:
             self.call_back()
@@ -266,15 +228,48 @@ class SettingsWindow(QMainWindow):
         if self.number == len(self.lsm_list):
             self.number = 0
         self.lsm_path = self.lsm_list[self.number]
+        self._safe_add_images_with_fallback("Error during layout images\n\nUse Next button", set_num_channels=False)
+        self.setWindowTitle(f'Settings - {os.path.basename(self.lsm_path)}')
+
+    def _create_channel_selector(self, option, num_channels, layout):
+        """
+        Create a channel selection row (label + combo box).
+
+        Args:
+            option: The option name.
+            num_channels: Number of channels.
+            layout: The layout to add to.
+        """
+        label = QLabel(option)
+        combo_box = QComboBox()
+        combo_box.addItems([f'Channel {i + 1}' for i in range(num_channels)])
+        combo_box.setCurrentText(f"Channel {self.parametrs[option] + 1}")
+        
+        h_layout = QHBoxLayout()
+        h_layout.addWidget(label)
+        h_layout.addWidget(combo_box)
+        layout.addLayout(h_layout)
+        
+        self.combo_box_dict[option] = combo_box
+
+    def _safe_add_images_with_fallback(self, message_text, set_num_channels=True):
+        """
+        Safely add images with warning on first error.
+
+        Args:
+            message_text: The warning message.
+            set_num_channels: Whether to set num_channels to 5 on error.
+        """
         try:
             self.add_images()
-        except:
+        except Exception as e:
             traceback.print_exc()
             if self.warning_count == 0:
-                self.warning_count = 1
-                self.show_warning_dialog("Error during layout images\n\nUse Next button")
+                self.show_warning_dialog(message_text)
+                self.warning_count += 1
+            if set_num_channels:
+                self.num_channels = 5
             self.scene.clear()
-        self.setWindowTitle(f'Settings - {os.path.basename(self.lsm_path)}')
 
     def add_images(self):
         """
@@ -298,8 +293,8 @@ class SettingsWindow(QMainWindow):
             for option in options:
                 current_amount = self.combo_box_dict[option].count()
                 if len(self.combo_box_dict[option]) < self.num_channels:
-                    self.combo_box_dict[option].addItems([f'Channel {i}' \
-                        for i in range(current_amount + 1, self.num_channels + 1)])
+                    self.combo_box_dict[option].addItems(
+                        [f'Channel {i}' for i in range(current_amount + 1, self.num_channels + 1)])
 
         # Image dimensions for display
         image_width = int(self.parent_width * 0.75 * 0.75 / 2)
@@ -316,8 +311,8 @@ class SettingsWindow(QMainWindow):
 
             # Add text "Channel X" below each image
             text_item = QGraphicsTextItem(f"Channel {i + 1}")
-            text_item.setPos((i % 2) * (image_width + 20) + image_width / 4,\
-                current_image_height + image_height)
+            text_item.setPos((i % 2) * (image_width + 20) + image_width / 4,
+                             current_image_height + image_height)
             self.scene.addItem(text_item)
 
     def center(self):
