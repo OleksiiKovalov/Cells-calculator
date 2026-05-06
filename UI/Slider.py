@@ -1,3 +1,10 @@
+"""
+Slider widget definitions for the application's UI.
+
+This module defines a custom horizontal slider and a paired value input field
+used for filtering object size settings in the right-side layout menu.
+"""
+
 # Standard library imports
 import sys
 
