@@ -1,3 +1,18 @@
+"""
+StarDist-based cell segmentation utilities.
+
+This module provides a wrapper around the StarDist 2D model for cell
+segmentation in microscopy images. It handles model initialization,
+image preprocessing, inference, and conversion of predictions into
+a standardized pandas DataFrame format with morphological metrics.
+
+Key responsibilities:
+- initialize StarDist2D model with custom or default configuration
+- load and preprocess microscopy images for inference
+- run StarDist segmentation and extract polygonal predictions
+- compute morphological properties from segmentation masks
+"""
+
 # Standard library imports
 import json
 import os
