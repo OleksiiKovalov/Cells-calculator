@@ -1,3 +1,10 @@
+"""
+Cell Detector plugin module for segmentation and detection UI.
+
+This module implements the CellDetectorPlugin and related UI helpers used for
+selecting models, configuring object filters, and running detection on images.
+"""
+
 # Standard library imports
 import os
 import math
