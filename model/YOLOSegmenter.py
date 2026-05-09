@@ -257,6 +257,7 @@ class YoloSegmenter(BaseModel):
             filtered_detections['mask'].tolist(),
             filename=filename,
             colormap=colormap,
-            alpha=alpha
+            alpha=alpha,
+            color_ids=filtered_detections['id_label'].tolist()
         )
         return filtered_detections
