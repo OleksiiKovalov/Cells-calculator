@@ -18,7 +18,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QCheckBox, QPushButton, QTextEdit,
     QComboBox, QLabel, QRadioButton, QButtonGroup, 
-    QHBoxLayout, QWidget, QVBoxLayout, QFileDialog, QApplication
+    QDoubleSpinBox, QHBoxLayout, QWidget, QVBoxLayout, QFileDialog, QApplication
 )
 
 # Local application imports
@@ -342,6 +342,15 @@ class CellDetectorPlugin(BasePlugin):
         current_min = self.object_size['min_size']
         current_max = self.object_size['max_size']
         self.on_range_slider_changed(current_min, current_max)
+
+    def update_um_per_px(self, value):
+        """
+        Update micrometers-per-pixel calibration.
+        """
+        self.object_size["um_per_px"] = float(value)
+
+        if getattr(self, 'result', None) is not None:
+            self.print_result(self.result)
     # def update_lineWidth(self):
     #     # Get value from QLineEdit
     #     input_text = self.LineWidth_edit.text()
@@ -1337,6 +1346,17 @@ class CellDetectorPlugin(BasePlugin):
         
         # Initialize alpha in object_size
         self.object_size["alpha"] = 0.75  # Default 75%
+
+        um_per_px_label = QLabel("um per px:")
+        um_per_px_label.setFont(QFont("Arial", 16))
+
+        self.um_per_px_spin = QDoubleSpinBox()
+        self.um_per_px_spin.setFont(QFont("Arial", 16))
+        self.um_per_px_spin.setDecimals(6)
+        self.um_per_px_spin.setRange(0.000001, 1000.0)
+        self.um_per_px_spin.setSingleStep(0.001)
+        self.um_per_px_spin.setValue(float(self.object_size.get("um_per_px", 0.325)))
+        self.um_per_px_spin.valueChanged.connect(self.update_um_per_px)
         
         # Create horizontal layout for colormap and alpha
         colormap_layout = QHBoxLayout()
@@ -1345,6 +1365,9 @@ class CellDetectorPlugin(BasePlugin):
         colormap_layout.addSpacing(20)
         #colormap_layout.addWidget(alpha_label)
         colormap_layout.addWidget(self.alpha_combo)
+        colormap_layout.addSpacing(20)
+        colormap_layout.addWidget(um_per_px_label)
+        colormap_layout.addWidget(self.um_per_px_spin)
         
         # Create widget to contain the horizontal layout
         colormap_widget = QWidget()
