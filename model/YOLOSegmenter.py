@@ -233,7 +233,10 @@ class YoloSegmenter(BaseModel):
                 slice_height=144,
                 slice_width=144,
                 overlap_height_ratio=.1,
-                overlap_width_ratio=.1
+                overlap_width_ratio=.1,
+                postprocess_type="NMS",
+                postprocess_match_metric="IOU",
+                verbose=0,
             ).to_coco_predictions()
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
