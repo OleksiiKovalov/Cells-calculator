@@ -114,3 +114,9 @@ def test_countnuclei_detects_two_blobs():
     cv2.circle(channel, (150, 150), 15, 200, -1)
     counter = NucleiCounter()
     assert counter.countNuclei(channel) == 2
+
+
+def test_countnuclei_blank_image_returns_zero():
+    counter = NucleiCounter()
+    channel = np.zeros((50, 50), dtype=np.uint8)
+    assert counter.countNuclei(channel) == 0

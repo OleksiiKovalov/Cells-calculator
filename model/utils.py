@@ -176,12 +176,21 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
             image_to_save = image
         
         # Save based on file extension
+        write_success = True
         if extension in ['jpg', 'jpeg']:
             # JPEG with quality control
-            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            write_success = cv2.imwrite(
+                filename,
+                image_to_save,
+                [cv2.IMWRITE_JPEG_QUALITY, quality],
+            )
         elif extension == 'png':
             # PNG with compression
-            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+            write_success = cv2.imwrite(
+                filename,
+                image_to_save,
+                [cv2.IMWRITE_PNG_COMPRESSION, 1],
+            )
         elif extension in ['tif', 'tiff']:
             # Use skimage for better TIFF support
             if len(image_to_save.shape) == 3 and image_to_save.shape[2] == 3:
@@ -190,9 +199,9 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
             imsave(filename, image_to_save)
         else:
             # Default to OpenCV for other formats
-            cv2.imwrite(filename, image_to_save)
+            write_success = cv2.imwrite(filename, image_to_save)
         
-        return True
+        return bool(write_success)
         
     except Exception as e:
         print(f"Error saving image {filename}: {str(e)}")
@@ -546,17 +555,17 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
     the foreground (the polygon for the given mask).
     """
-    if in_mask.max() > 1.0:
-        in_mask = in_mask / np.array([image_size[1], image_size[0]])
-    coords: NDArray = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
-    coords = coords.astype(np.int32)
     bin_mask: NDArray[np.uint8] = np.zeros(image_size, dtype=np.uint8)
-    cv2.fillPoly(bin_mask, [coords], [1])
-    bin_mask = np.zeros(image_size, dtype=np.uint8)
     if in_mask is None:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
     
-    coords = np.asarray(in_mask, dtype=np.float32).reshape(-1, 2)
+    coords = np.asarray(in_mask, dtype=np.float32)
+
+    if coords.size < 6 or coords.size % 2 != 0:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    coords = coords.reshape(-1, 2)
+    coords = coords[np.isfinite(coords).all(axis=1)]
 
     if coords.shape[0] < 3:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)

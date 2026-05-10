@@ -51,8 +51,16 @@ class NucleiCounter():
         Returns:
             np.ndarray: Preprocessed binary image with same shape as input
         """
-        _, img = cv2.threshold(channel,
-                               np.median(channel[channel > threshold]), 255, cv2.THRESH_BINARY)
+        bright_pixels = channel[channel > threshold]
+        if bright_pixels.size == 0:
+            return np.zeros_like(channel, dtype=np.uint8)
+
+        _, img = cv2.threshold(
+            channel,
+            float(np.median(bright_pixels)),
+            255,
+            cv2.THRESH_BINARY,
+        )
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
         opened_img = cv2.dilate(img, kernel)
         eroded_img = cv2.erode(opened_img, kernel)
