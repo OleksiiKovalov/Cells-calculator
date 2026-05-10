@@ -52,6 +52,21 @@ class YoloSegmenter(BaseModel):
         "volume",
     ]
 
+    def _get_sahi_predictions(self, input_image):
+        """Run SAHI prediction with the tuned x10 inference settings."""
+        return get_sliced_prediction(
+            input_image,
+            self.model_x10,
+            slice_height=512,
+            slice_width=512,
+            overlap_height_ratio=.1,
+            overlap_width_ratio=.1,
+            perform_standard_pred=False,
+            postprocess_type="NMS",
+            postprocess_match_metric="IOU",
+            verbose=0,
+        ).to_coco_predictions()
+
     def init_x20_model(self, path_to_model: str):
         """
         Load YOLO model for x20 magnification full-image inference.
@@ -227,18 +242,7 @@ class YoloSegmenter(BaseModel):
         colormap = self.object_size['color_map']
         if self.detections is None or self.original_image is None:
             self.original_image = read_image(input_image)
-            outputs = get_sliced_prediction(
-                input_image,
-                self.model_x10,
-                slice_height=512,
-                slice_width=512,
-                overlap_height_ratio=.1,
-                overlap_width_ratio=.1,
-                perform_standard_pred=False,
-                postprocess_type="NMS",
-                postprocess_match_metric="IOU",
-                verbose=0,
-            ).to_coco_predictions()
+            outputs = self._get_sahi_predictions(input_image)
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
             self.object_size['signal']("set_size", self.detections.copy())

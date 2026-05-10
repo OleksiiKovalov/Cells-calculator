@@ -497,6 +497,16 @@ class CellDetectorPlugin(BasePlugin):
                 # Remove progress_callback from kwargs if present since call_inference doesn't need it
                 kwargs.pop('progress_callback', None)
                 return self.call_inference(*args, **kwargs)
+
+            self.result = None
+
+            # Connect signals before the worker starts so fast runs cannot be missed.
+            def on_completion(result):
+                self.result = result
+
+            def on_error(error_msg):
+                self.result = None
+                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
             
             wait_window = run_with_wait_window(
                 inference_wrapper, 
@@ -504,21 +514,10 @@ class CellDetectorPlugin(BasePlugin):
                 title="Image Processing", 
                 info_text="Processing image...", 
                 parent=self.parent(),
-                threaded=True
+                threaded=True,
+                on_completed=on_completion,
+                on_failed=on_error
             )
-            
-            # Connect signals to handle completion
-            def on_completion(result):
-                self.result = result
-                
-            def on_error(error_msg):
-                self.result = None
-                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
-
-            if hasattr(wait_window, 'process_completed'):
-                wait_window.process_completed.connect(on_completion)
-            if hasattr(wait_window, 'process_failed'):
-                wait_window.process_failed.connect(on_error)
 
             # Wait for completion (this will block until thread finishes)
             if hasattr(wait_window, 'isVisible'):
@@ -526,7 +525,7 @@ class CellDetectorPlugin(BasePlugin):
                     QApplication.processEvents()
                     time.sleep(0.01)
                 
-            result = getattr(self, 'result', None)
+            result = getattr(wait_window, 'result', None)
         finally:
             self.button.setText("Calculate")
             self.button.setEnabled(button_enabled)
@@ -560,7 +559,8 @@ class CellDetectorPlugin(BasePlugin):
         """
         try:
                     # Attempt to calculate the result using the selected method
-            if self.model and (self.model == self.model.model_name):
+            if self.model and self.model.model_name == model:
+                self.model.cell_counter.original_image_path = self.lsm_path
                 result = self.model.calculate(
                             img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                                 nuclei_channel=self.parametrs['Nuclei'])
@@ -626,7 +626,7 @@ class CellDetectorPlugin(BasePlugin):
             Tuple of images and data.
         """
         model = None
-        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model)
+        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model_name)
         model.cell_counter.original_image_path = self.lsm_path
         try:
             model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
@@ -705,27 +705,24 @@ class CellDetectorPlugin(BasePlugin):
                 kwargs.pop('progress_callback', None)
                 self.batchProcess_ProcessModelList(model_list)
                 return
-            
+
+            # Connect signals before the worker starts so fast runs cannot be missed.
+            def on_completion(result):
+                pass
+
+            def on_error(error_msg):
+                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
+
             wait_window = run_with_wait_window(
                 inference_wrapper, 
                 title="Image Processing", 
                 info_text="Processing image...", 
                 parent=self.parent(),
-                threaded=True
+                threaded=True,
+                on_completed=on_completion,
+                on_failed=on_error
             )
             self.batch_wait_window = wait_window
-
-            # Connect signals to handle completion
-            def on_completion(result):
-                pass
-                
-            def on_error(error_msg):
-                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
-
-            if hasattr(wait_window, 'process_completed'):
-                wait_window.process_completed.connect(on_completion)
-            if hasattr(wait_window, 'process_failed'):
-                wait_window.process_failed.connect(on_error)
 
             # Wait for completion (this will block until thread finishes)
             if hasattr(wait_window, 'isVisible'):
@@ -814,14 +811,11 @@ class CellDetectorPlugin(BasePlugin):
                     title="Image Processing", 
                     info_text="Processing image...", 
                     parent=self.parent(),
-                    threaded=True
+                    threaded=True,
+                    on_completed=on_completion,
+                    on_failed=on_error
                 )
                 self.batch_wait_window = wait_window
-
-                if hasattr(wait_window, 'process_completed'):
-                    wait_window.process_completed.connect(on_completion)
-                if hasattr(wait_window, 'process_failed'):
-                    wait_window.process_failed.connect(on_error)
 
                 # Wait for completion (this will block until thread finishes)
                 if hasattr(wait_window, 'isVisible'):

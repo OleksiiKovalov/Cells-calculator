@@ -47,6 +47,11 @@ from model.utils import (
 )
 
 
+INSTANSEG_DEFAULT_OVERLAP = 200
+INSTANSEG_MIN_WINDOW_SIZE = INSTANSEG_DEFAULT_OVERLAP + 1
+INSTANSEG_MAX_PADDING_FLOOR = 512
+
+
 class InstansegSegmenter(BaseModel):
     """
     Cell/nuclei segmentation using InstanSeg deep learning model.
@@ -117,6 +122,29 @@ class InstansegSegmenter(BaseModel):
         Currently not implemented.
         """
         pass
+
+    def _ensure_eval_window_size(self, image, method_name, tile_size):
+        """Pad very narrow inputs so InstanSeg's fixed overlap is valid."""
+        if method_name != 'eval_medium_image':
+            return image
+
+        height, width = image.shape[:2]
+        padding_floor = max(
+            min(int(tile_size), INSTANSEG_MAX_PADDING_FLOOR),
+            INSTANSEG_MIN_WINDOW_SIZE,
+        )
+        target_height = max(height, padding_floor)
+        target_width = max(width, padding_floor)
+
+        if target_height == height and target_width == width:
+            return image
+
+        app_logger().info(
+            "Padding InstanSeg inference image from "
+            f"{width}x{height} to {target_width}x{target_height} "
+            "to keep overlap smaller than the inference window."
+        )
+        return resize_and_pad_cv(image, target_width, target_height)
 
     def count_x20(
         self,
@@ -201,6 +229,11 @@ class InstansegSegmenter(BaseModel):
         img_inference = process_loaded_image(
             image=image,
             settings=image_preprocess_settings
+        )
+        img_inference = self._ensure_eval_window_size(
+            img_inference,
+            method_name,
+            tile_size,
         )
         safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
         self.original_image = safegray2rgb(image)
