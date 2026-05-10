@@ -72,13 +72,13 @@ class YoloSegmenter(BaseModel):
             path_to_model (str): Path to YOLO .pt model weights file
             
         Note:
-            Confidence threshold: 0.005 (very permissive for SAHI)
+            Confidence threshold: 0.3 (aligned with x20 inference)
             Device: CPU (configurable in code)
         """
         self.model_x10 = AutoDetectionModel.from_pretrained(
             model_type='yolov8',
             model_path=path_to_model,
-            confidence_threshold=0.005,
+            confidence_threshold=0.3,
             device="cpu",  # or 'cuda:0'
         )
 
@@ -195,7 +195,7 @@ class YoloSegmenter(BaseModel):
         input_image: str,
         filename=IMAGE_FILE_NAME_DETECTION,
         colormap="tab20",
-        min_score=0.01,
+        min_score=0.3,
         alpha=0.75,
         **kwargs
     ):
@@ -209,7 +209,7 @@ class YoloSegmenter(BaseModel):
             input_image (str): Path to input image
             filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
             colormap (str): Matplotlib colormap. Defaults to 'tab20'.
-            min_score (float): Minimum confidence filter. Defaults to 0.01.
+            min_score (float): Minimum confidence filter. Defaults to 0.3.
             alpha (float): Mask transparency. Defaults to 0.75.
             **kwargs: Additional arguments (unused)
         
@@ -217,7 +217,7 @@ class YoloSegmenter(BaseModel):
             pd.DataFrame: Segmentation results (same format as count_x20)
             
         Note:
-            Tile configuration: 144x144 with 10% overlap
+            Tile configuration: 512x512 with 10% overlap
             Results are cached and reused if same image processed multiple times
         """
         try:
@@ -230,10 +230,14 @@ class YoloSegmenter(BaseModel):
             outputs = get_sliced_prediction(
                 input_image,
                 self.model_x10,
-                slice_height=144,
-                slice_width=144,
+                slice_height=512,
+                slice_width=512,
                 overlap_height_ratio=.1,
-                overlap_width_ratio=.1
+                overlap_width_ratio=.1,
+                perform_standard_pred=False,
+                postprocess_type="NMS",
+                postprocess_match_metric="IOU",
+                verbose=0,
             ).to_coco_predictions()
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
@@ -253,6 +257,7 @@ class YoloSegmenter(BaseModel):
             filtered_detections['mask'].tolist(),
             filename=filename,
             colormap=colormap,
-            alpha=alpha
+            alpha=alpha,
+            color_ids=filtered_detections['id_label'].tolist()
         )
         return filtered_detections
