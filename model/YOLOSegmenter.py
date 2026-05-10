@@ -16,7 +16,6 @@ from ultralytics import YOLO
 
 # Local application imports
 from UI.app_globals import register_model
-from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from sahi.auto_model import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
@@ -52,35 +51,6 @@ class YoloSegmenter(BaseModel):
         "area",
         "volume",
     ]
-
-    def _get_sahi_predictions(self, input_image):
-        """Run SAHI prediction, falling back when mask merging creates invalid masks."""
-        try:
-            return get_sliced_prediction(
-                input_image,
-                self.model_x10,
-                slice_height=144,
-                slice_width=144,
-                overlap_height_ratio=.1,
-                overlap_width_ratio=.1
-            ).to_coco_predictions()
-        except ValueError as exc:
-            if "Invalid segmentation mask" not in str(exc):
-                raise
-
-            app_logger().warning(
-                "SAHI mask merge produced an invalid segmentation mask; "
-                "retrying YOLO x10 prediction with NMS postprocess."
-            )
-            return get_sliced_prediction(
-                input_image,
-                self.model_x10,
-                slice_height=144,
-                slice_width=144,
-                overlap_height_ratio=.1,
-                overlap_width_ratio=.1,
-                postprocess_type="NMS"
-            ).to_coco_predictions()
 
     def init_x20_model(self, path_to_model: str):
         """
@@ -257,7 +227,18 @@ class YoloSegmenter(BaseModel):
         colormap = self.object_size['color_map']
         if self.detections is None or self.original_image is None:
             self.original_image = read_image(input_image)
-            outputs = self._get_sahi_predictions(input_image)
+            outputs = get_sliced_prediction(
+                input_image,
+                self.model_x10,
+                slice_height=512,
+                slice_width=512,
+                overlap_height_ratio=.1,
+                overlap_width_ratio=.1,
+                perform_standard_pred=False,
+                postprocess_type="NMS",
+                postprocess_match_metric="IOU",
+                verbose=0,
+            ).to_coco_predictions()
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
             self.object_size['signal']("set_size", self.detections.copy())
