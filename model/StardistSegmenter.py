@@ -152,7 +152,7 @@ class StardistSegmenter(BaseModel):
                 labels,
                 scores=details["prob"],
                 original_shape=image.shape[:2],
-                inference_shape=image.shape[:2]
+                inference_shape=img_inference.shape[:2]
             )
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
@@ -311,6 +311,7 @@ class StardistSegmenter(BaseModel):
                 ).astype(binary_mask.dtype)
             
             contours, _ = cv2.findContours(binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            pts = None
             if contours:
                 contour = contours[0]
                 if contour.ndim >= 2 and contour.shape[0] >= 3:
@@ -323,6 +324,8 @@ class StardistSegmenter(BaseModel):
                     elif polygon_points_fillpoly.ndim == 2:
                         pts = polygon_points_fillpoly.reshape((-1, 1, 2))
 
+            if pts is None:
+                continue
 
             # Confidence (if provided)
             confidence = scores[i] if scores is not None and i < len(scores) else None

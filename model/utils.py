@@ -154,6 +154,9 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
         if image is None:
             print("Cannot save None image")
             return False
+
+        filename = os.fspath(filename)
+        image = np.asarray(image)
             
         # Ensure output directory exists
         output_dir = os.path.dirname(filename)
@@ -176,7 +179,7 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
             image_to_save = image
         
         # Save based on file extension
-        write_success = True
+        write_success = False
         if extension in ['jpg', 'jpeg']:
             # JPEG with quality control
             write_success = cv2.imwrite(
@@ -191,17 +194,20 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
                 image_to_save,
                 [cv2.IMWRITE_PNG_COMPRESSION, 1],
             )
+        elif extension == 'bmp':
+            write_success = cv2.imwrite(filename, image_to_save)
         elif extension in ['tif', 'tiff']:
             # Use skimage for better TIFF support
             if len(image_to_save.shape) == 3 and image_to_save.shape[2] == 3:
                 # Convert BGR to RGB for skimage
                 image_to_save = cv2.cvtColor(image_to_save, cv2.COLOR_BGR2RGB)
             imsave(filename, image_to_save)
+            write_success = os.path.exists(filename)
         else:
-            # Default to OpenCV for other formats
-            write_success = cv2.imwrite(filename, image_to_save)
+            print(f"Unsupported image extension: {extension}")
+            return False
         
-        return bool(write_success)
+        return bool(write_success and os.path.exists(filename))
         
     except Exception as e:
         print(f"Error saving image {filename}: {str(e)}")
@@ -288,6 +294,25 @@ def calculate_alive_percentage(cell_count: int, nuclei_count: int):
         return -100
     return round((1 - nuclei_count / cell_count) * 100, 3)
 
+def _select_channel(image, channel, *, empty_on_missing=False):
+    """Return a valid channel, falling back to channel 0 or an empty image."""
+    try:
+        channel = int(channel)
+    except (TypeError, ValueError):
+        channel = -1
+
+    if image.ndim == 2:
+        if empty_on_missing and channel not in (0, None):
+            return np.zeros(image.shape, dtype=image.dtype)
+        return image
+
+    if 0 <= channel < image.shape[-1]:
+        return image[:, :, channel]
+    if empty_on_missing:
+        return np.zeros(image.shape[:2], dtype=image.dtype)
+    return image[:, :, 0]
+
+
 def calculate_lsm(cell_counter, nuclei_counter,
                   img_path, cell_channel=0, nuclei_channel=1, nuclei_count=None):
     """
@@ -302,9 +327,12 @@ def calculate_lsm(cell_counter, nuclei_counter,
     - Cells: count for all the cells detected;
     - %: the target percentage for alive cells.
     """
-    img = read_lsm_img(img_path)
+    img = lsm_to_channels_last(read_lsm_array(img_path))
 
-    cell_img = cv2.cvtColor(img[:,:,cell_channel], cv2.COLOR_GRAY2BGR)
+    cell_img = cv2.cvtColor(
+        _select_channel(img, cell_channel),
+        cv2.COLOR_GRAY2BGR
+    )
     tmp_path = IMAGE_FILE_NAME_TMP
     safe_image_write(cell_img, tmp_path)
     cell_count = cell_counter.count_cells(tmp_path)
@@ -313,7 +341,8 @@ def calculate_lsm(cell_counter, nuclei_counter,
     except FileNotFoundError:
         pass
     if nuclei_count is None:
-        nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
+        nuclei_img = _select_channel(img, nuclei_channel, empty_on_missing=True)
+        nuclei_count = nuclei_counter.countNuclei(nuclei_img)
     percentage = calculate_alive_percentage(
         count_detected_objects(cell_count),
         nuclei_count
@@ -558,30 +587,36 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     bin_mask: NDArray[np.uint8] = np.zeros(image_size, dtype=np.uint8)
     if in_mask is None:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
-    
-    coords = np.asarray(in_mask, dtype=np.float32)
 
-    if coords.size < 6 or coords.size % 2 != 0:
+    try:
+        coords = np.asarray(in_mask, dtype=np.float32)
+    except (TypeError, ValueError):
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
 
-    coords = coords.reshape(-1, 2)
+    if coords.size < 6:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    if coords.ndim == 1 and coords.size % 2 == 1:
+        coords = coords[:-1]
+
+    try:
+        coords = coords.reshape(-1, 2)
+    except ValueError:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
     coords = coords[np.isfinite(coords).all(axis=1)]
 
     if coords.shape[0] < 3:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
     
-    if coords.max() > 1.0:
-        coords = coords / np.array([image_size[1], image_size[0]], dtype=np.float32)
-
-    coords = coords * np.array([image_size[1], image_size[0]], dtype=np.float32)
+    if coords.max() <= 1.0 and coords.min() >= 0.0:
+        coords = coords * np.array([image_size[1], image_size[0]], dtype=np.float32)
 
     coords[:, 0] = np.clip(coords[:, 0], 0, image_size[1] - 1)
     coords[:, 1] = np.clip(coords[:, 1], 0, image_size[0] - 1)
 
     coords = np.round(coords).astype(np.int32)
 
-    coords = np.unique(coords, axis=0)
-    if coords.shape[0] < 3:
+    if np.unique(coords, axis=0).shape[0] < 3:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
     
     cv2.fillPoly(bin_mask, [coords], (1,))
@@ -709,11 +744,18 @@ def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     - volume - relative to the image volume (image area multiplied by square root of image area).
     """
     img_area = bin_mask.shape[0] * bin_mask.shape[1]
-    area = np.sum(bin_mask)
+    if img_area == 0:
+        return {'diameter': 0.0, 'area': 0.0, 'volume': 0.0}
+
+    area = float(np.sum(bin_mask))
     diameter = 2 * np.sqrt(area / np.pi)
     radius = diameter / 2
     volume = (4/3) * np.pi * radius**3
-    return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
+    return {
+        'diameter': float(diameter / np.sqrt(img_area)),
+        'area': float(area / img_area),
+        'volume': float(volume / (img_area * np.sqrt(img_area))),
+    }
 
 def create_image_grid(
     images, 
