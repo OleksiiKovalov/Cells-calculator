@@ -908,16 +908,27 @@ def process_loaded_image(image, settings: OrderedDict):
 
 def safegray2rgb(image):
     """
-    Convert grayscale to RGB if needed, otherwise return unchanged.
+    Convert image-like arrays to a 3-channel RGB-compatible array.
     
     Args:
         image (np.ndarray): Input image array
         
     Returns:
-        np.ndarray: RGB image if input was grayscale, otherwise unchanged
+        np.ndarray: 3-channel RGB-compatible image
     """
+    image = np.asarray(image)
     if image.ndim == 2:
         return gray2rgb(image)
+    if image.ndim == 3:
+        channels = image.shape[2]
+        if channels == 1:
+            return gray2rgb(image[:, :, 0])
+        if channels == 2:
+            return gray2rgb(image[:, :, 0])
+        if channels == 3:
+            return image
+        if channels > 3:
+            return image[:, :, :3]
     return image
 
 

@@ -107,6 +107,17 @@ def test_safe_image_write_reports_false_for_unsupported_extension(tmp_path):
     assert not path.exists()
 
 
+def test_safegray2rgb_drops_alpha_channel_for_model_input():
+    rgba = np.zeros((32, 31, 4), dtype=np.uint8)
+    rgba[:, :, 0] = 10
+    rgba[:, :, 3] = 255
+
+    rgb = model_utils.safegray2rgb(rgba)
+
+    assert rgb.shape == (32, 31, 3)
+    assert rgb[:, :, 0].max() == 10
+
+
 def test_countnuclei_blank_channel_is_empty():
     assert NucleiCounter().countNuclei(np.zeros((32, 32), dtype=np.uint8)) == 0
 
@@ -180,6 +191,17 @@ def test_instanseg_pads_narrow_eval_medium_image_window(request, monkeypatch):
     assert padded.shape[:2] == (512, 512)
 
 
+def test_instanseg_preprocess_keeps_rgba_input_to_three_channels():
+    rgba = np.zeros((32, 31, 4), dtype=np.uint8)
+
+    processed = model_utils.process_loaded_image(
+        rgba,
+        [{"gray2rgb": ""}, {"resize": "512:512"}],
+    )
+
+    assert processed.shape[2] == 3
+
+
 def test_stardist_skips_instance_when_no_usable_contour_exists(
     request,
     monkeypatch,
@@ -219,3 +241,59 @@ def test_stardist_skips_instance_when_no_usable_contour_exists(
         "volume",
     ]
     assert result.empty
+
+
+def test_yolo_x10_retries_sahi_invalid_mask_with_nms(monkeypatch, tmp_path):
+    from model import YOLOSegmenter as yolo_module
+
+    calls = []
+
+    class _FakeSlicedPrediction:
+        def to_coco_predictions(self):
+            return [
+                {
+                    "bbox": [0, 0, 10, 10],
+                    "segmentation": [[0, 0, 10, 0, 10, 10, 0, 10]],
+                    "score": 0.9,
+                }
+            ]
+
+    def fake_get_sliced_prediction(*args, **kwargs):
+        postprocess_type = kwargs.get("postprocess_type", "DEFAULT")
+        calls.append(postprocess_type)
+        if postprocess_type == "DEFAULT":
+            raise ValueError("Invalid segmentation mask.")
+        return _FakeSlicedPrediction()
+
+    monkeypatch.setattr(
+        yolo_module,
+        "get_sliced_prediction",
+        fake_get_sliced_prediction,
+    )
+    monkeypatch.setattr(
+        yolo_module,
+        "read_image",
+        lambda path: np.zeros((384, 34, 3), dtype=np.uint8),
+    )
+    monkeypatch.setattr(
+        yolo_module,
+        "plot_predictions",
+        lambda image, masks, **kwargs: image,
+    )
+
+    segmenter = yolo_module.YoloSegmenter.__new__(yolo_module.YoloSegmenter)
+    segmenter.object_size = {
+        "color_map": "tab20",
+        "signal": lambda *args, **kwargs: None,
+    }
+    segmenter.detections = None
+    segmenter.original_image = None
+    segmenter.model_x10 = object()
+
+    result = segmenter.count_x10(
+        "narrow.tif",
+        filename=str(tmp_path / "detections.png"),
+    )
+
+    assert calls == ["DEFAULT", "NMS"]
+    assert result.shape[0] == 1
