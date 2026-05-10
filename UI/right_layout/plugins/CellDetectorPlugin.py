@@ -18,7 +18,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QCheckBox, QPushButton, QTextEdit,
     QComboBox, QLabel, QRadioButton, QButtonGroup, 
-    QHBoxLayout, QWidget, QVBoxLayout, QFileDialog, QApplication
+    QDoubleSpinBox, QHBoxLayout, QWidget, QVBoxLayout, QFileDialog, QApplication
 )
 
 # Local application imports
@@ -56,6 +56,33 @@ class RangeSliderWrapper(QWidget):
 
     def _to_slider_ceil(self, value):
         return int(math.ceil(float(value) * self.round_parametr_slider))
+
+    def _get_image_size(self):
+        for key in ('image_display_base', 'image_inference'):
+            image = get_global(key)
+            if image is not None and hasattr(image, 'shape') and len(image.shape) >= 2:
+                return image.shape[0], image.shape[1]
+        return None
+
+    def _format_size_label(self, label, value):
+        value = float(value)
+        text = f"{label}: {value * self.round_parametr_value_input:.2f}"
+
+        image_size = self._get_image_size()
+        um_per_px = self.object_size.get("um_per_px")
+        if image_size is not None and um_per_px is not None:
+            image_area_px = image_size[0] * image_size[1]
+            area_um2 = value * image_area_px * (float(um_per_px) ** 2)
+            text += f" ({area_um2:.2f} um^2)"
+
+        return text
+
+    def refresh_labels(self):
+        """
+        Refresh displayed range values after size or calibration changes.
+        """
+        self.min_label.setText(self._format_size_label("Min", self.object_size['min_size']))
+        self.max_label.setText(self._format_size_label("Max", self.object_size['max_size']))
             
     def initUI(self):
         layout = QVBoxLayout()
@@ -102,16 +129,18 @@ class RangeSliderWrapper(QWidget):
         slider_controls_layout.addWidget(controls_widget, 0)  # Fixed size for controls
         
         # Create value display labels
-        value_layout = QHBoxLayout()
-        self.min_label = QLabel(f"Min: {self.object_size['min_size'] * self.round_parametr_value_input:.2f}")
-        self.max_label = QLabel(f"Max: {self.object_size['max_size'] * self.round_parametr_value_input:.2f}")
+        value_layout = QVBoxLayout()
+        self.min_label = QLabel()
+        self.max_label = QLabel()
         
         font = QFont("Arial", 12)
         self.min_label.setFont(font)
         self.max_label.setFont(font)
+        self.min_label.setWordWrap(True)
+        self.max_label.setWordWrap(True)
+        self.refresh_labels()
         
         value_layout.addWidget(self.min_label)
-        value_layout.addStretch()
         value_layout.addWidget(self.max_label)
         
         layout.addLayout(slider_controls_layout)
@@ -143,8 +172,7 @@ class RangeSliderWrapper(QWidget):
         self.object_size['max_size'] = max_value
         
         # Update display labels
-        self.min_label.setText(f"Min: {min_value * self.round_parametr_value_input:.2f}")
-        self.max_label.setText(f"Max: {max_value * self.round_parametr_value_input:.2f}")
+        self.refresh_labels()
         
         # Emit signal based on Auto Apply setting
         if self.auto_apply_checkbox.isChecked():
@@ -169,8 +197,7 @@ class RangeSliderWrapper(QWidget):
                 self._to_slider_floor(min_val),
                 self._to_slider_ceil(max_val)
             )
-            self.min_label.setText(f"Min: {min_val * self.round_parametr_value_input:.2f}")
-            self.max_label.setText(f"Max: {max_val * self.round_parametr_value_input:.2f}")
+            self.refresh_labels()
         finally:
             self.lockCount -= 1 
     
@@ -342,6 +369,18 @@ class CellDetectorPlugin(BasePlugin):
         current_min = self.object_size['min_size']
         current_max = self.object_size['max_size']
         self.on_range_slider_changed(current_min, current_max)
+
+    def update_um_per_px(self, value):
+        """
+        Update micrometers-per-pixel calibration.
+        """
+        self.object_size["um_per_px"] = float(value)
+
+        if hasattr(self, 'range_slider'):
+            self.range_slider.refresh_labels()
+
+        if getattr(self, 'result', None) is not None:
+            self.print_result(self.result)
     # def update_lineWidth(self):
     #     # Get value from QLineEdit
     #     input_text = self.LineWidth_edit.text()
@@ -1310,6 +1349,7 @@ class CellDetectorPlugin(BasePlugin):
 
         self.colormap_combo = QComboBox()
         self.colormap_combo.setFont(QFont("Arial", 16))
+        self.colormap_combo.setMinimumWidth(120)
 
         self.colormaps =  self.object_size["color_map_list"]
         self.colormap_combo.addItems(self.colormaps)
@@ -1318,10 +1358,11 @@ class CellDetectorPlugin(BasePlugin):
         
         # Create alpha combo box
         alpha_label = QLabel("Alpha:")
-        alpha_label.setFont(QFont("Arial", 24))
+        alpha_label.setFont(QFont("Arial", 16))
         
         self.alpha_combo = QComboBox()
         self.alpha_combo.setFont(QFont("Arial", 16))
+        self.alpha_combo.setMinimumWidth(80)
         
         # Add alpha values
         alpha_values = ["100%", "75%", "50%", "25%"]
@@ -1331,18 +1372,44 @@ class CellDetectorPlugin(BasePlugin):
         
         # Initialize alpha in object_size
         self.object_size["alpha"] = 0.75  # Default 75%
+
+        um_per_px_label = QLabel("um per px:")
+        um_per_px_label.setFont(QFont("Arial", 16))
+
+        self.um_per_px_spin = QDoubleSpinBox()
+        self.um_per_px_spin.setFont(QFont("Arial", 16))
+        self.um_per_px_spin.setDecimals(6)
+        self.um_per_px_spin.setRange(0.000001, 1000.0)
+        self.um_per_px_spin.setSingleStep(0.001)
+        self.um_per_px_spin.setMinimumWidth(120)
+        self.um_per_px_spin.setValue(float(self.object_size.get("um_per_px", 0.325)))
+        self.um_per_px_spin.valueChanged.connect(self.update_um_per_px)
         
         # Create horizontal layout for colormap and alpha
         colormap_layout = QHBoxLayout()
+        colormap_layout.setContentsMargins(0, 0, 0, 0)
         colormap_layout.addWidget(colormap_label)
         colormap_layout.addWidget(self.colormap_combo)
-        colormap_layout.addSpacing(20)
-        #colormap_layout.addWidget(alpha_label)
+        colormap_layout.addSpacing(12)
+        colormap_layout.addWidget(alpha_label)
         colormap_layout.addWidget(self.alpha_combo)
+        colormap_layout.addStretch()
+
+        calibration_layout = QHBoxLayout()
+        calibration_layout.setContentsMargins(0, 0, 0, 0)
+        calibration_layout.addWidget(um_per_px_label)
+        calibration_layout.addWidget(self.um_per_px_spin)
+        calibration_layout.addStretch()
+
+        settings_layout = QVBoxLayout()
+        settings_layout.setContentsMargins(0, 0, 0, 0)
+        settings_layout.setSpacing(8)
+        settings_layout.addLayout(colormap_layout)
+        settings_layout.addLayout(calibration_layout)
         
         # Create widget to contain the horizontal layout
         colormap_widget = QWidget()
-        colormap_widget.setLayout(colormap_layout)
+        colormap_widget.setLayout(settings_layout)
 
         # Add widgets to the right layout with spacing
         ###self.right_layout.addWidget(label)
