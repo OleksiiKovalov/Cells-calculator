@@ -56,6 +56,56 @@ Run forever until Ctrl+C:
 python scripts/fuzz_runtime.py --max-cases 0 --timeout 180
 ```
 
+Randomly choose one enabled/runnable model on every case:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 0 --model-strategy random --timeout 180
+```
+`random` is the default strategy, so an endless run will keep choosing models
+randomly unless `--model-strategy round-robin` is supplied.
+
+Cycle through models deterministically:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 100 --model-strategy round-robin
+```
+
+Mutate real images from a seed corpus and mix them with synthetic cases:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 100 --seed-corpus testimages --image-profile mixed
+```
+
+Enable extra runtime checks in child processes:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 100 --sanitizers all --max-rss-mb 4096
+```
+
+Exercise UI-like stateful workflows after inference. This fuzzes detection
+filtering, mask plotting, and repeated inference in the same child process:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 100 --workflow stateful --max-workflow-steps 6
+```
+
+Failures are grouped by a stable crash signature and logged to
+`.cache/runtime_fuzz/signatures.jsonl`. The first case for a signature is saved
+under `.cache/runtime_fuzz/failures`; later matching cases are saved under
+`.cache/runtime_fuzz/duplicates`. To keep every failure in the main failures
+directory, disable grouping:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 100 --no-dedupe
+```
+
+Try to shrink unique failures while preserving the same crash signature:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 100 --workflow stateful --minimize-failures --minimize-steps 10
+```
+
+For a customer-facing quality gate, run strict semantic oracles plus a
+deterministic count rerun. This treats invalid result contracts as failures even
+when the process does not crash, and writes `.cache/runtime_fuzz/run_summary.json`
+plus `.cache/runtime_fuzz/passes.jsonl` as evidence of what passed:
+```commandline
+python scripts/fuzz_runtime.py --max-cases 500 --workflow stateful --max-workflow-steps 8 --model-strategy random --seed-corpus testimages --image-profile mixed --sanitizers all --oracle-level strict --determinism-check counts --minimize-failures --timeout 600
+```
+
 Limit by time or model name:
 ```commandline
 python scripts/fuzz_runtime.py --seconds 3600 --models "Detector,YOLO-512 Segmenter"
