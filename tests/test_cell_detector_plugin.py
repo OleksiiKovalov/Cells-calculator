@@ -1,5 +1,7 @@
 """Regression tests for CellDetectorPlugin size-range calibration."""
 
+from types import SimpleNamespace
+
 import numpy as np
 import pandas as pd
 
@@ -12,6 +14,26 @@ class _RangeSliderStub:
 
     def change_default(self, min_size, max_size):
         self.calls.append((min_size, max_size))
+
+
+class _SignalStub:
+    def __init__(self):
+        self.calls = []
+
+    def emit(self, *args):
+        self.calls.append(args)
+
+
+class _ReusableModelStub:
+    def __init__(self, model_name):
+        self.model_name = model_name
+        self.path = "already-loaded-model"
+        self.cell_counter = SimpleNamespace(original_image_path=None)
+        self.calls = []
+
+    def calculate(self, **kwargs):
+        self.calls.append(kwargs)
+        return {"Cells": 1, "Nuclei": -100, "%": -100}
 
 
 def _build_plugin():
@@ -51,3 +73,33 @@ def test_set_size_falls_back_to_normalized_box_area_for_series():
     plugin.set_size(boxes)
 
     assert plugin.range_slider.calls[-1] == (0.06, 0.2)
+
+
+def test_call_inference_reuses_loaded_model_with_same_name(monkeypatch):
+    plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
+    plugin.model = _ReusableModelStub("Detector")
+    plugin.models = {
+        "Detector": {
+            "path": "would-reload-before-fix",
+            "object_size": {},
+            "model_type": "cellcounter",
+        }
+    }
+    plugin.lsm_path = "sample.lsm"
+    plugin.parametrs = {"Cell": 3, "Nuclei": 2}
+    plugin.plugin_signal = _SignalStub()
+    plugin.draw_bounding = 0
+    monkeypatch.setattr(
+        "UI.right_layout.plugins.CellDetectorPlugin.Model",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("Model should not be reloaded")
+        ),
+    )
+
+    result = plugin.call_inference("Detector")
+
+    assert result == {"Cells": 1, "Nuclei": -100, "%": -100}
+    assert plugin.model.calls == [
+        {"img_path": "sample.lsm", "cell_channel": 3, "nuclei_channel": 2}
+    ]
+    assert plugin.model.cell_counter.original_image_path == "sample.lsm"
