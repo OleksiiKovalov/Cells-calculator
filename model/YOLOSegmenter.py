@@ -16,7 +16,6 @@ from ultralytics import YOLO
 
 # Local application imports
 from UI.app_globals import register_model
-from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from sahi.auto_model import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
@@ -54,33 +53,19 @@ class YoloSegmenter(BaseModel):
     ]
 
     def _get_sahi_predictions(self, input_image):
-        """Run SAHI prediction, falling back when mask merging creates invalid masks."""
-        try:
-            return get_sliced_prediction(
-                input_image,
-                self.model_x10,
-                slice_height=144,
-                slice_width=144,
-                overlap_height_ratio=.1,
-                overlap_width_ratio=.1
-            ).to_coco_predictions()
-        except ValueError as exc:
-            if "Invalid segmentation mask" not in str(exc):
-                raise
-
-            app_logger().warning(
-                "SAHI mask merge produced an invalid segmentation mask; "
-                "retrying YOLO x10 prediction with NMS postprocess."
-            )
-            return get_sliced_prediction(
-                input_image,
-                self.model_x10,
-                slice_height=144,
-                slice_width=144,
-                overlap_height_ratio=.1,
-                overlap_width_ratio=.1,
-                postprocess_type="NMS"
-            ).to_coco_predictions()
+        """Run SAHI prediction with the tuned x10 inference settings."""
+        return get_sliced_prediction(
+            input_image,
+            self.model_x10,
+            slice_height=512,
+            slice_width=512,
+            overlap_height_ratio=.1,
+            overlap_width_ratio=.1,
+            perform_standard_pred=False,
+            postprocess_type="NMS",
+            postprocess_match_metric="IOU",
+            verbose=0,
+        ).to_coco_predictions()
 
     def init_x20_model(self, path_to_model: str):
         """

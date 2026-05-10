@@ -243,7 +243,7 @@ def test_stardist_skips_instance_when_no_usable_contour_exists(
     assert result.empty
 
 
-def test_yolo_x10_retries_sahi_invalid_mask_with_nms(monkeypatch, tmp_path):
+def test_yolo_x10_uses_sahi_nms_postprocess(monkeypatch, tmp_path):
     from model import YOLOSegmenter as yolo_module
 
     calls = []
@@ -259,10 +259,8 @@ def test_yolo_x10_retries_sahi_invalid_mask_with_nms(monkeypatch, tmp_path):
             ]
 
     def fake_get_sliced_prediction(*args, **kwargs):
-        postprocess_type = kwargs.get("postprocess_type", "DEFAULT")
+        postprocess_type = kwargs.get("postprocess_type")
         calls.append(postprocess_type)
-        if postprocess_type == "DEFAULT":
-            raise ValueError("Invalid segmentation mask.")
         return _FakeSlicedPrediction()
 
     monkeypatch.setattr(
@@ -295,5 +293,5 @@ def test_yolo_x10_retries_sahi_invalid_mask_with_nms(monkeypatch, tmp_path):
         filename=str(tmp_path / "detections.png"),
     )
 
-    assert calls == ["DEFAULT", "NMS"]
+    assert calls == ["NMS"]
     assert result.shape[0] == 1
