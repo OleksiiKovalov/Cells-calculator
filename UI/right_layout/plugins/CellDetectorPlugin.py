@@ -646,8 +646,10 @@ class CellDetectorPlugin(BasePlugin):
         )
         if detections is None:
             return None
+        if not hasattr(detections, "columns"):
+            return None
         source_detections = getattr(cell_counter, "detections", None)
-        if source_detections is None:
+        if source_detections is None or not hasattr(source_detections, "columns"):
             source_detections = detections
 
         original_image = getattr(cell_counter, "original_image", None)
