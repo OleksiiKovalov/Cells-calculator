@@ -257,6 +257,23 @@ class RangeSlider(QtWidgets.QWidget):
         ratio = (v - self._min) / float(self._max - self._min)
         return int(round(self._margin + ratio * self._available_w()))
 
+    def _handle_positions(self):
+        """Return current low and high handle positions."""
+        return self._value_to_pos(self._low), self._value_to_pos(self._high)
+
+    def _ordered_handles(self, x1, x2):
+        """Return the handle drawing order based on focus and active state."""
+        order = [("low", x1), ("high", x2)]
+        if self._focus == "low":
+            order = [("high", x2), ("low", x1)]
+        elif self._focus == "high":
+            order = [("low", x1), ("high", x2)]
+        if self._active == "low":
+            order = [("high", x2), ("low", x1)]
+        elif self._active == "high":
+            order = [("low", x1), ("high", x2)]
+        return order
+
     def _pos_to_value(self, x):
         """
         Convert position to value.
@@ -329,22 +346,13 @@ class RangeSlider(QtWidgets.QWidget):
         p.drawRoundedRect(r, 3, 3)
 
         # Selected range
-        x1 = self._value_to_pos(self._low)
-        x2 = self._value_to_pos(self._high)
+        x1, x2 = self._handle_positions()
         sel = QtCore.QRect(min(x1, x2), r.y(), abs(x2 - x1), r.height())
         p.setBrush(fill_brush)
         p.drawRoundedRect(sel, 3, 3)
 
         # Order: inactive first, then active/in focus - on top
-        order = [("low", x1), ("high", x2)]
-        if self._focus == "low":
-            order = [("high", x2), ("low", x1)]
-        elif self._focus == "high":
-            order = [("low", x1), ("high", x2)]
-        if self._active == "low":
-            order = [("high", x2), ("low", x1)]
-        elif self._active == "high":
-            order = [("low", x1), ("high", x2)]
+        order = self._ordered_handles(x1, x2)
 
         # Handles
         for role, xpos in order:
@@ -367,8 +375,7 @@ class RangeSlider(QtWidgets.QWidget):
         if ev.button() != QtCore.Qt.LeftButton:
             return super().mousePressEvent(ev)
         x = ev.x()
-        lx = self._value_to_pos(self._low)
-        hx = self._value_to_pos(self._high)
+        lx, hx = self._handle_positions()
 
         # Choose the closest handle
         if abs(x - lx) <= abs(x - hx):
@@ -410,6 +417,18 @@ class RangeSlider(QtWidgets.QWidget):
         self._active = None
         return super().mouseReleaseEvent(ev)
 
+    def _toggle_focus(self):
+        """Switch focus between low and high handles."""
+        self._focus = "low" if self._focus == "high" else "high"
+        self.update()
+
+    def _move_active_handle(self, target, delta):
+        """Move the active handle by delta depending on focus."""
+        if target == "low":
+            self.setLow(self._low + delta)
+        else:
+            self.setHigh(self._high + delta)
+
     # Keyboard
     def keyPressEvent(self, ev):
         """
@@ -423,12 +442,6 @@ class RangeSlider(QtWidgets.QWidget):
         step = self._step
         big = self._step * 10
 
-        def move_low(delta):
-            self.setLow(self._low + delta)
-
-        def move_high(delta):
-            self.setHigh(self._high + delta)
-
         target = self._focus or "high"
 
         if key in (QtCore.Qt.Key_Left, QtCore.Qt.Key_Right,
@@ -436,9 +449,7 @@ class RangeSlider(QtWidgets.QWidget):
                    QtCore.Qt.Key_Home, QtCore.Qt.Key_End,
                    QtCore.Qt.Key_Tab):
             if key == QtCore.Qt.Key_Tab:
-                # Switch handle focus
-                self._focus = "low" if self._focus == "high" else "high"
-                self.update()
+                self._toggle_focus()
                 return
 
             delta = 0
@@ -464,10 +475,7 @@ class RangeSlider(QtWidgets.QWidget):
                 return
 
             if delta != 0:
-                if target == "low":
-                    move_low(delta)
-                else:
-                    move_high(delta)
+                self._move_active_handle(target, delta)
             return
         super().keyPressEvent(ev)
 
