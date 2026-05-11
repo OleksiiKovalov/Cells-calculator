@@ -106,6 +106,28 @@ def test_call_inference_reuses_loaded_model_with_same_name(monkeypatch):
     assert plugin.model.cell_counter.original_image_path == "sample.lsm"
 
 
+def test_publish_inference_image_from_result_attrs(tmp_path):
+    from UI.prediction_rendering import publish_inference_image
+
+    inference_image = np.full((8, 9, 3), 120, dtype=np.uint8)
+    detections = pd.DataFrame({"box": [np.array([1, 1, 2, 2])]})
+    detections.attrs["inference_image"] = inference_image
+    model = SimpleNamespace(cell_counter=SimpleNamespace())
+    output_path = tmp_path / "inference.png"
+
+    set_global("image_inference", None)
+    published = publish_inference_image(
+        model,
+        {"Cells": detections},
+        filename=str(output_path),
+    )
+
+    assert published is inference_image
+    assert output_path.exists()
+    assert np.array_equal(get_global("image_inference"), inference_image)
+    assert np.array_equal(model.cell_counter.inference_image, inference_image)
+
+
 def test_render_filtered_result_keeps_full_detection_cache(monkeypatch):
     plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
     plugin.object_size = {"color_map": "tab20", "alpha": 0.75}

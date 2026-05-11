@@ -32,21 +32,14 @@ from skimage.color import rgb2gray
 from skimage.io import imread
 
 # Local application imports
-from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_GRID,
-    IMAGE_FILE_NAME_INGFERENCE,
-    IMAGE_FILE_NAME_TMP,
-)
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION
 from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
     plot_mask,
     process_loaded_image,
-    resize_and_pad_cv,
     safe_image_read,
     safegray2rgb,
-    safe_image_write,
 )
 
 
@@ -163,8 +156,6 @@ class CellposeSegmenter(BaseModel):
         img_inference = process_loaded_image(
             image=image, settings=image_preprocess_settings
         )
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
-        self.inference_image = img_inference.copy()
         self.original_image = safegray2rgb(image)
         channels_to_use = [0, 0]  # Adapt!
         try:
@@ -178,6 +169,11 @@ class CellposeSegmenter(BaseModel):
                 cellprob_map=cellprob,
                 image_shape_for_norm=image.shape[:2], # Or masks.shape[:2] if appropriate
                 store_bin_mask=False # Set to True if you need the binary masks in the DataFrame
+            )
+            self._attach_prediction_images(
+                self.detections,
+                original_image=self.original_image,
+                inference_image=img_inference,
             )
             detections = self.detections[self.detections["confidence"] >= min_score]
             if tracking is False:
@@ -194,6 +190,7 @@ class CellposeSegmenter(BaseModel):
                     index=False,
                 )
             filtered_detections = detections
+            self._copy_prediction_images(filtered_detections, self.detections)
 
             self.prediction_image = None
             return filtered_detections

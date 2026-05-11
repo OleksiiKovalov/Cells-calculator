@@ -8,11 +8,9 @@ import cv2
 import numpy as np
 import pandas as pd
 
-# Local application imports
-from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE, set_global
 from model.BaseModel import BaseModel
-from model.utils import safe_image_read, safe_image_write
-from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
+# Local application imports
+from model.utils import safe_image_read
 
 
 CLASSES = ["Cell"]
@@ -113,7 +111,6 @@ class CellCounter(BaseModel):
             length = max((height, width))
             image = np.zeros((length, length, 3), np.uint8)
             image[0:height, 0:width] = original_image
-            self.inference_image = image.copy()
 
             # Calculate scale factor
             scale = length / 512
@@ -123,9 +120,6 @@ class CellCounter(BaseModel):
                 image, scalefactor=1 / 255, size=(512, 512), swapRB=True
             )
             self.model.setInput(blob)
-
-            set_global("image_inference", image)
-            safe_image_write(image, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
 
             # Perform inference
             outputs = self.model.forward()
@@ -182,6 +176,11 @@ class CellCounter(BaseModel):
                 columns=["class_id", "class_name", "confidence", "box", "scale"],
             )
             self.detections = detections
+            self._attach_prediction_images(
+                self.detections,
+                original_image=self.original_image,
+                inference_image=image,
+            )
             csv_data = self.detections.copy()
             csv_data["width"] = csv_data["box"].apply(
                 lambda b: b[2] / length if b is not None else None
@@ -219,6 +218,7 @@ class CellCounter(BaseModel):
         #     max_size=self.object_size["max_size"],
         # )
         filtered_detections = detections
+        self._copy_prediction_images(filtered_detections, self.detections)
         self.detectionCount = filtered_detections.shape[0]
         self.prediction_image = None
 

@@ -7,7 +7,11 @@ import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, set_global
+from UI.app_globals import (
+    IMAGE_FILE_NAME_DETECTION,
+    IMAGE_FILE_NAME_INGFERENCE,
+    set_global,
+)
 
 
 CLASSES = ["Cell"]
@@ -61,6 +65,55 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
         return False
 
     return bool(cv2.imwrite(filename, image_to_save, params) and os.path.exists(filename))
+
+
+def _copy_image(image):
+    return image.copy() if hasattr(image, "copy") else image
+
+
+def get_prediction_image_artifacts(result):
+    """Extract raw original/inference images from a model result."""
+    detections = (
+        result.get("Cells")
+        if isinstance(result, dict) and "Cells" in result
+        else result
+    )
+    attrs = getattr(detections, "attrs", {}) or {}
+
+    original_image = result.get("original_image") if isinstance(result, dict) else None
+    inference_image = (
+        result.get("inference_image") if isinstance(result, dict) else None
+    )
+    if original_image is None:
+        original_image = attrs.get("original_image")
+    if inference_image is None:
+        inference_image = attrs.get("inference_image")
+
+    return original_image, inference_image
+
+
+def publish_inference_image(
+    model,
+    result,
+    filename=IMAGE_FILE_NAME_INGFERENCE,
+    preserve_dtype=False,
+):
+    """Publish a model-produced inference image for UI display/cache."""
+    _, inference_image = get_prediction_image_artifacts(result)
+    if inference_image is None:
+        return None
+
+    image_for_state = _copy_image(inference_image)
+    if model is not None and getattr(model, "cell_counter", None):
+        model.cell_counter.inference_image = _copy_image(inference_image)
+
+    set_global("image_inference", image_for_state)
+    safe_image_write(
+        inference_image,
+        filename,
+        preserve_dtype=preserve_dtype,
+    )
+    return inference_image
 
 
 def resize_and_pad_cv(image, target_width, target_height):

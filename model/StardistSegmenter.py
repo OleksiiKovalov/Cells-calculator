@@ -37,17 +37,13 @@ from model.BaseModel import BaseModel
 from model.utils import (
     plot_mask,
     process_loaded_image,
-    resize_and_pad_cv, 
     safegray2rgb, 
     safe_image_write, 
     safe_image_read, 
 )
 from UI.app_globals import (
     IMAGE_FILE_NAME_DETECTION, 
-    IMAGE_FILE_NAME_GRID, 
-    IMAGE_FILE_NAME_INGFERENCE, 
     IMAGE_FILE_NAME_INSTANCES, 
-    IMAGE_FILE_NAME_TMP
 )
 
 
@@ -140,8 +136,6 @@ class StardistSegmenter(BaseModel):
         image = imread(input_image)
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
-        self.inference_image = img_inference.copy()
        
         self.original_image = safegray2rgb(image)
         try:
@@ -152,6 +146,11 @@ class StardistSegmenter(BaseModel):
                 scores=details["prob"],
                 original_shape=image.shape[:2],
                 inference_shape=img_inference.shape[:2]
+            )
+            self._attach_prediction_images(
+                self.detections,
+                original_image=self.original_image,
+                inference_image=img_inference,
             )
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
@@ -164,6 +163,7 @@ class StardistSegmenter(BaseModel):
                     index=False
                 )
             filtered_detections = detections
+            self._copy_prediction_images(filtered_detections, self.detections)
             self.prediction_image = None
             return filtered_detections
         

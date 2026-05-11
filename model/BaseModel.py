@@ -18,8 +18,6 @@ import torch
 # Local application imports
 from UI.app_globals import (
     IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_GRID,
-    IMAGE_FILE_NAME_INGFERENCE,
     IMAGE_FILE_NAME_TMP,
 )
 
@@ -108,6 +106,47 @@ class BaseModel:
         detections = self.count(dst)
         if detections is None:
             return 0
+        return detections
+
+    def _attach_prediction_images(
+        self,
+        detections,
+        *,
+        original_image=None,
+        inference_image=None,
+    ):
+        """Attach raw image artifacts to DataFrame results without UI side effects."""
+        if detections is None or not hasattr(detections, "attrs"):
+            return detections
+
+        if original_image is not None:
+            detections.attrs["original_image"] = (
+                original_image.copy()
+                if hasattr(original_image, "copy")
+                else original_image
+            )
+        if inference_image is not None:
+            detections.attrs["inference_image"] = (
+                inference_image.copy()
+                if hasattr(inference_image, "copy")
+                else inference_image
+            )
+        return detections
+
+    def _copy_prediction_images(self, detections, source):
+        """Copy raw image artifacts from one DataFrame result to another."""
+        if (
+            detections is None
+            or source is None
+            or not hasattr(detections, "attrs")
+            or not hasattr(source, "attrs")
+        ):
+            return detections
+
+        for key in ("original_image", "inference_image"):
+            image = source.attrs.get(key)
+            if image is not None:
+                detections.attrs[key] = image.copy() if hasattr(image, "copy") else image
         return detections
 
     def count(self, input_image, scale: int = 20, filename=IMAGE_FILE_NAME_DETECTION):

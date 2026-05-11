@@ -27,8 +27,10 @@ from UI.app_globals import get_global, set_global
 from UI.errorhandling import app_logger
 from UI.ModelsCheckList import ModelsCheckListDialog
 from UI.prediction_rendering import (
+    get_prediction_image_artifacts,
     plot_predictions,
     plot_predictions_with_alignment,
+    publish_inference_image,
     render_detector_predictions,
 )
 from UI.rangeslider import RangeSlider
@@ -619,6 +621,7 @@ class CellDetectorPlugin(BasePlugin):
                         # clear the model so it can be restarted 
                 self.draw_bounding = 0
         if result is not None and self.model is not None:
+            publish_inference_image(self.model, result)
             self.render_model_result(self.model, result)
         return result
 
@@ -652,7 +655,12 @@ class CellDetectorPlugin(BasePlugin):
         if source_detections is None or not hasattr(source_detections, "columns"):
             source_detections = detections
 
-        original_image = getattr(cell_counter, "original_image", None)
+        result_original_image, result_inference_image = get_prediction_image_artifacts(
+            result
+        )
+        original_image = result_original_image
+        if original_image is None:
+            original_image = getattr(cell_counter, "original_image", None)
         if original_image is None:
             original_image = get_global("image_display_base")
         if original_image is None:
@@ -664,7 +672,9 @@ class CellDetectorPlugin(BasePlugin):
             original_image = original_image.copy()
 
         if hasattr(detections, "columns") and "mask" in detections.columns:
-            inference_image = getattr(cell_counter, "inference_image", None)
+            inference_image = result_inference_image
+            if inference_image is None:
+                inference_image = getattr(cell_counter, "inference_image", None)
             if inference_image is None:
                 inference_image = get_global("image_inference")
 
@@ -759,6 +769,7 @@ class CellDetectorPlugin(BasePlugin):
                     del model
                     model = None
         if model:
+            publish_inference_image(model, result)
             processed_image = self.render_model_result(model, result)
             return model.cell_counter.original_image, processed_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
         else:

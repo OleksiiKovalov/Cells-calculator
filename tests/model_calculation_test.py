@@ -107,7 +107,10 @@ def test_cellcounter_returns_empty_dataframe_when_nms_has_no_boxes(tmp_path):
 
     assert list(result.columns) == ["class_id", "class_name", "confidence", "box", "scale"]
     assert result.empty
+    assert result.attrs["original_image"].shape == image.shape
+    assert result.attrs["inference_image"].shape == image.shape
     assert not output_path.exists()
+    assert not hasattr(counter, "inference_image")
     assert counter.prediction_image is None
 
 

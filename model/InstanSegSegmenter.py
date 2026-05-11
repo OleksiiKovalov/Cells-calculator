@@ -32,7 +32,7 @@ from shapely.geometry import shape
 from skimage.io import imread
 
 # Local application imports
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_INGFERENCE, set_global
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION
 from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
@@ -41,7 +41,6 @@ from model.utils import (
     process_loaded_image,
     resize_and_pad_cv, 
     safegray2rgb, 
-    safe_image_write
 )
 
 
@@ -233,8 +232,6 @@ class InstansegSegmenter(BaseModel):
             method_name,
             tile_size,
         )
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
-        self.inference_image = img_inference.copy()
         self.original_image = safegray2rgb(image)
 
         try:
@@ -261,6 +258,11 @@ class InstansegSegmenter(BaseModel):
             labeled_output = method(**kwargs)
 
             self.detections = self.instanseg_results_to_pandas(labeled_output)
+            self._attach_prediction_images(
+                self.detections,
+                original_image=self.original_image,
+                inference_image=img_inference,
+            )
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
                 self.object_size['signal']('set_size', self.detections.copy())
@@ -274,7 +276,6 @@ class InstansegSegmenter(BaseModel):
                     index=False,
                 )
 
-            original_image = self.original_image.copy()
             #todo restore tracking feature
             if tracking is False:
                 signal_fn = self.object_size.get('signal')
@@ -324,10 +325,7 @@ class InstansegSegmenter(BaseModel):
 
             #filtered_detections = detections
 
-            set_global('detections', filtered_detections)
-            set_global('image_inference', img_inference.copy())
-            set_global('image_original', original_image.copy())
-            set_global('image_detections', None)
+            self._copy_prediction_images(filtered_detections, self.detections)
             self.prediction_image = None
 
             return filtered_detections
