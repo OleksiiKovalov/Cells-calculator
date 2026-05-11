@@ -654,11 +654,6 @@ def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTIO
         colormap=colormap,
         color_ids=color_ids,
     )
-    if False:
-        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
-
-
-            pass
 
 def plot_predictions_with_alignment(
     original_image,

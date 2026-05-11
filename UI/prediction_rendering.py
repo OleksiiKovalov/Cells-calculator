@@ -1,6 +1,7 @@
 """Rendering helpers for model predictions shown by the UI."""
 
 import os
+from typing import Optional
 
 import cv2
 import matplotlib.colors as mcolors
@@ -213,7 +214,7 @@ def denormalize_coordinates(coords, image_shape):
 def plot_predictions(
     image,
     pred_masks,
-    filename: str = IMAGE_FILE_NAME_DETECTION,
+    filename: Optional[str] = IMAGE_FILE_NAME_DETECTION,
     alpha=0.75,
     colormap="tab20",
     color_ids=None,
