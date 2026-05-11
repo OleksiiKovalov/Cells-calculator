@@ -6,9 +6,6 @@ These are the models for:
 - segmenting spheroids.
 """
 
-# Standard library imports
-import os
-
 # Third-party imports
 import numpy as np
 import pandas as pd
@@ -20,7 +17,7 @@ from model.BaseModel import BaseModel
 from sahi.auto_model import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from sahi.utils.cv import read_image
-from model.utils import results_to_pandas, sahi_to_pandas, plot_predictions
+from model.utils import results_to_pandas, sahi_to_pandas
 from UI.app_globals import (
     IMAGE_FILE_NAME_DETECTION,
     IMAGE_FILE_NAME_GRID,
@@ -132,15 +129,9 @@ class YoloSegmenter(BaseModel):
         Returns:
             list of dictionaries containing detections information.
         """
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-
         # Every time detect from fresh
         self.detections = None
         
-        colormap = self.object_size['color_map']
         outputs = self.model(
             input_image,
             conf=0.3,
@@ -150,6 +141,7 @@ class YoloSegmenter(BaseModel):
             **kwargs
         )[0]
         self.original_image = outputs.orig_img
+        self.inference_image = self.original_image.copy()
         self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
         set_global('image_inference', self.original_image.copy())
         set_global('image_display_base', self.original_image.copy())
@@ -161,14 +153,7 @@ class YoloSegmenter(BaseModel):
                 sep=';',
                 index=False
             )
-            self.prediction_image = self.original_image.copy()
-            plot_predictions(
-                self.prediction_image,
-                [],
-                filename=filename,
-                colormap=colormap,
-                alpha=self.object_size.get("alpha", 0.75),
-            )
+            self.prediction_image = None
             return self.detections
         self.detections = results_to_pandas(outputs, store_bin_mask)
         self.detections['box'] = self.detections['box'].apply(
@@ -187,22 +172,9 @@ class YoloSegmenter(BaseModel):
         detections = self.detections[self.detections['confidence'] >= min_score]
         if tracking is False:
             self.object_size['signal']("set_size", self.detections.copy())
-        original_image = self.original_image.copy()
-
         filtered_detections = detections
 
         self.prediction_image = None
-        if plot is True:
-            set_global('image_inference', original_image)
-            set_global('image_display_base', original_image.copy())
-            self.prediction_image = plot_predictions(
-                original_image,
-                filtered_detections['mask'].tolist(),
-                filename=filename,
-                colormap=colormap,
-                alpha=self.object_size.get("alpha", 0.75),
-                color_ids=filtered_detections['id_label'].tolist()
-            )
         return filtered_detections
 
     def count_x10(
@@ -235,13 +207,9 @@ class YoloSegmenter(BaseModel):
             Tile configuration: 512x512 with 10% overlap
             Results are cached and reused if same image processed multiple times
         """
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-        colormap = self.object_size['color_map']
         if self.detections is None or self.original_image is None:
             self.original_image = read_image(input_image)
+            self.inference_image = self.original_image.copy()
             outputs = self._get_sahi_predictions(input_image)
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
@@ -249,19 +217,9 @@ class YoloSegmenter(BaseModel):
 
         detections = self.detections[self.detections['confidence'] >= min_score]
 
-        original_image = self.original_image.copy()
-
         filtered_detections = detections
         
-        set_global('image_inference', original_image)
-        set_global('image_display_base', original_image.copy())
+        set_global('image_inference', self.original_image.copy())
+        set_global('image_display_base', self.original_image.copy())
         self.prediction_image = None
-        self.prediction_image = plot_predictions(
-            original_image,
-            filtered_detections['mask'].tolist(),
-            filename=filename,
-            colormap=colormap,
-            alpha=alpha,
-            color_ids=filtered_detections['id_label'].tolist()
-        )
         return filtered_detections

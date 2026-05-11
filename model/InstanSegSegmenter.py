@@ -38,8 +38,6 @@ from model.BaseModel import BaseModel
 from model.utils import (
     filter_segmentation_detections,
     plot_mask, 
-    plot_predictions,
-    plot_predictions_with_alignment,
     process_loaded_image,
     resize_and_pad_cv, 
     safegray2rgb, 
@@ -236,6 +234,7 @@ class InstansegSegmenter(BaseModel):
             tile_size,
         )
         safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        self.inference_image = img_inference.copy()
         self.original_image = safegray2rgb(image)
 
         try:
@@ -330,17 +329,6 @@ class InstansegSegmenter(BaseModel):
             set_global('image_original', original_image.copy())
             set_global('image_detections', None)
             self.prediction_image = None
-
-            if plot:
-                self.prediction_image = plot_predictions_with_alignment(
-                    original_image,
-                    img_inference,
-                    filtered_detections['mask'].tolist(),
-                    filename=filename,
-                    colormap=self.object_size.get("color_map"),
-                    alpha=self.object_size.get('alpha', 0.75),
-                    color_ids=filtered_detections['id_label'].tolist()
-                )
 
             return filtered_detections
         except Exception as e:

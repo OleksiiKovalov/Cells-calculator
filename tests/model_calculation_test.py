@@ -107,7 +107,8 @@ def test_cellcounter_returns_empty_dataframe_when_nms_has_no_boxes(tmp_path):
 
     assert list(result.columns) == ["class_id", "class_name", "confidence", "box", "scale"]
     assert result.empty
-    assert output_path.exists()
+    assert not output_path.exists()
+    assert counter.prediction_image is None
 
 
 def test_calculate_standard_omits_nuclei_metrics_when_not_provided(tmp_path):

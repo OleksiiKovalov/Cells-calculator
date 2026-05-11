@@ -353,23 +353,19 @@ def calculate_lsm(cell_counter, nuclei_counter,
 
 
 def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
-    """
-    Draws bounding boxes on the input image.
+    """Compatibility wrapper for UI-owned prediction rendering."""
+    from UI.prediction_rendering import draw_bounding_box as _draw_bounding_box
 
-    Args:
-        img (numpy.ndarray): The input image to draw the bounding box on.
-        x (int): X-coordinate of the top-left corner of the bounding box.
-        y (int): Y-coordinate of the top-left corner of the bounding box.
-        x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
-        y_plus_h (int): Y-coordinate of the bottom-right corner of the bounding box.
-        draw_mode (int): 0 for rectangle, other for circle.
-    """
-    color = COLORS[0]
-    thickness = 1 if img.shape[0] < 800 else 2
-    if draw_mode == 0:
-        cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
-    else:
-        cv2.circle(img, (x, y), 2, color, -1)
+    return _draw_bounding_box(
+        img,
+        class_id,
+        confidence,
+        x,
+        y,
+        x_plus_w,
+        y_plus_h,
+        draw_mode=draw_mode,
+    )
 
 def filter_detections(
     detections: pd.DataFrame, 
@@ -626,72 +622,41 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     return bin_mask.astype(bool), morphology
 
 def colormap_to_hex(cmap_name):
-    """
-    Convert a matplotlib colormap into a list of discrete HEX colors.
-    
-    Parameters:
-        cmap_name (str): Name of the colormap (e.g., 'viridis', 'plasma', etc.).        
-    Returns:
-        List[str]: List of HEX color strings.
-    """
-    color_number = COLOR_NUMBER
-    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
-    num_colors = color_number[cmap_name]
-    # Get the colormap object
-    cmap = plt.get_cmap(cmap_name)
-    color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
-    hex_colors = [mcolors.to_hex(c) for c in color_values]
-    return hex_colors
+    """Compatibility wrapper for UI-owned prediction rendering."""
+    from UI.prediction_rendering import colormap_to_hex as _colormap_to_hex
+
+    return _colormap_to_hex(cmap_name)
 
 def hex_to_bgr(hex_colors):
-    """
-    Convert a HEX color string to a BGR tuple for OpenCV.
+    """Compatibility wrapper for UI-owned prediction rendering."""
+    from UI.prediction_rendering import hex_to_bgr as _hex_to_bgr
 
-    Parameters:
-        hex_color (str): HEX color string (e.g., '#FF5733').
-    Returns:
-        Tuple[int, int, int]: BGR color tuple.
-    """
-    # Convert HEX to RGB
-    if isinstance(hex_colors, str):  # Single color
-        hex_colors = [hex_colors]
-    bgr_colors = []
-    for hex_color in hex_colors:
-        rgb = [int(c * 255) for c in mcolors.hex2color(hex_color)]
-        bgr_colors.append(tuple(reversed(rgb)))
-    return bgr_colors
+    return _hex_to_bgr(hex_colors)
 
 def denormalize_coordinates(coords, image_shape):
-    """Converts normalized coords to given image coordinates."""
-    return coords * np.array([image_shape[1], image_shape[0]])
+    """Compatibility wrapper for UI-owned prediction rendering."""
+    from UI.prediction_rendering import denormalize_coordinates as _denormalize_coordinates
+
+    return _denormalize_coordinates(coords, image_shape)
 
 def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
                      alpha=0.75, colormap="tab20", color_ids=None):
-    """Draws predicted masks on the image."""
-    hex_colors = hex_to_bgr(colormap_to_hex(colormap))
-    if not pred_masks:
-        print("No masks found.")
-        safe_image_write(image, filename)
-        return image
-    overlay = image.copy()
-    for i, mask in enumerate(pred_masks):
-        coords = np.asarray(mask, dtype=np.float32).reshape(-1, 2)
-        if coords.shape[0] < 3:
-            continue
-        color_index = i if color_ids is None else int(color_ids[i])
-        color = hex_colors[color_index % len(hex_colors)]
-        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
-            coords = denormalize_coordinates(coords, image.shape)
-        coords[:, 0] = np.clip(coords[:, 0], 0, image.shape[1] - 1)
-        coords[:, 1] = np.clip(coords[:, 1], 0, image.shape[0] - 1)
-        coords = np.round(coords).astype(np.int32)
-        if len(np.unique(coords, axis=0)) < 3:
-            continue
-        cv2.fillPoly(overlay, [coords], color)
-    cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
-    safe_image_write(image, filename)
-    return image
+    """Compatibility wrapper for UI-owned prediction rendering."""
+    from UI.prediction_rendering import plot_predictions as _plot_predictions
 
+    return _plot_predictions(
+        image,
+        pred_masks,
+        filename=filename,
+        alpha=alpha,
+        colormap=colormap,
+        color_ids=color_ids,
+    )
+    if False:
+        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
+
+
+            pass
 
 def plot_predictions_with_alignment(
     original_image,
@@ -700,7 +665,8 @@ def plot_predictions_with_alignment(
     filename: str = IMAGE_FILE_NAME_DETECTION,
     colormap="tab20",
     alpha=0.75,
-    color_ids=None
+    color_ids=None,
+    mask_coordinate_space="auto",
 ):
     """
     Plot predictions with automatic dimension alignment.
@@ -720,18 +686,19 @@ def plot_predictions_with_alignment(
     Returns:
         np.ndarray: Image with overlaid masks
     """
-    h, w = img_inference.shape[:2]
-    o_h, o_w = original_image.shape[:2]
-    if h != o_h or w != o_w:
-        original_image = resize_and_pad_cv(original_image, w, h)
-    set_global('image_display_base', original_image.copy())
-    return plot_predictions(
+    from UI.prediction_rendering import (
+        plot_predictions_with_alignment as _plot_predictions_with_alignment,
+    )
+
+    return _plot_predictions_with_alignment(
         original_image,
+        img_inference,
         pred_masks,
         filename=filename,
         colormap=colormap,
         alpha=alpha,
-        color_ids=color_ids
+        color_ids=color_ids,
+        mask_coordinate_space=mask_coordinate_space,
     )
 
 

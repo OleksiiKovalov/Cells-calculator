@@ -118,6 +118,31 @@ def test_safegray2rgb_drops_alpha_channel_for_model_input():
     assert rgb[:, :, 0].max() == 10
 
 
+def test_prediction_alignment_restores_original_image_size(tmp_path):
+    from UI.prediction_rendering import plot_predictions_with_alignment
+
+    output_path = tmp_path / "detections.png"
+    original = np.zeros((509, 512, 3), dtype=np.uint8)
+    inference = np.zeros((512, 512, 3), dtype=np.uint8)
+    masks = [
+        np.array(
+            [[10, 10], [100, 10], [100, 100], [10, 100]],
+            dtype=np.float32,
+        )
+    ]
+
+    rendered = plot_predictions_with_alignment(
+        original,
+        inference,
+        masks,
+        filename=str(output_path),
+        mask_coordinate_space="inference",
+    )
+
+    assert rendered.shape == original.shape
+    assert output_path.exists()
+
+
 def test_countnuclei_blank_channel_is_empty():
     assert NucleiCounter().countNuclei(np.zeros((32, 32), dtype=np.uint8)) == 0
 
@@ -273,12 +298,6 @@ def test_yolo_x10_uses_sahi_nms_postprocess(monkeypatch, tmp_path):
         "read_image",
         lambda path: np.zeros((384, 34, 3), dtype=np.uint8),
     )
-    monkeypatch.setattr(
-        yolo_module,
-        "plot_predictions",
-        lambda image, masks, **kwargs: image,
-    )
-
     segmenter = yolo_module.YoloSegmenter.__new__(yolo_module.YoloSegmenter)
     segmenter.object_size = {
         "color_map": "tab20",

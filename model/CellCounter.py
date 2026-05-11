@@ -3,9 +3,6 @@ In this module the CellCounter class is defined which is used
 to calculate cells on a given contrast microimage.
 """
 
-# Standard library imports
-import os
-
 # Third-party imports
 import cv2
 import numpy as np
@@ -15,7 +12,6 @@ import pandas as pd
 from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE, set_global
 from model.BaseModel import BaseModel
 from model.utils import safe_image_read, safe_image_write
-from model.utils import draw_bounding_box, filter_detections
 from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
 
 
@@ -117,6 +113,7 @@ class CellCounter(BaseModel):
             length = max((height, width))
             image = np.zeros((length, length, 3), np.uint8)
             image[0:height, 0:width] = original_image
+            self.inference_image = image.copy()
 
             # Calculate scale factor
             scale = length / 512
@@ -206,9 +203,6 @@ class CellCounter(BaseModel):
 
         detections = self.detections
         self.object_size["signal"]("set_size", detections["box"].copy())
-        original_image = self.original_image.copy()
-        scale = self.scale
-
         # TODO: in this codeline, calculate max and min squares of obtained bboxes
         # and automatically set them as lower and upper bounds for the filtering
         # sliders if the sliders currently have default values (0 and 10) set up.
@@ -225,36 +219,8 @@ class CellCounter(BaseModel):
         #     max_size=self.object_size["max_size"],
         # )
         filtered_detections = detections
-        for i in range(filtered_detections.shape[0]):
-            draw_bounding_box(
-                original_image,
-                filtered_detections.iloc[i, 0],
-                filtered_detections.iloc[i, 2],
-                round(filtered_detections.iloc[i, 3][0] * scale),
-                round(filtered_detections.iloc[i, 3][1] * scale),
-                round(
-                    (
-                        filtered_detections.iloc[i, -2][0]
-                        + filtered_detections.iloc[i, -2][2]
-                    )
-                    * filtered_detections.iloc[i, -1]
-                ),
-                round(
-                    (
-                        filtered_detections.iloc[i, -2][1]
-                        + filtered_detections.iloc[i, -2][3]
-                    )
-                    * filtered_detections.iloc[i, -1]
-                ),
-            )
-
-        self.prediction_image = original_image
         self.detectionCount = filtered_detections.shape[0]
-        try:
-            os.remove(filename)
-        except:
-            pass
-        safe_image_write(original_image, filename)
+        self.prediction_image = None
 
         return filtered_detections
 

@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 
 from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin
+from UI.app_globals import get_global, set_global
 
 
 class _RangeSliderStub:
@@ -103,3 +104,38 @@ def test_call_inference_reuses_loaded_model_with_same_name(monkeypatch):
         {"img_path": "sample.lsm", "cell_channel": 3, "nuclei_channel": 2}
     ]
     assert plugin.model.cell_counter.original_image_path == "sample.lsm"
+
+
+def test_render_filtered_result_keeps_full_detection_cache(monkeypatch):
+    plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
+    plugin.object_size = {"color_map": "tab20", "alpha": 0.75}
+    full_detections = pd.DataFrame(
+        {
+            "class_id": [0, 0],
+            "confidence": [0.9, 0.8],
+            "box": [np.array([1, 1, 3, 3]), np.array([5, 5, 2, 2])],
+            "scale": [1, 1],
+        }
+    )
+    filtered_detections = full_detections.iloc[:1].copy()
+    cell_counter = SimpleNamespace(
+        original_image=np.zeros((12, 12, 3), dtype=np.uint8),
+        detections=full_detections,
+        prediction_image=None,
+    )
+    model = SimpleNamespace(cell_counter=cell_counter)
+
+    monkeypatch.setattr(
+        "UI.right_layout.plugins.CellDetectorPlugin.render_detector_predictions",
+        lambda image, detections, filename: image,
+    )
+    set_global("detections", full_detections)
+
+    plugin.render_model_result(
+        model,
+        {"Cells": filtered_detections},
+        update_global_detections=False,
+    )
+
+    assert get_global("detections") is full_detections
+    assert cell_counter.prediction_image is not None

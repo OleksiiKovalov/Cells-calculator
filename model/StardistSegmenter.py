@@ -35,14 +35,12 @@ from stardist.models import StarDist2D
 from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
-    plot_predictions,
     plot_mask,
     process_loaded_image,
     resize_and_pad_cv, 
     safegray2rgb, 
     safe_image_write, 
     safe_image_read, 
-    plot_predictions_with_alignment
 )
 from UI.app_globals import (
     IMAGE_FILE_NAME_DETECTION, 
@@ -143,6 +141,7 @@ class StardistSegmenter(BaseModel):
         image_preprocess_settings = self.model_data["image_preprocess"] if "image_preprocess" in self.model_data else self.image_preprocess_settings_default
         img_inference = process_loaded_image(image=image, settings=image_preprocess_settings)
         safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
+        self.inference_image = img_inference.copy()
        
         self.original_image = safegray2rgb(image)
         try:
@@ -164,19 +163,8 @@ class StardistSegmenter(BaseModel):
                     sep=';',
                     index=False
                 )
-            original_image = self.original_image.copy()
-
             filtered_detections = detections
             self.prediction_image = None
-            if plot:
-                self.prediction_image = plot_predictions_with_alignment(
-                    original_image,
-                    img_inference,
-                    filtered_detections["mask"].tolist(),
-                    filename=filename,
-                    colormap=colormap,
-                    alpha=self.object_size.get("alpha", 0.75),
-                )
             return filtered_detections
         
         except Exception as e:

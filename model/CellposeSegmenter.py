@@ -42,8 +42,6 @@ from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
     plot_mask,
-    plot_predictions,
-    plot_predictions_with_alignment,
     process_loaded_image,
     resize_and_pad_cv,
     safe_image_read,
@@ -166,6 +164,7 @@ class CellposeSegmenter(BaseModel):
             image=image, settings=image_preprocess_settings
         )
         safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
+        self.inference_image = img_inference.copy()
         self.original_image = safegray2rgb(image)
         channels_to_use = [0, 0]  # Adapt!
         try:
@@ -194,20 +193,9 @@ class CellposeSegmenter(BaseModel):
                     sep=";",
                     index=False,
                 )
-            original_image = self.original_image.copy()
-
             filtered_detections = detections
 
             self.prediction_image = None
-            if plot:
-                self.prediction_image = plot_predictions_with_alignment(
-                    original_image,
-                    img_inference,
-                    filtered_detections["mask"].tolist(),
-                    filename=filename,
-                    colormap=colormap,
-                    alpha=self.object_size.get("alpha", 0.75),
-                )
             return filtered_detections
         except Exception as e:
             raise RuntimeError(f"Помилка інференсу Cellpose: {e}")

@@ -34,6 +34,7 @@ class BaseModel:
     Implements the necessary high-level functional utils for using the model.
     """
     original_image: np.ndarray | None
+    inference_image: np.ndarray | None
     detections: pd.DataFrame | None
     image_preprocess_settings_default: object
 
@@ -61,6 +62,7 @@ class BaseModel:
         self.path_to_model = path_to_model
         self.object_size = object_size
         self.original_image = None
+        self.inference_image = None
         self.prediction_image = None
         self.detections = None
         self.out_dir = OUT_DIR
