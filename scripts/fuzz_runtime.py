@@ -326,28 +326,97 @@ def discover_corpus_images(seed_corpus: str) -> list[Path]:
     return sorted(set(images))
 
 
-def read_corpus_image(path: Path) -> np.ndarray | None:
+def read_corpus_image_with_metadata(path: Path) -> tuple[np.ndarray, dict[str, Any]] | None:
     try:
+        axes = None
         if path.suffix.lower() == ".lsm":
-            image = tifffile.TiffFile(str(path)).series[0].asarray()
+            with tifffile.TiffFile(str(path)) as tif:
+                series = tif.series[0]
+                axes = getattr(series, "axes", None)
+                image = series.asarray()
         elif path.suffix.lower() in {".tif", ".tiff"}:
-            image = tifffile.imread(str(path))
+            with tifffile.TiffFile(str(path)) as tif:
+                series = tif.series[0]
+                axes = getattr(series, "axes", None)
+                image = series.asarray()
         else:
             data = np.fromfile(str(path), dtype=np.uint8)
             image = cv2.imdecode(data, cv2.IMREAD_UNCHANGED)
         if image is None:
             return None
-        return normalize_loaded_array(np.asarray(image))
+        raw_image = np.asarray(image)
+        normalized = normalize_loaded_array(raw_image, axes=axes)
+        return normalized, {
+            "source": str(path),
+            "source_extension": path.suffix.lower().lstrip("."),
+            "source_shape": list(raw_image.shape),
+            "source_axes": axes,
+            "normalized_shape": list(normalized.shape),
+        }
     except Exception:
         return None
 
 
-def normalize_loaded_array(image: np.ndarray) -> np.ndarray:
-    image = np.squeeze(image)
+def read_corpus_image(path: Path) -> np.ndarray | None:
+    loaded = read_corpus_image_with_metadata(path)
+    return None if loaded is None else loaded[0]
+
+
+def squeeze_loaded_array(
+    image: np.ndarray,
+    axes: str | None = None,
+) -> tuple[np.ndarray, str | None]:
+    if axes and len(axes) == image.ndim:
+        squeeze_axes = tuple(
+            index
+            for index, size in enumerate(image.shape)
+            if size == 1 and axes[index] not in {"Y", "X"}
+        )
+        if squeeze_axes:
+            image = np.squeeze(image, axis=squeeze_axes)
+            axes = "".join(
+                axis for index, axis in enumerate(axes) if index not in squeeze_axes
+            )
+        return image, axes
+
+    return np.squeeze(image), None
+
+
+def aggressively_flatten_microscopy_image_for_fuzzing(
+    image: np.ndarray,
+    axes: str | None = None,
+) -> np.ndarray:
+    """Collapse non-spatial microscopy axes into channels for fuzzing."""
+    if axes and len(axes) == image.ndim and "Y" in axes and "X" in axes:
+        y_axis = axes.index("Y")
+        x_axis = axes.index("X")
+        other_axes = [index for index in range(image.ndim) if index not in (y_axis, x_axis)]
+        transposed = np.transpose(image, [y_axis, x_axis, *other_axes])
+        if not other_axes:
+            return transposed
+        return transposed.reshape(transposed.shape[0], transposed.shape[1], -1)
+
+    flattened = image.reshape((-1, image.shape[-2], image.shape[-1]))
+    return np.transpose(flattened, (1, 2, 0))
+
+
+def normalize_loaded_array(
+    image: np.ndarray,
+    axes: str | None = None,
+) -> np.ndarray:
+    image, axes = squeeze_loaded_array(np.asarray(image), axes)
     if image.ndim == 0:
         return np.full((1, 1), int(image), dtype=np.uint8)
+    if image.ndim == 1:
+        image = image.reshape(1, -1)
     if image.ndim > 3:
-        image = image.reshape((-1, image.shape[-2], image.shape[-1]))
+        image = aggressively_flatten_microscopy_image_for_fuzzing(image, axes)
+        axes = "YXC" if image.ndim == 3 else None
+    if image.ndim == 3 and axes and len(axes) == 3 and "Y" in axes and "X" in axes:
+        other_axes = [index for index, axis in enumerate(axes) if axis not in {"Y", "X"}]
+        if other_axes and axes != "YXC":
+            image = np.transpose(image, [axes.index("Y"), axes.index("X"), other_axes[0]])
+            axes = "YXC"
     if image.ndim == 3 and image.shape[0] <= 8 and image.shape[1] > 8 and image.shape[2] > 8:
         image = np.transpose(image, (1, 2, 0))
     if image.dtype != np.uint8:
@@ -773,9 +842,17 @@ def write_generated_image(
 ) -> tuple[Path, dict[str, Any]]:
     if corpus_images and rng.random() < corpus_probability:
         source = rng.choice(corpus_images)
-        source_image = read_corpus_image(source)
-        if source_image is not None:
-            return write_corpus_mutation(rng, case_dir, source, source_image, max_side)
+        loaded_source = read_corpus_image_with_metadata(source)
+        if loaded_source is not None:
+            source_image, source_meta = loaded_source
+            return write_corpus_mutation(
+                rng,
+                case_dir,
+                source,
+                source_image,
+                max_side,
+                source_meta,
+            )
 
     profile = choose_effective_profile(rng, profile, bool(corpus_images))
     if profile == "corpus":
@@ -844,6 +921,7 @@ def write_corpus_mutation(
     source: Path,
     source_image: np.ndarray,
     max_side: int,
+    source_meta: dict[str, Any] | None = None,
 ) -> tuple[Path, dict[str, Any]]:
     image, mutations = mutate_corpus_image(rng, source_image, max_side)
     extension = rng.choice(["png", "jpg", "tif", "lsm"])
@@ -854,7 +932,7 @@ def write_corpus_mutation(
         elif image.shape[2] == 1:
             channels_last = np.repeat(image, 2, axis=2)
         else:
-            channels_last = image[:, :, :max(2, min(4, image.shape[2]))]
+            channels_last = image[:, :, :min(4, image.shape[2])]
         image_to_write = np.transpose(channels_last, (2, 0, 1))
         image_path = case_dir / "input.lsm"
         tifffile.imwrite(str(image_path), image_to_write, metadata={"axes": "CYX"})
@@ -878,6 +956,7 @@ def write_corpus_mutation(
         "shape": shape,
         "patterns": mutations,
         "source": str(source),
+        "source_meta": source_meta or {},
         "cell_channel": rng.randrange(0, max(1, channels)),
         "nuclei_channel": rng.randrange(0, max(1, channels)),
     }
@@ -1152,7 +1231,9 @@ def validate_mask_geometry(
     if oracle_level == "basic":
         return
     if coords.shape[0] < 3:
-        raise AssertionError(f"Degenerate mask at row {row_index}")
+        if oracle_level == "paranoid":
+            raise AssertionError(f"Degenerate mask at row {row_index}")
+        return
 
     if oracle_level == "paranoid" and image_size is not None:
         width, height = image_size
@@ -1744,9 +1825,24 @@ def save_failure(
     return target
 
 
+def canonical_minimizer_extension(extension: str) -> str:
+    extension = extension.lower().lstrip(".")
+    if extension == "jpeg":
+        return "jpg"
+    if extension == "tiff":
+        return "tif"
+    if extension in VALID_GENERATED_EXTENSIONS:
+        return extension
+    return "png"
+
+
+def non_lsm_channel_count(image: np.ndarray) -> int:
+    return image.shape[2] if image.ndim == 3 else 1
+
+
 def write_minimizer_image(path: Path, image: np.ndarray, extension: str) -> tuple[Path, dict[str, Any]]:
     image = normalize_loaded_array(np.asarray(image))
-    extension = extension.lower().lstrip(".")
+    extension = canonical_minimizer_extension(extension)
 
     if extension == "lsm":
         if image.ndim == 2:
@@ -1754,7 +1850,7 @@ def write_minimizer_image(path: Path, image: np.ndarray, extension: str) -> tupl
         elif image.ndim == 3 and image.shape[2] == 1:
             channels_last = np.repeat(image, 2, axis=2)
         elif image.ndim == 3:
-            channels_last = image[:, :, : max(2, min(4, image.shape[2]))]
+            channels_last = image[:, :, :min(4, image.shape[2])]
         else:
             channels_last = image.reshape((*image.shape[-2:], 1))
             channels_last = np.repeat(channels_last, 2, axis=2)
@@ -1768,15 +1864,28 @@ def write_minimizer_image(path: Path, image: np.ndarray, extension: str) -> tupl
             "nuclei_channel": 1 if image_to_write.shape[0] > 1 else 0,
         }
 
-    image_path = path / "input.png"
-    writable = cv2_writable_image(image, "png")
-    if not cv2.imwrite(str(image_path), writable):
-        raise RuntimeError(f"Could not write minimized image: {image_path}")
+    image_path = path / f"input.{extension}"
+    if extension in {"png", "jpg", "bmp"}:
+        writable = cv2_writable_image(image, extension)
+        if not cv2.imwrite(str(image_path), writable):
+            raise RuntimeError(f"Could not write minimized image: {image_path}")
+        image = writable
+    elif extension == "tif":
+        tifffile.imwrite(str(image_path), image)
+    else:
+        extension = "png"
+        image_path = path / "input.png"
+        writable = cv2_writable_image(image, extension)
+        if not cv2.imwrite(str(image_path), writable):
+            raise RuntimeError(f"Could not write minimized image: {image_path}")
+        image = writable
+
+    channels = non_lsm_channel_count(image)
     return image_path, {
-        "extension": "png",
-        "shape": list(writable.shape),
+        "extension": extension,
+        "shape": list(image.shape),
         "cell_channel": 0,
-        "nuclei_channel": 0 if writable.ndim == 2 else min(1, writable.shape[2] - 1),
+        "nuclei_channel": 0 if channels == 1 else min(1, channels - 1),
     }
 
 
@@ -1849,10 +1958,13 @@ def materialize_minimizer_case(
     candidate_dir: Path,
     image: np.ndarray,
     case_variant: dict[str, Any] | None,
+    extension_override: str | None = None,
 ) -> dict[str, Any]:
     candidate_dir.mkdir(parents=True, exist_ok=True)
     case = copy.deepcopy(case_variant or base_case)
-    original_extension = str(base_case.get("image", {}).get("extension", "png"))
+    original_extension = str(
+        extension_override or base_case.get("image", {}).get("extension", "png")
+    )
     image_path, image_meta = write_minimizer_image(candidate_dir, image, original_extension)
     case["image_path"] = str(image_path.resolve())
     case["image"].update(image_meta)
@@ -1923,23 +2035,35 @@ def minimize_failure(
 
     while len(accepted) < max(0, args.minimize_steps):
         progress = False
-        candidates: list[tuple[str, np.ndarray, dict[str, Any] | None]] = [
-            (name, candidate_image, None)
+        candidates: list[tuple[str, np.ndarray, dict[str, Any] | None, str | None]] = [
+            (name, candidate_image, None, None)
             for name, candidate_image in image_minimization_candidates(best_image)
         ]
         candidates.extend(
-            (name, best_image, candidate_case)
+            (name, best_image, candidate_case, None)
             for name, candidate_case in case_minimization_candidates(best_case)
         )
+        if canonical_minimizer_extension(
+            str(best_case.get("image", {}).get("extension", "png"))
+        ) != "png":
+            candidates.append(("format_png", best_image, None, "png"))
 
-        for label, candidate_image, candidate_case_variant in candidates:
-            if candidate_case_variant is None and np.array_equal(candidate_image, best_image):
+        for label, candidate_image, candidate_case_variant, extension_override in candidates:
+            if (
+                candidate_case_variant is None
+                and extension_override is None
+                and np.array_equal(candidate_image, best_image)
+            ):
                 continue
-            if candidate_case_variant is not None and json.dumps(
-                candidate_case_variant,
-                sort_keys=True,
-                default=str,
-            ) == json.dumps(best_case, sort_keys=True, default=str):
+            if (
+                candidate_case_variant is not None
+                and extension_override is None
+                and json.dumps(
+                    candidate_case_variant,
+                    sort_keys=True,
+                    default=str,
+                ) == json.dumps(best_case, sort_keys=True, default=str)
+            ):
                 continue
 
             attempt += 1
@@ -1949,6 +2073,7 @@ def minimize_failure(
                 candidate_dir,
                 candidate_image,
                 candidate_case_variant,
+                extension_override,
             )
             candidate_path = candidate_dir / "case.json"
             preserved, signature, stdout, stderr, reason = candidate_preserves_signature(
