@@ -36,6 +36,7 @@ from UI.prediction_rendering import (
 from UI.rangeslider import RangeSlider
 from UI.right_layout.plugins.BasePlugin import BasePlugin
 from model.Model import Model
+from model.PredictionResult import unwrap_prediction_cells
 from model.utils import create_image_grid, filter_segmentation_detections, safe_image_write
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE
 
@@ -546,7 +547,9 @@ class CellDetectorPlugin(BasePlugin):
             'detections',
             self.model.cell_counter.detections
             if self.model and self.model.cell_counter
-            else result.get('Cells') if isinstance(result, dict) else None,
+            else unwrap_prediction_cells(result.get('Cells'))
+            if isinstance(result, dict)
+            else None,
         )
         
         # Create QGraphicsTextItems to display the results
@@ -642,16 +645,19 @@ class CellDetectorPlugin(BasePlugin):
             return None
 
         cell_counter = model.cell_counter
-        detections = (
+        raw_detections = (
             result.get("Cells")
             if isinstance(result, dict) and "Cells" in result
             else getattr(cell_counter, "detections", None)
         )
+        detections = unwrap_prediction_cells(raw_detections)
         if detections is None:
             return None
         if not hasattr(detections, "columns"):
             return None
-        source_detections = getattr(cell_counter, "detections", None)
+        source_detections = unwrap_prediction_cells(
+            getattr(cell_counter, "detections", None)
+        )
         if source_detections is None or not hasattr(source_detections, "columns"):
             source_detections = detections
 

@@ -343,7 +343,7 @@ def test_yolo_x10_uses_sahi_nms_postprocess(request, monkeypatch, tmp_path):
 
     assert calls == ["NMS"]
     assert result.shape[0] == 1
-    assert np.array_equal(result.attrs["original_image"], source_image)
-    assert np.array_equal(result.attrs["inference_image"], source_image)
+    assert np.array_equal(result.original_image, source_image)
+    assert np.array_equal(result.inference_image, source_image)
     assert not output_path.exists()
     assert getattr(segmenter, "inference_image", None) is None

@@ -98,6 +98,7 @@ class CellCounter(BaseModel):
             - Confidence threshold: 0.2
         """
         # Read the input image
+        inference_image = getattr(self, "_last_inference_image", None)
         if self.detections is None:
             original_image: np.ndarray = safe_image_read(
                 input_image, color_mode="color"
@@ -111,6 +112,7 @@ class CellCounter(BaseModel):
             length = max((height, width))
             image = np.zeros((length, length, 3), np.uint8)
             image[0:height, 0:width] = original_image
+            inference_image = image
 
             # Calculate scale factor
             scale = length / 512
@@ -176,11 +178,6 @@ class CellCounter(BaseModel):
                 columns=["class_id", "class_name", "confidence", "box", "scale"],
             )
             self.detections = detections
-            self._attach_prediction_images(
-                self.detections,
-                original_image=self.original_image,
-                inference_image=image,
-            )
             csv_data = self.detections.copy()
             csv_data["width"] = csv_data["box"].apply(
                 lambda b: b[2] / length if b is not None else None
@@ -218,9 +215,12 @@ class CellCounter(BaseModel):
         #     max_size=self.object_size["max_size"],
         # )
         filtered_detections = detections
-        self._copy_prediction_images(filtered_detections, self.detections)
         self.detectionCount = filtered_detections.shape[0]
         self.prediction_image = None
 
-        return filtered_detections
+        return self._prediction_result(
+            filtered_detections,
+            original_image=self.original_image,
+            inference_image=inference_image,
+        )
 

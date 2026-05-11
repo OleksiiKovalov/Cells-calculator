@@ -137,11 +137,6 @@ class YoloSegmenter(BaseModel):
         self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
         if outputs.masks is None:
             self.detections = pd.DataFrame(columns=self.DETECTION_COLUMNS)
-            self._attach_prediction_images(
-                self.detections,
-                original_image=self.original_image,
-                inference_image=inference_image,
-            )
             self.object_size['signal']("set_size", self.detections['box'].copy())
             self.detections[['id_label', 'confidence', 'diameter', 'area', 'volume']].to_csv(
                 self.out_dir / "cell_data.csv",
@@ -149,7 +144,11 @@ class YoloSegmenter(BaseModel):
                 index=False
             )
             self.prediction_image = None
-            return self.detections
+            return self._prediction_result(
+                self.detections,
+                original_image=self.original_image,
+                inference_image=inference_image,
+            )
         self.detections = results_to_pandas(outputs, store_bin_mask)
         self.detections['box'] = self.detections['box'].apply(
             lambda b: b * np.array([self.w, self.h, self.w, self.h])
@@ -168,15 +167,13 @@ class YoloSegmenter(BaseModel):
         if tracking is False:
             self.object_size['signal']("set_size", self.detections.copy())
         filtered_detections = detections
-        self._attach_prediction_images(
-            self.detections,
+
+        self.prediction_image = None
+        return self._prediction_result(
+            filtered_detections,
             original_image=self.original_image,
             inference_image=inference_image,
         )
-        self._copy_prediction_images(filtered_detections, self.detections)
-
-        self.prediction_image = None
-        return filtered_detections
 
     def count_x10(
         self,
@@ -210,21 +207,19 @@ class YoloSegmenter(BaseModel):
         """
         if self.detections is None or self.original_image is None:
             self.original_image = read_image(input_image)
-            inference_image = self.original_image.copy()
             outputs = self._get_sahi_predictions(input_image)
             self.h, self.w = self.original_image.shape[0], self.original_image.shape[1]
             self.detections = sahi_to_pandas(outputs, self.h, self.w)
-            self._attach_prediction_images(
-                self.detections,
-                original_image=self.original_image,
-                inference_image=inference_image,
-            )
             self.object_size['signal']("set_size", self.detections.copy())
 
         detections = self.detections[self.detections['confidence'] >= min_score]
 
         filtered_detections = detections
-        self._copy_prediction_images(filtered_detections, self.detections)
+        inference_image = self.original_image.copy()
         
         self.prediction_image = None
-        return filtered_detections
+        return self._prediction_result(
+            filtered_detections,
+            original_image=self.original_image,
+            inference_image=inference_image,
+        )

@@ -12,6 +12,7 @@ from UI.app_globals import (
     IMAGE_FILE_NAME_INGFERENCE,
     set_global,
 )
+from model.PredictionResult import get_prediction_images
 
 
 CLASSES = ["Cell"]
@@ -73,23 +74,7 @@ def _copy_image(image):
 
 def get_prediction_image_artifacts(result):
     """Extract raw original/inference images from a model result."""
-    detections = (
-        result.get("Cells")
-        if isinstance(result, dict) and "Cells" in result
-        else result
-    )
-    attrs = getattr(detections, "attrs", {}) or {}
-
-    original_image = result.get("original_image") if isinstance(result, dict) else None
-    inference_image = (
-        result.get("inference_image") if isinstance(result, dict) else None
-    )
-    if original_image is None:
-        original_image = attrs.get("original_image")
-    if inference_image is None:
-        inference_image = attrs.get("inference_image")
-
-    return original_image, inference_image
+    return get_prediction_images(result)
 
 
 def publish_inference_image(

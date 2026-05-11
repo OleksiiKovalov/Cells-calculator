@@ -32,6 +32,7 @@ from UI.app_globals import (
     IMAGE_FILE_NAME_TMP,
     CASH_DIRECTORY
 )
+from model.PredictionResult import unwrap_prediction_cells
 
 
 
@@ -282,6 +283,7 @@ def extract_nuclei_channel(img_path, nuclei_channel=1):
 
 def count_detected_objects(detections) -> int:
     """Returns the number of detected objects for detector- and segmenter-style outputs."""
+    detections = unwrap_prediction_cells(detections)
     if detections is None:
         return 0
     if hasattr(detections, "shape"):

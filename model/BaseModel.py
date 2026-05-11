@@ -20,6 +20,7 @@ from UI.app_globals import (
     IMAGE_FILE_NAME_DETECTION,
     IMAGE_FILE_NAME_TMP,
 )
+from model.PredictionResult import PredictionResult, count_prediction_cells
 
 
 OUT_DIR = Path("cellprocesser_output")
@@ -61,6 +62,8 @@ class BaseModel:
         self.object_size = object_size
         self.original_image = None
         self.inference_image = None
+        self._last_original_image = None
+        self._last_inference_image = None
         self.prediction_image = None
         self.detections = None
         self.out_dir = OUT_DIR
@@ -108,46 +111,31 @@ class BaseModel:
             return 0
         return detections
 
-    def _attach_prediction_images(
+    def _prediction_result(
         self,
-        detections,
+        cells,
         *,
         original_image=None,
         inference_image=None,
     ):
-        """Attach raw image artifacts to DataFrame results without UI side effects."""
-        if detections is None or not hasattr(detections, "attrs"):
-            return detections
-
-        if original_image is not None:
-            detections.attrs["original_image"] = (
-                original_image.copy()
-                if hasattr(original_image, "copy")
-                else original_image
-            )
-        if inference_image is not None:
-            detections.attrs["inference_image"] = (
-                inference_image.copy()
-                if hasattr(inference_image, "copy")
-                else inference_image
-            )
-        return detections
-
-    def _copy_prediction_images(self, detections, source):
-        """Copy raw image artifacts from one DataFrame result to another."""
-        if (
-            detections is None
-            or source is None
-            or not hasattr(detections, "attrs")
-            or not hasattr(source, "attrs")
-        ):
-            return detections
-
-        for key in ("original_image", "inference_image"):
-            image = source.attrs.get(key)
-            if image is not None:
-                detections.attrs[key] = image.copy() if hasattr(image, "copy") else image
-        return detections
+        """Build an explicit raw prediction result without UI side effects."""
+        original = (
+            original_image.copy()
+            if hasattr(original_image, "copy")
+            else original_image
+        )
+        inference = (
+            inference_image.copy()
+            if hasattr(inference_image, "copy")
+            else inference_image
+        )
+        self._last_original_image = original
+        self._last_inference_image = inference
+        return PredictionResult(
+            cells=cells,
+            original_image=original,
+            inference_image=inference,
+        )
 
     def count(self, input_image, scale: int = 20, filename=IMAGE_FILE_NAME_DETECTION):
         """
@@ -179,7 +167,7 @@ class BaseModel:
             result =  self.count_x10(input_image, filename=filename)
         end_time = time.time()
         self.inference_duration = end_time - start_time
-        self.detectionCount = len(result) if result is not None else 0
+        self.detectionCount = count_prediction_cells(result)
 
         return result
 

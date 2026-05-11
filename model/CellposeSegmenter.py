@@ -170,11 +170,6 @@ class CellposeSegmenter(BaseModel):
                 image_shape_for_norm=image.shape[:2], # Or masks.shape[:2] if appropriate
                 store_bin_mask=False # Set to True if you need the binary masks in the DataFrame
             )
-            self._attach_prediction_images(
-                self.detections,
-                original_image=self.original_image,
-                inference_image=img_inference,
-            )
             detections = self.detections[self.detections["confidence"] >= min_score]
             if tracking is False:
                 self.object_size["signal"](
@@ -190,10 +185,13 @@ class CellposeSegmenter(BaseModel):
                     index=False,
                 )
             filtered_detections = detections
-            self._copy_prediction_images(filtered_detections, self.detections)
 
             self.prediction_image = None
-            return filtered_detections
+            return self._prediction_result(
+                filtered_detections,
+                original_image=self.original_image,
+                inference_image=img_inference,
+            )
         except Exception as e:
             raise RuntimeError(f"Помилка інференсу Cellpose: {e}")
         

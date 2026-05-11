@@ -147,11 +147,6 @@ class StardistSegmenter(BaseModel):
                 original_shape=image.shape[:2],
                 inference_shape=img_inference.shape[:2]
             )
-            self._attach_prediction_images(
-                self.detections,
-                original_image=self.original_image,
-                inference_image=img_inference,
-            )
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
                 self.object_size['signal']("set_size", self.detections.copy())
@@ -163,9 +158,12 @@ class StardistSegmenter(BaseModel):
                     index=False
                 )
             filtered_detections = detections
-            self._copy_prediction_images(filtered_detections, self.detections)
             self.prediction_image = None
-            return filtered_detections
+            return self._prediction_result(
+                filtered_detections,
+                original_image=self.original_image,
+                inference_image=img_inference,
+            )
         
         except Exception as e:
             traceback.print_exc()
