@@ -88,6 +88,31 @@ def _fake_stardist_modules():
     }
 
 
+def _fake_yolo_modules():
+    fake_ultralytics = types.ModuleType("ultralytics")
+    fake_ultralytics.YOLO = object
+
+    fake_sahi = types.ModuleType("sahi")
+    fake_auto_model = types.ModuleType("sahi.auto_model")
+    fake_auto_model.AutoDetectionModel = types.SimpleNamespace(
+        from_pretrained=lambda **kwargs: object()
+    )
+    fake_predict = types.ModuleType("sahi.predict")
+    fake_predict.get_sliced_prediction = None
+    fake_utils_pkg = types.ModuleType("sahi.utils")
+    fake_cv = types.ModuleType("sahi.utils.cv")
+    fake_cv.read_image = None
+
+    return {
+        "ultralytics": fake_ultralytics,
+        "sahi": fake_sahi,
+        "sahi.auto_model": fake_auto_model,
+        "sahi.predict": fake_predict,
+        "sahi.utils": fake_utils_pkg,
+        "sahi.utils.cv": fake_cv,
+    }
+
+
 def test_plot_mask_none_returns_empty_mask_instead_of_crashing():
     mask, morphology = model_utils.plot_mask(None, image_size=(16, 16))
 
@@ -268,10 +293,16 @@ def test_stardist_skips_instance_when_no_usable_contour_exists(
     assert result.empty
 
 
-def test_yolo_x10_uses_sahi_nms_postprocess(monkeypatch, tmp_path):
-    from model import YOLOSegmenter as yolo_module
+def test_yolo_x10_uses_sahi_nms_postprocess(request, monkeypatch, tmp_path):
+    yolo_module = _import_with_fakes(
+        request,
+        monkeypatch,
+        "model.YOLOSegmenter",
+        _fake_yolo_modules(),
+    )
 
     calls = []
+    source_image = np.zeros((384, 34, 3), dtype=np.uint8)
 
     class _FakeSlicedPrediction:
         def to_coco_predictions(self):
@@ -296,7 +327,7 @@ def test_yolo_x10_uses_sahi_nms_postprocess(monkeypatch, tmp_path):
     monkeypatch.setattr(
         yolo_module,
         "read_image",
-        lambda path: np.zeros((384, 34, 3), dtype=np.uint8),
+        lambda path: source_image,
     )
     segmenter = yolo_module.YoloSegmenter.__new__(yolo_module.YoloSegmenter)
     segmenter.object_size = {
@@ -307,10 +338,12 @@ def test_yolo_x10_uses_sahi_nms_postprocess(monkeypatch, tmp_path):
     segmenter.original_image = None
     segmenter.model_x10 = object()
 
-    result = segmenter.count_x10(
-        "narrow.tif",
-        filename=str(tmp_path / "detections.png"),
-    )
+    output_path = tmp_path / "detections.png"
+    result = segmenter.count_x10("narrow.tif", filename=str(output_path))
 
     assert calls == ["NMS"]
     assert result.shape[0] == 1
+    assert np.array_equal(result.attrs["original_image"], source_image)
+    assert np.array_equal(result.attrs["inference_image"], source_image)
+    assert not output_path.exists()
+    assert getattr(segmenter, "inference_image", None) is None

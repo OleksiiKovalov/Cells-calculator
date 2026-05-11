@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 
+import UI.right_layout.plugins.CellDetectorPlugin as plugin_module
 from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin
 from UI.app_globals import get_global, set_global
 
@@ -35,6 +36,36 @@ class _ReusableModelStub:
     def calculate(self, **kwargs):
         self.calls.append(kwargs)
         return {"Cells": 1, "Nuclei": -100, "%": -100}
+
+
+class _ArtifactModelStub:
+    def __init__(self, model_name):
+        self.model_name = model_name
+        self.path = "already-loaded-model"
+        self.calls = []
+        self.original_image = np.full((7, 8, 3), 30, dtype=np.uint8)
+        self.inference_image = np.full((9, 10, 3), 90, dtype=np.uint8)
+        self.detections = pd.DataFrame(
+            {
+                "class_id": [0],
+                "confidence": [0.9],
+                "box": [np.array([1, 1, 2, 2])],
+                "scale": [1],
+            }
+        )
+        self.detections.attrs["original_image"] = self.original_image
+        self.detections.attrs["inference_image"] = self.inference_image
+        self.cell_counter = SimpleNamespace(
+            original_image_path=None,
+            original_image=None,
+            inference_image=None,
+            detections=self.detections,
+            prediction_image=None,
+        )
+
+    def calculate(self, **kwargs):
+        self.calls.append(kwargs)
+        return {"Cells": self.detections, "Nuclei": -100, "%": -100}
 
 
 def _build_plugin():
@@ -126,6 +157,110 @@ def test_publish_inference_image_from_result_attrs(tmp_path):
     assert output_path.exists()
     assert np.array_equal(get_global("image_inference"), inference_image)
     assert np.array_equal(model.cell_counter.inference_image, inference_image)
+
+
+def test_call_inference_publishes_returned_inference_image(monkeypatch, tmp_path):
+    from UI.prediction_rendering import publish_inference_image
+
+    plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
+    plugin.model = _ArtifactModelStub("Detector")
+    plugin.models = {
+        "Detector": {
+            "path": "already-loaded-model",
+            "object_size": {},
+            "model_type": "cellcounter",
+        }
+    }
+    plugin.lsm_path = "sample.png"
+    plugin.parametrs = {"Cell": 3, "Nuclei": 2}
+    plugin.plugin_signal = _SignalStub()
+    plugin.draw_bounding = 0
+    output_path = tmp_path / "inference.png"
+
+    monkeypatch.setattr(
+        plugin_module,
+        "publish_inference_image",
+        lambda model, result: publish_inference_image(
+            model,
+            result,
+            filename=str(output_path),
+        ),
+    )
+    plugin.render_model_result = lambda model, result: None
+    set_global("image_inference", None)
+
+    result = plugin.call_inference("Detector")
+
+    assert result["Cells"] is plugin.model.detections
+    assert output_path.exists()
+    assert np.array_equal(
+        get_global("image_inference"),
+        plugin.model.inference_image,
+    )
+    assert np.array_equal(
+        plugin.model.cell_counter.inference_image,
+        plugin.model.inference_image,
+    )
+
+
+def test_render_model_result_uses_result_attrs_for_segmentation(monkeypatch):
+    plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
+    plugin.object_size = {"color_map": "tab20", "alpha": 0.75}
+    original_image = np.full((12, 13, 3), 40, dtype=np.uint8)
+    inference_image = np.full((16, 17, 3), 80, dtype=np.uint8)
+    detections = pd.DataFrame(
+        {
+            "id_label": [1],
+            "confidence": [0.9],
+            "area": [0.1],
+            "mask": [
+                np.array([[0, 0], [1, 0], [1, 1], [0, 1]], dtype=np.float32)
+            ],
+        }
+    )
+    detections.attrs["original_image"] = original_image
+    detections.attrs["inference_image"] = inference_image
+    cell_counter = SimpleNamespace(
+        original_image=None,
+        inference_image=None,
+        detections=detections,
+        prediction_image=None,
+    )
+    model = SimpleNamespace(cell_counter=cell_counter)
+    captured = {}
+
+    def fake_plot_predictions_with_alignment(
+        original,
+        inference,
+        pred_masks,
+        filename,
+        colormap,
+        alpha,
+        color_ids,
+        mask_coordinate_space,
+    ):
+        captured["original"] = original
+        captured["inference"] = inference
+        captured["pred_masks"] = pred_masks
+        captured["color_ids"] = color_ids
+        return original
+
+    monkeypatch.setattr(
+        plugin_module,
+        "plot_predictions_with_alignment",
+        fake_plot_predictions_with_alignment,
+    )
+    set_global("image_display_base", None)
+    set_global("image_inference", None)
+
+    rendered = plugin.render_model_result(model, {"Cells": detections})
+
+    assert np.array_equal(captured["original"], original_image)
+    assert np.array_equal(captured["inference"], inference_image)
+    assert len(captured["pred_masks"]) == 1
+    assert np.array_equal(captured["pred_masks"][0], detections["mask"].iloc[0])
+    assert captured["color_ids"] == [1]
+    assert cell_counter.prediction_image is rendered
 
 
 def test_render_filtered_result_keeps_full_detection_cache(monkeypatch):
