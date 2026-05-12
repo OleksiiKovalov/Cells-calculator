@@ -28,7 +28,7 @@ from skimage.io import imread
 from UI.app_globals import get_global
 from UI.errorhandling import connect_to_log_events
 from UI.ImageNormalizeDialog import ImageNormalizeDialog
-from UI.menubar import menubar
+from UI.menubar import MenuBar
 from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin as CellDetector_plugin
 from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugin
 from UI.right_layout.right_layout import right_layout
@@ -87,7 +87,7 @@ class MainWindow(QMainWindow):
         
         self._update_progress(60, "Initializing menu bar...")
         # Initialize the user interface
-        self.menu_bar = menubar(self, list(self.plugin_list.keys()), self.current_plugin_name)
+        self.menu_bar = MenuBar(self, list(self.plugin_list.keys()), self.current_plugin_name)
         self.setMenuBar(self.menu_bar)
         
         self._update_progress(75, "Setting up right panel...")
