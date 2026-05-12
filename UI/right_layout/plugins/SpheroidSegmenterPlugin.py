@@ -20,8 +20,8 @@ from PyQt5.QtWidgets import (
 
 # Local application imports
 from UI.Slider import Slider
+from UI.app_globals import IMAGE_FILE_NAME_DETECTION
 from UI.right_layout.plugins.BasePlugin import BasePlugin
-from model.utils import IMAGE_FILE_NAME_DETECTION
 
 
 class SpheroidSegmenterPlugin(BasePlugin):

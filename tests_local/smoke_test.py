@@ -70,7 +70,7 @@ def run_model_on_image(model_path: str, image_path: str, model_type: str = "yolo
     elif hasattr(model, 'calculate'):
         results = model.calculate(image_path)
     elif hasattr(model, 'count_x20'):
-        results = model.count_x20(input_image=image_path, tracking=True, plot=False)
+        results = model.count_x20(input_image=image_path, tracking=True)
     else:
         raise AttributeError(f"Class {type(model).__name__} doesn't have methods 'predict', 'calculate' or 'count_x20'")
     return {

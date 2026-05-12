@@ -9,8 +9,6 @@ from typing import Any
 
 # Third-party imports
 import cv2
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
@@ -24,33 +22,15 @@ from skimage.transform import resize
 from ultralytics.engine.results import Results
 
 # Local application imports
-from UI.app_globals import set_global
 from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_GRID,
-    IMAGE_FILE_NAME_INGFERENCE,
     IMAGE_FILE_NAME_TMP,
     CASH_DIRECTORY
 )
+from model.PredictionResult import unwrap_prediction_cells
 
 
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'bmp', 'lsm']
-CLASSES = ['Cell']
-COLORS = [(3, 177, 252)]
-COLOR_NUMBER = {
-    "gist_rainbow": 20,
-    "tab20": 20,
-    "tab20b": 20,
-    "tab20c": 20,
-    "tab10": 10,
-    "Set1": 9,
-    "Set2": 8,
-    "Set3": 12,
-    "Paired": 12,
-    "viridis": 10,
-    "plasma": 10
-}
 
 
 def read_lsm_array(img_path):
@@ -282,6 +262,7 @@ def extract_nuclei_channel(img_path, nuclei_channel=1):
 
 def count_detected_objects(detections) -> int:
     """Returns the number of detected objects for detector- and segmenter-style outputs."""
+    detections = unwrap_prediction_cells(detections)
     if detections is None:
         return 0
     if hasattr(detections, "shape"):
@@ -349,27 +330,6 @@ def calculate_lsm(cell_counter, nuclei_counter,
         nuclei_count
     )
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
-
-
-
-def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
-    """
-    Draws bounding boxes on the input image.
-
-    Args:
-        img (numpy.ndarray): The input image to draw the bounding box on.
-        x (int): X-coordinate of the top-left corner of the bounding box.
-        y (int): Y-coordinate of the top-left corner of the bounding box.
-        x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
-        y_plus_h (int): Y-coordinate of the bottom-right corner of the bounding box.
-        draw_mode (int): 0 for rectangle, other for circle.
-    """
-    color = COLORS[0]
-    thickness = 1 if img.shape[0] < 800 else 2
-    if draw_mode == 0:
-        cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
-    else:
-        cv2.circle(img, (x, y), 2, color, -1)
 
 def filter_detections(
     detections: pd.DataFrame, 
@@ -624,116 +584,6 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     cv2.fillPoly(bin_mask, [coords], (1,))
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
-
-def colormap_to_hex(cmap_name):
-    """
-    Convert a matplotlib colormap into a list of discrete HEX colors.
-    
-    Parameters:
-        cmap_name (str): Name of the colormap (e.g., 'viridis', 'plasma', etc.).        
-    Returns:
-        List[str]: List of HEX color strings.
-    """
-    color_number = COLOR_NUMBER
-    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
-    num_colors = color_number[cmap_name]
-    # Get the colormap object
-    cmap = plt.get_cmap(cmap_name)
-    color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
-    hex_colors = [mcolors.to_hex(c) for c in color_values]
-    return hex_colors
-
-def hex_to_bgr(hex_colors):
-    """
-    Convert a HEX color string to a BGR tuple for OpenCV.
-
-    Parameters:
-        hex_color (str): HEX color string (e.g., '#FF5733').
-    Returns:
-        Tuple[int, int, int]: BGR color tuple.
-    """
-    # Convert HEX to RGB
-    if isinstance(hex_colors, str):  # Single color
-        hex_colors = [hex_colors]
-    bgr_colors = []
-    for hex_color in hex_colors:
-        rgb = [int(c * 255) for c in mcolors.hex2color(hex_color)]
-        bgr_colors.append(tuple(reversed(rgb)))
-    return bgr_colors
-
-def denormalize_coordinates(coords, image_shape):
-    """Converts normalized coords to given image coordinates."""
-    return coords * np.array([image_shape[1], image_shape[0]])
-
-def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=0.75, colormap="tab20", color_ids=None):
-    """Draws predicted masks on the image."""
-    hex_colors = hex_to_bgr(colormap_to_hex(colormap))
-    if not pred_masks:
-        print("No masks found.")
-        safe_image_write(image, filename)
-        return image
-    overlay = image.copy()
-    for i, mask in enumerate(pred_masks):
-        coords = np.asarray(mask, dtype=np.float32).reshape(-1, 2)
-        if coords.shape[0] < 3:
-            continue
-        color_index = i if color_ids is None else int(color_ids[i])
-        color = hex_colors[color_index % len(hex_colors)]
-        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
-            coords = denormalize_coordinates(coords, image.shape)
-        coords[:, 0] = np.clip(coords[:, 0], 0, image.shape[1] - 1)
-        coords[:, 1] = np.clip(coords[:, 1], 0, image.shape[0] - 1)
-        coords = np.round(coords).astype(np.int32)
-        if len(np.unique(coords, axis=0)) < 3:
-            continue
-        cv2.fillPoly(overlay, [coords], color)
-    cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
-    safe_image_write(image, filename)
-    return image
-
-
-def plot_predictions_with_alignment(
-    original_image,
-    img_inference,
-    pred_masks,
-    filename: str = IMAGE_FILE_NAME_DETECTION,
-    colormap="tab20",
-    alpha=0.75,
-    color_ids=None
-):
-    """
-    Plot predictions with automatic dimension alignment.
-    
-    Resizes original image to match inference dimensions if needed, then
-    overlays predicted masks. Useful when inference uses different image
-    size than original.
-    
-    Args:
-        original_image (np.ndarray): Original input image
-        img_inference (np.ndarray): Image dimensions used for inference
-        pred_masks (list): List of mask contours (normalized coordinates)
-        filename (str): Output image path. Defaults to IMAGE_FILE_NAME_DETECTION.
-        colormap (str): Matplotlib colormap. Defaults to 'tab20'.
-        alpha (float): Mask transparency (0-1). Defaults to 0.75.
-    
-    Returns:
-        np.ndarray: Image with overlaid masks
-    """
-    h, w = img_inference.shape[:2]
-    o_h, o_w = original_image.shape[:2]
-    if h != o_h or w != o_w:
-        original_image = resize_and_pad_cv(original_image, w, h)
-    set_global('image_display_base', original_image.copy())
-    return plot_predictions(
-        original_image,
-        pred_masks,
-        filename=filename,
-        colormap=colormap,
-        alpha=alpha,
-        color_ids=color_ids
-    )
-
 
 def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     """

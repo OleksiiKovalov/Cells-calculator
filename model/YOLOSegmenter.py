@@ -6,28 +6,16 @@ These are the models for:
 - segmenting spheroids.
 """
 
-# Standard library imports
-import os
-
 # Third-party imports
 import numpy as np
 import pandas as pd
 from ultralytics import YOLO
 
-# Local application imports
-from UI.app_globals import register_model
 from model.BaseModel import BaseModel
 from sahi.auto_model import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from sahi.utils.cv import read_image
-from model.utils import results_to_pandas, sahi_to_pandas, plot_predictions
-from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_GRID,
-    IMAGE_FILE_NAME_INGFERENCE,
-    IMAGE_FILE_NAME_TMP,
-)
-from UI.app_globals import set_global
+from model.utils import results_to_pandas, sahi_to_pandas
 
 class YoloSegmenter(BaseModel):
     """
@@ -100,12 +88,8 @@ class YoloSegmenter(BaseModel):
     def count_x20(
         self,
         input_image,
-        plot=True,
-        colormap="tab20",
         tracking=False,
-        filename=IMAGE_FILE_NAME_DETECTION,
         min_score=0.05,
-        alpha=0.75,
         store_bin_mask=False,
         **kwargs
     ):
@@ -116,31 +100,21 @@ class YoloSegmenter(BaseModel):
         2. Perform forward propagation and get results: bboxes, masks, confs;
         3. Structure the output;
         4. Save output in RAM cache as pandas DataFrame for further possible recalculations;
-        5. Display obtained results through masks, if available, or simply through bboxes.
+        5. Return raw detections plus original/inference image artifacts.
 
         Args:
             input_image: path to input image
-            plot: whether to plot predictions
-            colormap: colormap for plotting
             tracking: whether tracking is enabled
-            filename: filename for output
             min_score: minimum confidence score
-            alpha: alpha for plotting
             store_bin_mask: whether to store binary mask
             **kwargs: additional configurations for model inference: conf, iou etc.
 
         Returns:
             list of dictionaries containing detections information.
         """
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-
         # Every time detect from fresh
         self.detections = None
         
-        colormap = self.object_size['color_map']
         outputs = self.model(
             input_image,
             conf=0.3,
@@ -150,9 +124,8 @@ class YoloSegmenter(BaseModel):
             **kwargs
         )[0]
         self.original_image = outputs.orig_img
+        inference_image = self.original_image.copy()
         self.h, self.w = outputs.orig_img.shape[0], outputs.orig_img.shape[1]
-        set_global('image_inference', self.original_image.copy())
-        set_global('image_display_base', self.original_image.copy())
         if outputs.masks is None:
             self.detections = pd.DataFrame(columns=self.DETECTION_COLUMNS)
             self.object_size['signal']("set_size", self.detections['box'].copy())
@@ -161,15 +134,12 @@ class YoloSegmenter(BaseModel):
                 sep=';',
                 index=False
             )
-            self.prediction_image = self.original_image.copy()
-            plot_predictions(
-                self.prediction_image,
-                [],
-                filename=filename,
-                colormap=colormap,
-                alpha=self.object_size.get("alpha", 0.75),
+            self.prediction_image = None
+            return self._prediction_result(
+                self.detections,
+                original_image=self.original_image,
+                inference_image=inference_image,
             )
-            return self.detections
         self.detections = results_to_pandas(outputs, store_bin_mask)
         self.detections['box'] = self.detections['box'].apply(
             lambda b: b * np.array([self.w, self.h, self.w, self.h])
@@ -187,33 +157,16 @@ class YoloSegmenter(BaseModel):
         detections = self.detections[self.detections['confidence'] >= min_score]
         if tracking is False:
             self.object_size['signal']("set_size", self.detections.copy())
-        original_image = self.original_image.copy()
-
         filtered_detections = detections
 
         self.prediction_image = None
-        if plot is True:
-            set_global('image_inference', original_image)
-            set_global('image_display_base', original_image.copy())
-            self.prediction_image = plot_predictions(
-                original_image,
-                filtered_detections['mask'].tolist(),
-                filename=filename,
-                colormap=colormap,
-                alpha=self.object_size.get("alpha", 0.75),
-                color_ids=filtered_detections['id_label'].tolist()
-            )
-        return filtered_detections
+        return self._prediction_result(
+            filtered_detections,
+            original_image=self.original_image,
+            inference_image=inference_image,
+        )
 
-    def count_x10(
-        self,
-        input_image: str,
-        filename=IMAGE_FILE_NAME_DETECTION,
-        colormap="tab20",
-        min_score=0.3,
-        alpha=0.75,
-        **kwargs
-    ):
+    def count_x10(self, input_image: str, min_score=0.3):
         """
         Segment image using YOLO with SAHI tiling at x10 magnification.
         
@@ -222,11 +175,7 @@ class YoloSegmenter(BaseModel):
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
-            colormap (str): Matplotlib colormap. Defaults to 'tab20'.
             min_score (float): Minimum confidence filter. Defaults to 0.3.
-            alpha (float): Mask transparency. Defaults to 0.75.
-            **kwargs: Additional arguments (unused)
         
         Returns:
             pd.DataFrame: Segmentation results (same format as count_x20)
@@ -235,11 +184,6 @@ class YoloSegmenter(BaseModel):
             Tile configuration: 512x512 with 10% overlap
             Results are cached and reused if same image processed multiple times
         """
-        try:
-            os.remove(filename)
-        except FileNotFoundError:
-            pass
-        colormap = self.object_size['color_map']
         if self.detections is None or self.original_image is None:
             self.original_image = read_image(input_image)
             outputs = self._get_sahi_predictions(input_image)
@@ -249,19 +193,12 @@ class YoloSegmenter(BaseModel):
 
         detections = self.detections[self.detections['confidence'] >= min_score]
 
-        original_image = self.original_image.copy()
-
         filtered_detections = detections
+        inference_image = self.original_image.copy()
         
-        set_global('image_inference', original_image)
-        set_global('image_display_base', original_image.copy())
         self.prediction_image = None
-        self.prediction_image = plot_predictions(
-            original_image,
-            filtered_detections['mask'].tolist(),
-            filename=filename,
-            colormap=colormap,
-            alpha=alpha,
-            color_ids=filtered_detections['id_label'].tolist()
+        return self._prediction_result(
+            filtered_detections,
+            original_image=self.original_image,
+            inference_image=inference_image,
         )
-        return filtered_detections

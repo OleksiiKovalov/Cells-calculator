@@ -26,10 +26,17 @@ from UI.WaitWindow import run_with_wait_window
 from UI.app_globals import get_global, set_global
 from UI.errorhandling import app_logger
 from UI.ModelsCheckList import ModelsCheckListDialog
+from UI.prediction_rendering import (
+    plot_predictions,
+    plot_predictions_with_alignment,
+    publish_inference_image,
+    render_detector_predictions,
+)
 from UI.rangeslider import RangeSlider
 from UI.right_layout.plugins.BasePlugin import BasePlugin
 from model.Model import Model
-from model.utils import create_image_grid, draw_bounding_box, filter_segmentation_detections, plot_predictions, safe_image_write
+from model.PredictionResult import get_prediction_images, unwrap_prediction_cells
+from model.utils import create_image_grid, filter_segmentation_detections, safe_image_write
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE
 
 
@@ -535,7 +542,14 @@ class CellDetectorPlugin(BasePlugin):
         if not result:
             return 0
 
-        set_global('detections',self.model.cell_counter.detections if self.model and self.model.cell_counter else None)
+        set_global(
+            'detections',
+            self.model.cell_counter.detections
+            if self.model and self.model.cell_counter
+            else unwrap_prediction_cells(result.get('Cells'))
+            if isinstance(result, dict)
+            else None,
+        )
         
         # Create QGraphicsTextItems to display the results
         self.results_text.clear()
@@ -608,7 +622,122 @@ class CellDetectorPlugin(BasePlugin):
                     self.model = None
                         # clear the model so it can be restarted 
                 self.draw_bounding = 0
+        if result is not None and self.model is not None:
+            publish_inference_image(self.model, result)
+            self.render_model_result(self.model, result)
         return result
+
+    def render_model_result(
+        self,
+        model,
+        result,
+        filename=IMAGE_FILE_NAME_DETECTION,
+        update_global_detections=True,
+    ):
+        """
+        Render raw detection data returned by a model call.
+
+        Model classes produce the raw DataFrame and image state; this UI caller
+        turns those values into the displayed detection image.
+        """
+        if model is None or not getattr(model, "cell_counter", None):
+            return None
+
+        cell_counter = model.cell_counter
+        raw_detections = (
+            result.get("Cells")
+            if isinstance(result, dict) and "Cells" in result
+            else getattr(cell_counter, "detections", None)
+        )
+        detections = unwrap_prediction_cells(raw_detections)
+        if detections is None:
+            return None
+        if not hasattr(detections, "columns"):
+            return None
+        source_detections = unwrap_prediction_cells(
+            getattr(cell_counter, "detections", None)
+        )
+        if source_detections is None or not hasattr(source_detections, "columns"):
+            source_detections = detections
+
+        result_original_image, result_inference_image = get_prediction_images(
+            result
+        )
+        original_image = result_original_image
+        if original_image is None:
+            original_image = getattr(cell_counter, "original_image", None)
+        if original_image is None:
+            original_image = get_global("image_display_base")
+        if original_image is None:
+            original_image = get_global("image_inference")
+        if original_image is None:
+            return None
+
+        if hasattr(original_image, "copy"):
+            original_image = original_image.copy()
+
+        if hasattr(detections, "columns") and "mask" in detections.columns:
+            inference_image = result_inference_image
+            if inference_image is None:
+                inference_image = getattr(cell_counter, "inference_image", None)
+            if inference_image is None:
+                inference_image = get_global("image_inference")
+
+            counter_object_size = getattr(cell_counter, "object_size", {}) or {}
+            colormap = self.object_size.get(
+                "color_map",
+                counter_object_size.get("color_map", "tab20"),
+            )
+            alpha = self.object_size.get(
+                "alpha",
+                counter_object_size.get("alpha", 0.75),
+            )
+            color_ids = (
+                detections["id_label"].tolist()
+                if "id_label" in detections
+                else None
+            )
+            model_class_name = type(cell_counter).__name__.lower()
+            mask_coordinate_space = (
+                "inference"
+                if "instanseg" in model_class_name
+                else "original"
+            )
+            if inference_image is not None:
+                rendered_image = plot_predictions_with_alignment(
+                    original_image,
+                    inference_image,
+                    detections["mask"].tolist(),
+                    filename=filename,
+                    colormap=colormap,
+                    alpha=alpha,
+                    color_ids=color_ids,
+                    mask_coordinate_space=mask_coordinate_space,
+                )
+            else:
+                set_global("image_display_base", original_image.copy())
+                rendered_image = plot_predictions(
+                    original_image,
+                    detections["mask"].tolist(),
+                    filename=filename,
+                    colormap=colormap,
+                    alpha=alpha,
+                    color_ids=color_ids,
+                )
+        else:
+            set_global("image_display_base", original_image.copy())
+            rendered_image = render_detector_predictions(
+                original_image,
+                detections,
+                filename=filename,
+            )
+
+        cell_counter.prediction_image = rendered_image
+        if update_global_detections:
+            set_global("detections", source_detections)
+        if hasattr(rendered_image, "copy"):
+            set_global("image_detections", rendered_image.copy())
+        return rendered_image
 
     def calculate_single_model(self, modeltype,modelpath,object_size, image_path,model_data = None, model_name = "<not set>"):
         """
@@ -628,13 +757,14 @@ class CellDetectorPlugin(BasePlugin):
         model = None
         model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model_name)
         model.cell_counter.original_image_path = self.lsm_path
+        result = None
         try:
-            model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
+            result = model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
         except  Exception as e:
             traceback.print_exc()
             app_logger().error(e)
             try:
-                model.calculate(img_path=image_path)
+                result = model.calculate(img_path=image_path)
             except  Exception as e:
                 traceback.print_exc()
                 app_logger().error(e)
@@ -644,7 +774,9 @@ class CellDetectorPlugin(BasePlugin):
                     del model
                     model = None
         if model:
-            return model.cell_counter.original_image, model.cell_counter.prediction_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
+            publish_inference_image(model, result)
+            processed_image = self.render_model_result(model, result)
+            return model.cell_counter.original_image, processed_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
         else:
             return None, None, None, None
 
@@ -1137,35 +1269,35 @@ class CellDetectorPlugin(BasePlugin):
                 max_size=max_value
             )
 
-        # Check if filtered_detections has 'mask' key and is valid
-        if filtered_detections is not None and 'mask' in filtered_detections and filtered_detections['mask'] is not None:
-            base_image = get_global('image_display_base')
-            plot_predictions(
-                base_image.copy(),
-                filtered_detections['mask'].tolist(), 
-                filename=IMAGE_FILE_NAME_DETECTION, 
-                colormap=self.object_size["color_map"], 
-                alpha=self.object_size.get("alpha", 0.75),
-                color_ids=filtered_detections['id_label'].tolist() if 'id_label' in filtered_detections else None
+        current_model = getattr(self, "model", None)
+        if current_model is not None:
+            self.render_model_result(
+                current_model,
+                {"Cells": filtered_detections},
+                update_global_detections=False,
             )
         else:
-            image = get_global('image_inference').copy()
-            for i in range(filtered_detections.shape[0]):
-                draw_bounding_box(
-                    image,
-                    filtered_detections.iloc[i,0],
-                    filtered_detections.iloc[i,2],
-                    round(filtered_detections.iloc[i,3][0] * filtered_detections.iloc[i,4]),
-                    round(filtered_detections.iloc[i,3][1] * filtered_detections.iloc[i,4]),
-                    round((filtered_detections.iloc[i,-2][0] + filtered_detections.iloc[i,-2][2]) * filtered_detections.iloc[i,-1]),
-                    round((filtered_detections.iloc[i,-2][1] + filtered_detections.iloc[i,-2][3]) * filtered_detections.iloc[i,-1]),
+            # Fallback for tests or partially initialized plugin instances.
+            image = get_global('image_display_base')
+            if image is None:
+                image = get_global('image_inference')
+            if image is None:
+                return
+            if filtered_detections is not None and 'mask' in filtered_detections:
+                plot_predictions(
+                    image.copy(),
+                    filtered_detections['mask'].tolist(),
+                    filename=IMAGE_FILE_NAME_DETECTION,
+                    colormap=self.object_size["color_map"],
+                    alpha=self.object_size.get("alpha", 0.75),
+                    color_ids=filtered_detections['id_label'].tolist() if 'id_label' in filtered_detections else None
                 )
-                
-            try:
-                os.remove(IMAGE_FILE_NAME_DETECTION)
-            except:
-                pass
-            safe_image_write(image, IMAGE_FILE_NAME_DETECTION)
+            else:
+                render_detector_predictions(
+                    image.copy(),
+                    filtered_detections,
+                    filename=IMAGE_FILE_NAME_DETECTION,
+                )
 
         self.draw_bounding_box()
         return
