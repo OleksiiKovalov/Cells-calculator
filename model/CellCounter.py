@@ -56,7 +56,7 @@ class CellCounter(BaseModel):
         """
         self.model_x10 = None
 
-    def count_x10(self, input_image, filename):
+    def count_x10(self, input_image):
         """
         Count cells at x10 magnification.
         
@@ -64,15 +64,14 @@ class CellCounter(BaseModel):
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output path for detection visualization
-            
+
         Returns:
             pd.DataFrame: Detection results
         """
-        return self.count_x20(input_image, filename)
+        return self.count_x20(input_image)
 
 
-    def count_x20(self, input_image, filename):
+    def count_x20(self, input_image):
         """
         Perform inference on x20 magnification image using ONNX model.
         
@@ -80,12 +79,11 @@ class CellCounter(BaseModel):
         an ultralytics-based inference pipeline for improved performance and simplicity.
         
         Loads image, preprocesses for model input, runs ONNX inference, applies NMS,
-        and saves results both as visualization and CSV data.
+        and saves CSV data for downstream UI/reporting use.
         
         Args:
             input_image (str): Path to input microscopy image
-            filename (str): Output path for detection visualization
-        
+
         Returns:
             pd.DataFrame: Detection results with columns:
                 - class_id, class_name, confidence

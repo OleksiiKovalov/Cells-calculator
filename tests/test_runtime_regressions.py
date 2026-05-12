@@ -339,7 +339,7 @@ def test_yolo_x10_uses_sahi_nms_postprocess(request, monkeypatch, tmp_path):
     segmenter.model_x10 = object()
 
     output_path = tmp_path / "detections.png"
-    result = segmenter.count_x10("narrow.tif", filename=str(output_path))
+    result = segmenter.count_x10("narrow.tif")
 
     assert calls == ["NMS"]
     assert result.shape[0] == 1

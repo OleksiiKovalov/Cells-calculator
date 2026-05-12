@@ -16,10 +16,7 @@ import pandas as pd
 import torch
 
 # Local application imports
-from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_TMP,
-)
+from UI.app_globals import IMAGE_FILE_NAME_TMP
 from model.PredictionResult import PredictionResult, count_prediction_cells
 
 
@@ -137,7 +134,7 @@ class BaseModel:
             inference_image=inference,
         )
 
-    def count(self, input_image, scale: int = 20, filename=IMAGE_FILE_NAME_DETECTION):
+    def count(self, input_image, scale: int = 20):
         """
         Process microimages of cells with specified magnification scale.
         
@@ -147,8 +144,7 @@ class BaseModel:
         Args:
             input_image (str): Path to the image file to process
             scale (int): Magnification scale, must be 10 or 20. Defaults to 20.
-            filename (str): Output path for processed detection image. Defaults to IMAGE_FILE_NAME_DETECTION.
-        
+
         Returns:
             pd.DataFrame | None: DataFrame with detection results or None if processing fails.
                             Columns: class_id, class_name, confidence, box, scale
@@ -162,46 +158,48 @@ class BaseModel:
         start_time = time.time()
         result = None
         if scale == 20:
-            result =  self.count_x20(input_image, filename=filename)
+            result =  self.count_x20(input_image)
         else:
-            result =  self.count_x10(input_image, filename=filename)
+            result =  self.count_x10(input_image)
         end_time = time.time()
         self.inference_duration = end_time - start_time
         self.detectionCount = count_prediction_cells(result)
 
         return result
 
-    def count_x10(self, input_image, filename):
+    def count_x10(self, input_image):
         """
         Process images of x10 scale by applying sliding window approach.
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output path for detection visualization
-            
+
         Returns:
             pd.DataFrame: Detection results
             
         Raises:
             NotImplementedError: Always raised (must be implemented by subclasses)
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"{self.__class__.__name__}.count_x10 is not implemented for {input_image}"
+        )
 
-    def count_x20(self, input_image, filename):
+    def count_x20(self, input_image):
         """
         Process images of x20 scale using single-time inference.
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output path for detection visualization
-            
+
         Returns:
             pd.DataFrame: Detection results
             
         Raises:
             NotImplementedError: Always raised (must be implemented by subclasses)
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"{self.__class__.__name__}.count_x20 is not implemented for {input_image}"
+        )
 
     def clear_cached_detections(self):
         """

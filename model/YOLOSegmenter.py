@@ -16,7 +16,6 @@ from sahi.auto_model import AutoDetectionModel
 from sahi.predict import get_sliced_prediction
 from sahi.utils.cv import read_image
 from model.utils import results_to_pandas, sahi_to_pandas
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION
 
 class YoloSegmenter(BaseModel):
     """
@@ -89,12 +88,8 @@ class YoloSegmenter(BaseModel):
     def count_x20(
         self,
         input_image,
-        plot=True,
-        colormap="tab20",
         tracking=False,
-        filename=IMAGE_FILE_NAME_DETECTION,
         min_score=0.05,
-        alpha=0.75,
         store_bin_mask=False,
         **kwargs
     ):
@@ -105,16 +100,12 @@ class YoloSegmenter(BaseModel):
         2. Perform forward propagation and get results: bboxes, masks, confs;
         3. Structure the output;
         4. Save output in RAM cache as pandas DataFrame for further possible recalculations;
-        5. Display obtained results through masks, if available, or simply through bboxes.
+        5. Return raw detections plus original/inference image artifacts.
 
         Args:
             input_image: path to input image
-            plot: whether to plot predictions
-            colormap: colormap for plotting
             tracking: whether tracking is enabled
-            filename: filename for output
             min_score: minimum confidence score
-            alpha: alpha for plotting
             store_bin_mask: whether to store binary mask
             **kwargs: additional configurations for model inference: conf, iou etc.
 
@@ -175,15 +166,7 @@ class YoloSegmenter(BaseModel):
             inference_image=inference_image,
         )
 
-    def count_x10(
-        self,
-        input_image: str,
-        filename=IMAGE_FILE_NAME_DETECTION,
-        colormap="tab20",
-        min_score=0.3,
-        alpha=0.75,
-        **kwargs
-    ):
+    def count_x10(self, input_image: str, min_score=0.3):
         """
         Segment image using YOLO with SAHI tiling at x10 magnification.
         
@@ -192,11 +175,7 @@ class YoloSegmenter(BaseModel):
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
-            colormap (str): Matplotlib colormap. Defaults to 'tab20'.
             min_score (float): Minimum confidence filter. Defaults to 0.3.
-            alpha (float): Mask transparency. Defaults to 0.75.
-            **kwargs: Additional arguments (unused)
         
         Returns:
             pd.DataFrame: Segmentation results (same format as count_x20)

@@ -41,10 +41,7 @@ from model.utils import (
     safe_image_write, 
     safe_image_read, 
 )
-from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION, 
-    IMAGE_FILE_NAME_INSTANCES, 
-)
+from UI.app_globals import IMAGE_FILE_NAME_INSTANCES
 
 
 
@@ -103,28 +100,16 @@ class StardistSegmenter(BaseModel):
     def count_x20(
         self,
         input_image,
-        plot=True,
-        colormap="tab20",
         tracking=False,
-        filename=IMAGE_FILE_NAME_DETECTION,
         min_score=0.05,
-        alpha=0.75,
-        store_bin_mask=False,
-        **kwargs
     ):
         """
         Segment objects using StarDist at x20 magnification.
         
         Args:
             input_image (str): Path to input microscopy image
-            plot (bool): Whether to generate visualization. Defaults to True.
-            colormap (str): Colormap for visualization. Defaults to 'tab20'.
             tracking (bool): Whether in tracking mode. Defaults to False.
-            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
             min_score (float): Minimum confidence score threshold. Defaults to 0.05.
-            alpha (float): Mask transparency (0-1). Defaults to 0.75.
-            store_bin_mask (bool): Whether to store binary masks. Defaults to False.
-            **kwargs: Additional arguments for compatibility
         
         Returns:
             pd.DataFrame: Instance segmentation results with columns:
@@ -171,15 +156,7 @@ class StardistSegmenter(BaseModel):
             raise RuntimeError(f"Error when inferrecing StardistSegmenter: {e}")
         
 
-    def count_x10(
-        self,
-        input_image: str,
-        filename=IMAGE_FILE_NAME_DETECTION,
-        colormap="tab20",
-        min_score=0.01,
-        alpha=0.75,
-        **kwargs
-    ):
+    def count_x10(self, input_image: str):
         """
         Segment objects using StarDist at x10 magnification.
         
@@ -187,16 +164,13 @@ class StardistSegmenter(BaseModel):
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output path (unused)
-            colormap (str): Colormap (unused)
-            min_score (float): Minimum score (unused)
-            alpha (float): Transparency (unused)
-            **kwargs: Additional arguments (unused)
         
         Raises:
             NotImplementedError: Always raised
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"{self.__class__.__name__}.count_x10 is not implemented for {input_image}"
+        )
     
     def image_preprocess(self,image):
         """

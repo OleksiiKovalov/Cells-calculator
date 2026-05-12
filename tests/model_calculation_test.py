@@ -61,7 +61,7 @@ class StubNucleiCounter:
 class StubBaseModel(base_model_module.BaseModel):
     """Small BaseModel subclass for exercising count_cells."""
 
-    def count_x20(self, input_image, filename):
+    def count_x20(self, input_image):
         return pd.DataFrame({"box": [np.array([0, 0, 1, 1])]})
 
 
@@ -138,7 +138,7 @@ def test_cellcounter_returns_empty_dataframe_when_nms_has_no_boxes(tmp_path):
     counter.object_size = {"signal": lambda *args, **kwargs: None}
     counter.out_dir = tmp_path
 
-    result = counter.count_x20(str(image_path), filename=str(output_path))
+    result = counter.count_x20(str(image_path))
 
     assert isinstance(result, PredictionResult)
     assert list(result.cells.columns) == ["class_id", "class_name", "confidence", "box", "scale"]
