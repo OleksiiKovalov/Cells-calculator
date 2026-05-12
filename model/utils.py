@@ -42,20 +42,40 @@ def read_lsm_array(img_path):
 def lsm_to_channels_last(image):
     """Normalizes LSM arrays to (height, width, channels)."""
     image = np.asarray(image)
-    if image.ndim == 2:
-        return image[:, :, np.newaxis]
-
-    image = np.squeeze(image)
+    if image.ndim == 0:
+        return image.reshape(1, 1, 1)
+    if image.ndim == 1:
+        return image.reshape(1, 1, image.shape[0])
     if image.ndim == 2:
         return image[:, :, np.newaxis]
 
     if image.ndim > 3:
+        image = np.squeeze(image)
+        if image.ndim == 0:
+            return image.reshape(1, 1, 1)
+        if image.ndim == 1:
+            return image.reshape(1, 1, image.shape[0])
+        if image.ndim == 2:
+            return image[:, :, np.newaxis]
         image = image.reshape((-1, image.shape[-2], image.shape[-1]))
 
     if image.ndim != 3:
         raise ValueError(f"Unsupported LSM image shape: {image.shape}")
 
+    if (
+        image.shape[0] <= 8
+        and (
+            image.shape[1] > 8
+            or image.shape[2] > 8
+            or (image.shape[0] > 1 and image.shape[2] <= 1)
+        )
+    ):
+        return np.transpose(image, (1, 2, 0))
+
     if image.shape[-1] <= 8 and image.shape[0] > 8 and image.shape[1] > 8:
+        return image
+
+    if image.shape[-1] in (3, 4):
         return image
 
     return np.transpose(image, (1, 2, 0))
@@ -408,21 +428,28 @@ def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataF
             "bin_mask": []
         }
     for i, _ in enumerate(outputs.masks.xyn):
-        if len(outputs.masks.xyn[i]) == 0:
-            pass
-        else:
-            data['id_label'].append(i)
-            box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
-            box[2:] -= box[:2]
-            data['box'].append(box)
-            data['mask'].append(outputs.masks.xyn[i])
-            data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
-            bin_mask, morphology = plot_mask(outputs.masks.xyn[i], image_size=outputs.orig_shape)
-            data['diameter'].append(morphology['diameter'])
-            data['area'].append(morphology['area'])
-            data['volume'].append(morphology['volume'])
-            if store_bin_mask is True:
-                data['bin_mask'].append(bin_mask)
+        try:
+            mask = np.asarray(outputs.masks.xyn[i], dtype=np.float32).reshape(-1, 2)
+        except (TypeError, ValueError):
+            continue
+        if mask.shape[0] < 3 or not np.isfinite(mask).all():
+            continue
+
+        bin_mask, morphology = plot_mask(mask, image_size=outputs.orig_shape)
+        if not bin_mask.any():
+            continue
+
+        data['id_label'].append(i)
+        box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
+        box[2:] -= box[:2]
+        data['box'].append(box)
+        data['mask'].append(mask)
+        data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
+        data['diameter'].append(morphology['diameter'])
+        data['area'].append(morphology['area'])
+        data['volume'].append(morphology['volume'])
+        if store_bin_mask is True:
+            data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
 def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:

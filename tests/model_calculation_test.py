@@ -75,6 +75,19 @@ class EmptyDnn:
         return np.zeros((1, 5, 1), dtype=np.float32)
 
 
+class SingleBoxDnn:
+    """DNN stub that returns one detector row in model-input coordinates."""
+
+    def __init__(self, row):
+        self.row = np.asarray(row, dtype=np.float32)
+
+    def setInput(self, blob):
+        self.blob = blob
+
+    def forward(self):
+        return self.row.reshape(1, 5, 1)
+
+
 def test_calculate_alive_percentage_returns_sentinel_when_no_cells():
     assert calculate_alive_percentage(0, 3) == -100
 
@@ -150,6 +163,32 @@ def test_cellcounter_returns_empty_dataframe_when_nms_has_no_boxes(tmp_path):
     assert counter.prediction_image is None
 
 
+def test_cellcounter_scales_and_clips_detector_boxes_to_original_image(tmp_path):
+    image_path = tmp_path / "narrow.png"
+    image = np.zeros((31, 3, 3), dtype=np.uint8)
+    assert cv2.imwrite(str(image_path), image)
+
+    counter = CellCounter.__new__(CellCounter)
+    counter.detections = None
+    # Model-space xywh centered so the decoded box starts slightly left of
+    # the image and extends beyond its narrow right edge after scaling.
+    counter.model = SingleBoxDnn([35, 288, 80, 64, 0.9])
+    counter.object_size = {"signal": lambda *args, **kwargs: None}
+    counter.out_dir = tmp_path
+
+    result = counter.count_x20(str(image_path))
+
+    assert result.shape[0] == 1
+    box = result.cells.iloc[0]["box"]
+    assert result.cells.iloc[0]["scale"] == 1.0
+    assert box[0] >= 0
+    assert box[1] >= 0
+    assert box[2] > 0
+    assert box[3] > 0
+    assert box[0] + box[2] <= image.shape[1]
+    assert box[1] + box[3] <= image.shape[0]
+
+
 def test_calculate_standard_omits_nuclei_metrics_when_not_provided(tmp_path):
     image_path = tmp_path / "cells.png"
     image = np.zeros((16, 16, 3), dtype=np.uint8)
@@ -184,10 +223,9 @@ def test_model_calculate_preserves_prediction_result_images(tmp_path):
     assert model.inference_duration == cell_counter.inference_duration
 
 
-def test_calculate_skips_nuclei_count_for_regular_images(tmp_path):
+def test_calculate_skips_nuclei_count_for_single_channel_regular_images(tmp_path):
     image_path = tmp_path / "stained.png"
-    image = np.zeros((16, 16, 3), dtype=np.uint8)
-    image[:, :, 1] = 255
+    image = np.zeros((16, 16), dtype=np.uint8)
     assert cv2.imwrite(str(image_path), image)
 
     model = new_model("cellcounter")
@@ -197,6 +235,24 @@ def test_calculate_skips_nuclei_count_for_regular_images(tmp_path):
     assert result["Nuclei"] == -100
     assert result["%"] == -100
     assert model.nuclei_counter.calls == 0
+
+
+def test_calculate_counts_nuclei_for_detector_regular_multichannel_images(tmp_path):
+    image_path = tmp_path / "stained.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    image[:, :, 1] = 255
+    assert cv2.imwrite(str(image_path), image)
+
+    model = Model.__new__(Model)
+    model.model_type = "cellcounter"
+    model.cell_counter = StubCellCounter()
+    model.nuclei_counter = StubNucleiCounter()
+
+    result = model.calculate(str(image_path), nuclei_channel=1)
+
+    assert result["Nuclei"] == 1
+    assert result["%"] == 75.0
+    assert model.nuclei_counter.calls == 1
 
 
 def test_get_nuclei_count_does_not_cache_for_same_image(tmp_path):

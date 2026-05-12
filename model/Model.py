@@ -20,6 +20,7 @@ from model.utils import (
     count_detected_objects,
     extract_nuclei_channel,
     is_image_valid,
+    safe_image_read,
     show_error_message
 )
 
@@ -95,6 +96,19 @@ class Model:
     def _uses_detector_metrics(self):
         """Returns True when nuclei and alive metrics are meaningful for this model."""
         return self.model_type == DETECTOR_MODEL_TYPE
+
+    def _has_standard_nuclei_channel(self, img_path, nuclei_channel=1):
+        """Returns True when a non-LSM image has a separate nuclei channel."""
+        img = safe_image_read(img_path, color_mode='unchanged')
+        if img is None or img.ndim != 3:
+            return False
+
+        try:
+            nuclei_channel = int(nuclei_channel)
+        except (TypeError, ValueError):
+            return False
+
+        return 0 <= nuclei_channel < img.shape[2]
         
     def init_counter(self, path, object_size, model_type, model_data, get_registered_model: Callable[[str], Any]):
         """
@@ -145,10 +159,16 @@ class Model:
             return calculate_lsm(self.cell_counter, self.nuclei_counter,
                   img_path, cell_channel, nuclei_channel, nuclei_count=nuclei_count)
         elif is_image_valid(img_path):
+            nuclei_count = (
+                self.get_nuclei_count(img_path, nuclei_channel=nuclei_channel)
+                if include_nuclei
+                and self._has_standard_nuclei_channel(img_path, nuclei_channel)
+                else NO_NUCLEI_METRIC
+            )
             result = calculate_standard(
                 self.cell_counter,
                 img_path,
-                nuclei_count=NO_NUCLEI_METRIC
+                nuclei_count=nuclei_count
             )
             self.inference_duration = self.cell_counter.inference_duration
             return result
