@@ -258,6 +258,21 @@ def plot_predictions_with_alignment(
     h, w = img_inference.shape[:2]
     o_h, o_w = original_image.shape[:2]
 
+    if mask_coordinate_space == "inference":
+        inference_base = img_inference.copy() if hasattr(img_inference, "copy") else img_inference
+        set_global(
+            "image_display_base",
+            inference_base.copy() if hasattr(inference_base, "copy") else inference_base,
+        )
+        return plot_predictions(
+            inference_base,
+            pred_masks,
+            filename=filename,
+            colormap=colormap,
+            alpha=alpha,
+            color_ids=color_ids,
+        )
+
     if h == o_h and w == o_w:
         set_global("image_display_base", original_image.copy())
         return plot_predictions(

@@ -143,18 +143,20 @@ def test_safegray2rgb_drops_alpha_channel_for_model_input():
     assert rgb[:, :, 0].max() == 10
 
 
-def test_prediction_alignment_restores_original_image_size(tmp_path):
+def test_prediction_alignment_uses_inference_image_for_inference_space(tmp_path):
     from UI.prediction_rendering import plot_predictions_with_alignment
+    from UI.app_globals import get_global, set_global
 
     output_path = tmp_path / "detections.png"
-    original = np.zeros((509, 512, 3), dtype=np.uint8)
-    inference = np.zeros((512, 512, 3), dtype=np.uint8)
+    original = np.full((509, 512, 3), 25, dtype=np.uint8)
+    inference = np.full((512, 512, 3), 80, dtype=np.uint8)
     masks = [
         np.array(
             [[10, 10], [100, 10], [100, 100], [10, 100]],
             dtype=np.float32,
         )
     ]
+    set_global("image_display_base", None)
 
     rendered = plot_predictions_with_alignment(
         original,
@@ -164,7 +166,9 @@ def test_prediction_alignment_restores_original_image_size(tmp_path):
         mask_coordinate_space="inference",
     )
 
-    assert rendered.shape == original.shape
+    assert rendered.shape == inference.shape
+    assert rendered[0, 0, 0] == inference[0, 0, 0]
+    assert get_global("image_display_base").shape == inference.shape
     assert output_path.exists()
 
 
