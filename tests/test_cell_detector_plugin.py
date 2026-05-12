@@ -27,6 +27,14 @@ class _SignalStub:
         self.calls.append(args)
 
 
+class _TextEditStub:
+    def __init__(self):
+        self.text = None
+
+    def setPlainText(self, text):
+        self.text = text
+
+
 class _ReusableModelStub:
     def __init__(self, model_name):
         self.model_name = model_name
@@ -268,6 +276,39 @@ def test_render_model_result_uses_prediction_result_for_segmentation(monkeypatch
     assert np.array_equal(captured["pred_masks"][0], detections["mask"].iloc[0])
     assert captured["color_ids"] == [1]
     assert cell_counter.prediction_image is rendered
+
+
+def test_print_result_segmenter_uses_inference_image_for_instanseg_metrics():
+    plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
+    plugin.object_size = {"um_per_px": 2.0}
+    plugin.results_text = _TextEditStub()
+
+    original_image = np.zeros((10, 10, 3), dtype=np.uint8)
+    inference_image = np.zeros((20, 20, 3), dtype=np.uint8)
+    detections = pd.DataFrame(
+        {"diameter": [0.1], "area": [0.01], "volume": [0.001]}
+    )
+    result = {
+        "Cells": PredictionResult(
+            cells=detections,
+            original_image=original_image,
+            inference_image=inference_image,
+        )
+    }
+
+    instanseg_counter = type("InstansegSegmenter", (), {})()
+    instanseg_counter.original_image = original_image
+    instanseg_counter.inference_image = inference_image
+    plugin.model = SimpleNamespace(
+        cell_counter=instanseg_counter,
+        inference_duration=0.25,
+    )
+
+    plugin.print_result_segmenter(result)
+
+    assert plugin.results_text.text is not None
+    assert "16.00" in plugin.results_text.text
+    assert "64.00" in plugin.results_text.text
 
 
 def test_render_filtered_result_keeps_full_detection_cache(monkeypatch):

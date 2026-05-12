@@ -984,6 +984,34 @@ class CellDetectorPlugin(BasePlugin):
         else:
             self.print_result_segmenter(result)
 
+    def _get_segmenter_measurements_image_shape(self, result):
+        """Return the image shape used for segmenter size conversions."""
+        if not self.model or not getattr(self.model, "cell_counter", None):
+            return None
+
+        cell_counter = self.model.cell_counter
+        model_class_name = type(cell_counter).__name__.lower()
+        original_image, inference_image = get_prediction_images(result)
+
+        image = None
+        if "instanseg" in model_class_name:
+            image = inference_image
+            if image is None:
+                image = getattr(cell_counter, "inference_image", None)
+            if image is None:
+                image = get_global("image_inference")
+
+        if image is None:
+            image = original_image
+        if image is None:
+            image = getattr(cell_counter, "original_image", None)
+        if image is None:
+            image = get_global("image_display_base")
+
+        if image is None or not hasattr(image, "shape") or len(image.shape) < 2:
+            return None
+        return image.shape[:2]
+
     def _format_value(self, label, value_permyriad, value_um=None, unit_um="µm"):
         """
         Format value for display.
@@ -1140,17 +1168,17 @@ class CellDetectorPlugin(BasePlugin):
 
             um_per_px = self.object_size.get("um_per_px")
             if um_per_px is not None:
-                image_h = self.model.cell_counter.original_image.shape[0]
-                image_w = self.model.cell_counter.original_image.shape[1]
+                image_shape = self._get_segmenter_measurements_image_shape(result)
+                if image_shape is not None:
+                    image_h, image_w = image_shape
+                    avg_diameter_px = avg_diameter * image_w
+                    avg_area_px2 = avg_area * image_h * image_w
+                    linear_scale_px = (image_h + image_w) / 2
+                    avg_volume_px3 = avg_volume * (linear_scale_px ** 3)
 
-                avg_diameter_px = avg_diameter * image_w
-                avg_area_px2 = avg_area * image_h * image_w
-                linear_scale_px = (image_h + image_w) / 2
-                avg_volume_px3 = avg_volume * (linear_scale_px ** 3)
-
-                avg_diameter_um = round(avg_diameter_px * um_per_px, 2)
-                avg_area_um2 = round(avg_area_px2 * (um_per_px ** 2), 2)
-                avg_volume_um3 = round(avg_volume_px3 * (um_per_px ** 3), 2)
+                    avg_diameter_um = round(avg_diameter_px * um_per_px, 2)
+                    avg_area_um2 = round(avg_area_px2 * (um_per_px ** 2), 2)
+                    avg_volume_um3 = round(avg_volume_px3 * (um_per_px ** 3), 2)
 
             # Create strings for output
             results = [

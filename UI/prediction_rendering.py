@@ -290,6 +290,11 @@ def plot_predictions_with_alignment(
         alpha=alpha,
         color_ids=color_ids,
     )
+    if mask_coordinate_space == "inference":
+        set_global("image_display_base", aligned_image.copy())
+        safe_image_write(rendered_aligned, filename)
+        return rendered_aligned
+
     rendered_original = restore_from_resize_and_pad(rendered_aligned, metadata)
     set_global("image_display_base", original_image.copy())
     safe_image_write(rendered_original, filename)
