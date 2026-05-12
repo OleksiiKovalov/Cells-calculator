@@ -73,11 +73,6 @@ def _copy_image(image):
     return image.copy() if hasattr(image, "copy") else image
 
 
-def get_prediction_image_artifacts(result):
-    """Extract raw original/inference images from a model result."""
-    return get_prediction_images(result)
-
-
 def publish_inference_image(
     model,
     result,
@@ -85,7 +80,7 @@ def publish_inference_image(
     preserve_dtype=False,
 ):
     """Publish a model-produced inference image for UI display/cache."""
-    _, inference_image = get_prediction_image_artifacts(result)
+    _, inference_image = get_prediction_images(result)
     if inference_image is None:
         return None
 

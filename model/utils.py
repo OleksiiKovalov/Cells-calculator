@@ -9,8 +9,6 @@ from typing import Any
 
 # Third-party imports
 import cv2
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
@@ -24,11 +22,7 @@ from skimage.transform import resize
 from ultralytics.engine.results import Results
 
 # Local application imports
-from UI.app_globals import set_global
 from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_GRID,
-    IMAGE_FILE_NAME_INGFERENCE,
     IMAGE_FILE_NAME_TMP,
     CASH_DIRECTORY
 )
@@ -37,21 +31,6 @@ from model.PredictionResult import unwrap_prediction_cells
 
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'bmp', 'lsm']
-CLASSES = ['Cell']
-COLORS = [(3, 177, 252)]
-COLOR_NUMBER = {
-    "gist_rainbow": 20,
-    "tab20": 20,
-    "tab20b": 20,
-    "tab20c": 20,
-    "tab10": 10,
-    "Set1": 9,
-    "Set2": 8,
-    "Set3": 12,
-    "Paired": 12,
-    "viridis": 10,
-    "plasma": 10
-}
 
 
 def read_lsm_array(img_path):
@@ -352,23 +331,6 @@ def calculate_lsm(cell_counter, nuclei_counter,
     )
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
 
-
-
-def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
-    """Compatibility wrapper for UI-owned prediction rendering."""
-    from UI.prediction_rendering import draw_bounding_box as _draw_bounding_box
-
-    return _draw_bounding_box(
-        img,
-        class_id,
-        confidence,
-        x,
-        y,
-        x_plus_w,
-        y_plus_h,
-        draw_mode=draw_mode,
-    )
-
 def filter_detections(
     detections: pd.DataFrame, 
     min_size: float = 0.0, 
@@ -622,82 +584,6 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     cv2.fillPoly(bin_mask, [coords], (1,))
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
-
-def colormap_to_hex(cmap_name):
-    """Compatibility wrapper for UI-owned prediction rendering."""
-    from UI.prediction_rendering import colormap_to_hex as _colormap_to_hex
-
-    return _colormap_to_hex(cmap_name)
-
-def hex_to_bgr(hex_colors):
-    """Compatibility wrapper for UI-owned prediction rendering."""
-    from UI.prediction_rendering import hex_to_bgr as _hex_to_bgr
-
-    return _hex_to_bgr(hex_colors)
-
-def denormalize_coordinates(coords, image_shape):
-    """Compatibility wrapper for UI-owned prediction rendering."""
-    from UI.prediction_rendering import denormalize_coordinates as _denormalize_coordinates
-
-    return _denormalize_coordinates(coords, image_shape)
-
-def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=0.75, colormap="tab20", color_ids=None):
-    """Compatibility wrapper for UI-owned prediction rendering."""
-    from UI.prediction_rendering import plot_predictions as _plot_predictions
-
-    return _plot_predictions(
-        image,
-        pred_masks,
-        filename=filename,
-        alpha=alpha,
-        colormap=colormap,
-        color_ids=color_ids,
-    )
-
-def plot_predictions_with_alignment(
-    original_image,
-    img_inference,
-    pred_masks,
-    filename: str = IMAGE_FILE_NAME_DETECTION,
-    colormap="tab20",
-    alpha=0.75,
-    color_ids=None,
-    mask_coordinate_space="auto",
-):
-    """
-    Plot predictions with automatic dimension alignment.
-    
-    Resizes original image to match inference dimensions if needed, then
-    overlays predicted masks. Useful when inference uses different image
-    size than original.
-    
-    Args:
-        original_image (np.ndarray): Original input image
-        img_inference (np.ndarray): Image dimensions used for inference
-        pred_masks (list): List of mask contours (normalized coordinates)
-        filename (str): Output image path. Defaults to IMAGE_FILE_NAME_DETECTION.
-        colormap (str): Matplotlib colormap. Defaults to 'tab20'.
-        alpha (float): Mask transparency (0-1). Defaults to 0.75.
-    
-    Returns:
-        np.ndarray: Image with overlaid masks
-    """
-    from UI.prediction_rendering import (
-        plot_predictions_with_alignment as _plot_predictions_with_alignment,
-    )
-
-    return _plot_predictions_with_alignment(
-        original_image,
-        img_inference,
-        pred_masks,
-        filename=filename,
-        colormap=colormap,
-        alpha=alpha,
-        color_ids=color_ids,
-        mask_coordinate_space=mask_coordinate_space,
-    )
-
 
 def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     """

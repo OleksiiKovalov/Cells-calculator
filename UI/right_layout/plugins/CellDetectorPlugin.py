@@ -27,7 +27,6 @@ from UI.app_globals import get_global, set_global
 from UI.errorhandling import app_logger
 from UI.ModelsCheckList import ModelsCheckListDialog
 from UI.prediction_rendering import (
-    get_prediction_image_artifacts,
     plot_predictions,
     plot_predictions_with_alignment,
     publish_inference_image,
@@ -36,7 +35,7 @@ from UI.prediction_rendering import (
 from UI.rangeslider import RangeSlider
 from UI.right_layout.plugins.BasePlugin import BasePlugin
 from model.Model import Model
-from model.PredictionResult import unwrap_prediction_cells
+from model.PredictionResult import get_prediction_images, unwrap_prediction_cells
 from model.utils import create_image_grid, filter_segmentation_detections, safe_image_write
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE
 
@@ -661,7 +660,7 @@ class CellDetectorPlugin(BasePlugin):
         if source_detections is None or not hasattr(source_detections, "columns"):
             source_detections = detections
 
-        result_original_image, result_inference_image = get_prediction_image_artifacts(
+        result_original_image, result_inference_image = get_prediction_images(
             result
         )
         original_image = result_original_image
