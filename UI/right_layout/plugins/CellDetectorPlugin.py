@@ -651,7 +651,7 @@ class CellDetectorPlugin(BasePlugin):
             dlg = ModelsCheckListDialog(items, self.checked_indices, parent=self.parent())
             #set to resonable height to fit most of models
             dlg.resize(300,383)
-            if dlg.Execute():
+            if dlg.execute():
                 checked = dlg.get_checked_items()
             else:
                 return
