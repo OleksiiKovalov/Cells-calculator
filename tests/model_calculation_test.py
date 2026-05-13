@@ -168,10 +168,7 @@ def test_model_calculate_preserves_prediction_result_images(tmp_path):
     assert cv2.imwrite(str(image_path), image)
 
     cell_counter = ResultCellCounter()
-    model = Model.__new__(Model)
-    model.model_type = "yolo"
-    model.cell_counter = cell_counter
-    model.nuclei_counter = StubNucleiCounter()
+    model = new_model("yolo", cell_counter=cell_counter)
 
     result = model.calculate(str(image_path), nuclei_channel=1)
 
@@ -193,10 +190,7 @@ def test_calculate_skips_nuclei_count_for_regular_images(tmp_path):
     image[:, :, 1] = 255
     assert cv2.imwrite(str(image_path), image)
 
-    model = Model.__new__(Model)
-    model.model_type = "cellcounter"
-    model.cell_counter = StubCellCounter()
-    model.nuclei_counter = StubNucleiCounter()
+    model = new_model("cellcounter")
 
     result = model.calculate(str(image_path), nuclei_channel=1)
 
@@ -211,8 +205,7 @@ def test_get_nuclei_count_does_not_cache_for_same_image(tmp_path):
     image[:, :, 1] = 255
     assert cv2.imwrite(str(image_path), image)
 
-    model = Model.__new__(Model)
-    model.nuclei_counter = StubNucleiCounter()
+    model = new_model("nuclei_counter", nuclei_counter=StubNucleiCounter())
 
     first = model.get_nuclei_count(str(image_path), nuclei_channel=1)
     second = model.get_nuclei_count(str(image_path), nuclei_channel=1)
@@ -228,10 +221,7 @@ def test_calculate_skips_nuclei_count_for_segmenter_model(tmp_path):
     image[:, :, 1] = 255
     assert cv2.imwrite(str(image_path), image)
 
-    model = Model.__new__(Model)
-    model.model_type = "yolo"
-    model.cell_counter = StubCellCounter()
-    model.nuclei_counter = StubNucleiCounter()
+    model = new_model("yolo")
 
     result = model.calculate(str(image_path), nuclei_channel=1)
 
@@ -295,3 +285,13 @@ def test_read_lsm_img_uses_series_shape_for_multichannel_lsm(tmp_path):
     assert result.shape == (20, 30, 3)
     assert nuclei.shape == (20, 30)
     assert nuclei.max() == 255
+
+
+def new_model(model_type,
+              cell_counter=StubCellCounter(),
+              nuclei_counter=StubNucleiCounter()) -> Model:
+    model = Model.__new__(Model)
+    model.model_type = model_type
+    model.cell_counter = cell_counter
+    model.nuclei_counter = nuclei_counter
+    return model
