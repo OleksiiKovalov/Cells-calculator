@@ -41,8 +41,7 @@ from model.utils import (
     safe_image_write, 
     safe_image_read, 
 )
-from UI.app_globals import IMAGE_FILE_NAME_INSTANCES
-
+from model.constants import IMAGE_FILE_NAME_INSTANCES
 
 
 class StardistSegmenter(BaseModel):

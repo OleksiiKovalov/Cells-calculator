@@ -8,10 +8,11 @@ In this module the general Model class is defined which is used to calculate:
 import importlib
 import inspect
 import os
+from collections.abc import Callable
 from logging import Logger
+from typing import Any
 
 # Local application imports
-from UI.app_globals import get_registered_model
 from model.NucleiCounter import NucleiCounter
 from model.utils import (
     calculate_alive_percentage,
@@ -49,6 +50,7 @@ class Model:
     def __init__(
         self,
         logger: Logger,
+        get_registered_model: Callable[[str], Any],
         path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
         threshold=100, eps=5, min_samples=10,
         object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
@@ -80,7 +82,7 @@ class Model:
         )
         self.path = path
         self.model_type = model_type
-        self.init_counter(path, object_size,model_type,model_data)
+        self.init_counter(path, object_size,model_type, model_data, get_registered_model)
         self.inference_duration = 0
         self.model_name = model_name       
         self.cell_counter.model_name = model_name
@@ -94,7 +96,7 @@ class Model:
         """Returns True when nuclei and alive metrics are meaningful for this model."""
         return self.model_type == DETECTOR_MODEL_TYPE
         
-    def init_counter(self, path, object_size, model_type,model_data = None):
+    def init_counter(self, path, object_size, model_type, model_data, get_registered_model: Callable[[str], Any]):
         """
         Helper constructor method for initializing cell counter param.
         Depending on the model file name, either CellCounter or Segmenter

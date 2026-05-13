@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 
 # Local application imports
 from UI.WaitWindow import run_with_wait_window
-from UI.app_globals import get_global, set_global
+from UI.app_globals import get_global, set_global, get_registered_model
 from UI.errorhandling import app_logger
 from UI.ModelsCheckList import ModelsCheckListDialog
 from UI.prediction_rendering import (
@@ -282,6 +282,7 @@ class CellDetectorPlugin(BasePlugin):
         self.plugin_signal.emit("Save_as", False)
         currentModel = self.combo_box.currentText()
         self.model = Model(logger=app_logger(),
+                           get_registered_model=get_registered_model,
                            path=arg[-1][currentModel]['path'],
                            object_size=arg[-1][currentModel]['object_size'],
                            model_type = arg[-1][currentModel]['model_type']
@@ -584,6 +585,7 @@ class CellDetectorPlugin(BasePlugin):
                     del self.model
                     self.model = None
                 self.model = Model(logger=app_logger(),
+                                   get_registered_model=get_registered_model,
                                    path=self.models[model]['path'],
                                    object_size=self.models[model]['object_size'],
                                    model_type=self.models[model]['model_type'],
@@ -607,6 +609,7 @@ class CellDetectorPlugin(BasePlugin):
                     self.model = None
                     a_path = self.models[model]['path']
                     self.model = Model(logger=app_logger(),
+                                       get_registered_model=get_registered_model,
                                        path=a_path,
                                        object_size=self.models[model]['object_size'],
                                        model_type=self.models[model]['model_type'],
@@ -758,6 +761,7 @@ class CellDetectorPlugin(BasePlugin):
             Tuple of images and data.
         """
         model = Model(logger=app_logger(),
+                      get_registered_model=get_registered_model,
                       path=modelpath,
                       object_size=object_size,
                       model_type=modeltype,
