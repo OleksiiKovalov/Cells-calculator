@@ -6,11 +6,13 @@ In this module the general Model class is defined which is used to calculate:
 
 # Standard library imports
 import importlib
+import inspect
 import os
 
 
 # Local application imports
 from UI.app_globals import get_registered_model
+from UI.errorhandling import app_logger
 from model.NucleiCounter import NucleiCounter
 from model.utils import (
     calculate_alive_percentage,
@@ -101,7 +103,17 @@ class Model:
         module_name, class_name = cell_counter_class_name.rsplit(".", 1)
         module = importlib.import_module(module_name)
         cell_counter_class = getattr(module, class_name)
-        self.cell_counter =cell_counter_class(path, object_size = object_size,model_data = model_data)   
+
+        init_kwargs = {
+            "path_to_model": path,
+            "object_size": object_size,
+            "model_data": model_data
+        }
+        sig = inspect.signature(cell_counter_class)
+        if 'logger' in sig.parameters:
+            init_kwargs["logger"] = app_logger()
+
+        self.cell_counter = cell_counter_class(**init_kwargs)
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """
