@@ -6,3 +6,6 @@ pandas-stubs==2.2.*
 types-tensorflow==2.*
 scipy-stubs==1.15.*
 types-shapely==2.0.*
+types-pywin32==311.0.*; sys_platform == 'win32'
+types-pycocotools==2.0.*
+typing-extensions==4.13.*

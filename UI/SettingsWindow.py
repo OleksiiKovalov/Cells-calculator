@@ -5,6 +5,7 @@ This module defines the dialog window for selecting channels in the Cells Calcul
 # Standard library imports
 import os
 import traceback
+from typing import Optional
 
 # Third-party imports
 import tifffile
@@ -77,13 +78,13 @@ class SettingsWindow(QMainWindow):
                 font-size: 32px;
             }
         ''')
-        self.lsm_list = None
+        self.lsm_list: Optional[list[str]] = None
         self.parametrs = parametrs
         self.number = 0
 
         # If multiple LSM files are selected, use the first one
         if isinstance(lsm_path, list):
-            self.lsm_path = lsm_path[0]
+            self.lsm_path: str = lsm_path[0]
             self.lsm_list = lsm_path
         else:
             self.lsm_path = lsm_path

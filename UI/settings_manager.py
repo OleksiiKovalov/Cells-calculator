@@ -64,7 +64,7 @@ class SettingsManager:
         self.backup_count = backup_count
         self.auto_save = auto_save
         self._lock = threading.RLock()
-        self._settings = {}
+        self._settings: Dict[str, Any] = {}
         self._defaults = self._get_default_settings()
         
         # Set up logging (also in application directory)

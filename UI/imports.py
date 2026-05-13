@@ -31,6 +31,8 @@ import string
 import time
 import re
 from datetime import datetime
+from types import ModuleType
+from typing import Optional, Type
 
 splash_manager.update_splash(curpc, "Loading Path and File Handling...")
 curpc += 1
@@ -42,18 +44,17 @@ curpc += 1
 from collections import OrderedDict
 import json
 from typing import Optional, List, Tuple, Dict, Any, Union, Callable
-from pyparsing import Optional
 
 # Windows-specific imports (conditional for cross-platform compatibility)
 try:
     import win32api
 except ImportError:
-    win32api = None
+    win32api: Optional[ModuleType] = None
     
 try:
     import winsound
 except ImportError:
-    winsound = None
+    winsound: Optional[ModuleType] = None
 
 ## Third-Party Scientific Libraries
 
@@ -92,7 +93,7 @@ import torch
 try:
     from sklearn.cluster import DBSCAN
 except ImportError:
-    DBSCAN = None
+    DBSCAN: Optional[type] = None
 
 splash_manager.update_splash(curpc, "Loading YOLO Models...")
 curpc += 1
@@ -111,15 +112,15 @@ if r is not None and r['preload'] is True:
 try:
     import onnxruntime
 except ImportError:
-    onnxruntime = None
+    onnxruntime: Optional[ModuleType] = None
 
 # Optional evaluation tools
 try:
     from pycocotools.coco import COCO
     from pycocotools.cocoeval import COCOeval
 except ImportError:
-    COCO = None
-    COCOeval = None
+    COCO: Optional[type] = None
+    COCOeval: Optional[type] = None
 
 # Optional advanced packages
 try:
@@ -128,22 +129,22 @@ except ImportError:
     try:
         import importlib.metadata as importlib_metadata
     except ImportError:
-        importlib_metadata = None
+        importlib_metadata: Optional[ModuleType] = None
 
 try:
     import IPython
 except ImportError:
-    IPython = None
+    IPython: Optional[ModuleType] = None
 
 try:
     import fiftyone as fo
 except ImportError:
-    fo = None
+    fo: Optional[ModuleType] = None
 
 try:
     import imantics
 except ImportError:
-    imantics = None
+    imantics: Optional[ModuleType] = None
 
 try:
     import skimage.io

@@ -6,6 +6,7 @@ to calculate cells on a given contrast microimage.
 # Third-party imports
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 
 from model.BaseModel import BaseModel
@@ -152,8 +153,7 @@ class CellCounter(BaseModel):
                     class_ids.append(maxClassIndex)
 
             # Apply NMS (Non-maximum suppression)
-            result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)  # score, nms thresholds
-            result_boxes = np.array(result_boxes).flatten()
+            result_boxes: NDArray[np.int64] = np.array(cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)).flatten() # score, nms thresholds
 
             detections = []
 
@@ -171,11 +171,11 @@ class CellCounter(BaseModel):
 
             # Perform square-based filtering of bboxes. Keep the expected
             # columns even when no objects pass the detector/NMS thresholds.
-            detections = pd.DataFrame(
+            detections_df = pd.DataFrame(
                 detections,
                 columns=["class_id", "class_name", "confidence", "box", "scale"],
             )
-            self.detections = detections
+            self.detections = detections_df
             csv_data = self.detections.copy()
             csv_data["width"] = csv_data["box"].apply(
                 lambda b: b[2] / length if b is not None else None
@@ -193,10 +193,10 @@ class CellCounter(BaseModel):
             )
             self.scale = scale
             # Change object_size for detection
-            self.object_size["signal"]("set_size", detections["box"].copy())
+            self.object_size["signal"]("set_size", detections_df["box"].copy())
 
-        detections = self.detections
-        self.object_size["signal"]("set_size", detections["box"].copy())
+        detections_df = self.detections
+        self.object_size["signal"]("set_size", detections_df["box"].copy())
         # TODO: in this codeline, calculate max and min squares of obtained bboxes
         # and automatically set them as lower and upper bounds for the filtering
         # sliders if the sliders currently have default values (0 and 10) set up.
@@ -212,7 +212,7 @@ class CellCounter(BaseModel):
         #     min_size=self.object_size["min_size"],
         #     max_size=self.object_size["max_size"],
         # )
-        filtered_detections = detections
+        filtered_detections = detections_df
         self.detectionCount = filtered_detections.shape[0]
         self.prediction_image = None
 

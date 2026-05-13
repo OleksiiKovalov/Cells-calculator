@@ -182,11 +182,14 @@ class menubar(QMenuBar):
 
         if file_info.isFile():
             filename = str(Path(file_info.absoluteFilePath()))
-            val = self.parent.image_mru.get(filename)
-            if val is not None:
-                if val.year == 1:
-                    return QColor(0, 150, 0)  # Green for recently opened files
-                return QColor(0, 0, 150)  # Blue for processed files
+            parent_object = self.parent()
+            if parent_object is not None and hasattr(parent_object, 'image_mru'):
+                image_mru = getattr(parent_object, 'image_mru')
+                val = image_mru.get(filename)
+                if val is not None:
+                    if val.year == 1:
+                        return QColor(0, 150, 0)  # Green for recently opened files
+                    return QColor(0, 0, 150)  # Blue for processed files
         return None  # Use default color
 
     def open_file(self):

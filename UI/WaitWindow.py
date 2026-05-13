@@ -19,7 +19,7 @@ Features:
 
 # Standard library imports
 import time
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 # Third-party imports
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
@@ -192,7 +192,15 @@ class WaitWindow(QDialog):
         
         # Window properties
         self.setWindowTitle(title)
-        self.setWindowFlags(Qt.Dialog | Qt.WindowTitleHint | Qt.CustomizeWindowHint | Qt.Tool)
+
+        flags = cast(Qt.WindowType,
+            Qt.WindowType.Dialog
+            | Qt.WindowType.WindowTitleHint
+            | Qt.WindowType.CustomizeWindowHint
+            | Qt.WindowType.Tool
+        )
+
+        self.setWindowFlags(flags)
         self.setModal(True)
         
         # Time tracking
@@ -202,7 +210,7 @@ class WaitWindow(QDialog):
         
         # Worker thread for non-blocking operations
         self.worker_thread: Optional[WorkerThread] = None
-        self.result = None
+        self.result_ = None
         self.error_message = None
         
         # Timer for duration counter
@@ -315,12 +323,12 @@ class WaitWindow(QDialog):
         
         # Wait animation label
         self.wait_label = AnimatedWaitLabel()
-        self.wait_label.setAlignment(Qt.AlignCenter)
+        self.wait_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         content_layout.addWidget(self.wait_label)
         
         # Info label
         self.info_label = QLabel(info_text)
-        self.info_label.setAlignment(Qt.AlignCenter)
+        self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label.setWordWrap(True)
         self.info_label.setStyleSheet(INFO_LABEL_STYLE)
         content_layout.addWidget(self.info_label)
@@ -332,13 +340,13 @@ class WaitWindow(QDialog):
         
         # Duration counter
         self.duration_label = QLabel("Elapsed: 00:00")
-        self.duration_label.setAlignment(Qt.AlignCenter)
+        self.duration_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.duration_label.setStyleSheet(DURATION_LABEL_STYLE)
         time_layout.addWidget(self.duration_label)
         
         # Last duration label
         self.last_duration_label = QLabel("Estimated: Unknown")
-        self.last_duration_label.setAlignment(Qt.AlignCenter)
+        self.last_duration_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.last_duration_label.setStyleSheet(LAST_DURATION_LABEL_STYLE)
         time_layout.addWidget(self.last_duration_label)
         

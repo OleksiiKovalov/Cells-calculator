@@ -72,7 +72,7 @@ def calculate_table(
         for model_name, model in model_dict.items():
             try:
                 # Attempt to apply the method to the image file
-                result = model.calculate(img_path=file_path, cell_channel=parameters['Cell'],\
+                result = getattr(model, 'calculate', lambda **kwargs: None)(img_path=file_path, cell_channel=parameters['Cell'],\
                     nuclei_channel=parameters['Nuclei'])
             except:
                 result = None

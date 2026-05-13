@@ -20,6 +20,7 @@ import json
 import os
 from collections import OrderedDict
 from typing import Any
+from shapely.geometry import Polygon, MultiPolygon
 
 # Third-party imports
 import cv2  # OpenCV for findContours
@@ -360,12 +361,15 @@ class InstansegSegmenter(BaseModel):
         if geom.is_empty:
             return None, None
 
-        if geom.geom_type == "Polygon":
+        if isinstance(geom, Polygon):
             poly = geom
-        elif geom.geom_type == "MultiPolygon":
+
+        elif isinstance(geom, MultiPolygon):
             if len(geom.geoms) == 0:
                 return None, None
+
             poly = max(geom.geoms, key=lambda g: g.area)
+
         else:
             return None, None
 

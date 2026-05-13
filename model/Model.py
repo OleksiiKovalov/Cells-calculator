@@ -101,7 +101,7 @@ class Model:
         module_name, class_name = cell_counter_class_name.rsplit(".", 1)
         module = importlib.import_module(module_name)
         cell_counter_class = getattr(module, class_name)
-        self.cell_counter =cell_counter_class(path, object_size = object_size,model_data = model_data)   
+        self.cell_counter = cell_counter_class(path, object_size = object_size,model_data = model_data)   
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """

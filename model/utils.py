@@ -355,7 +355,7 @@ def filter_detections(
     if detections.empty:
         return detections
     img_sq = img_size[0] * img_size[1]
-    filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
+    filtered_detections: pd.DataFrame = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
     return filtered_detections
 
 def filter_segmentation_detections(
@@ -692,9 +692,9 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
         padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
     # For color or multi-channel
     elif resized.ndim == 3:
-        pad_width = pad_width + ((0, 0),)  # no padding on channels
-        padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
-        
+        pad_width_3d = pad_width + ((0, 0),)  # no padding on channels
+        padded = np.pad(resized, pad_width_3d, mode='constant', constant_values=0)
+
     return padded
 
 
