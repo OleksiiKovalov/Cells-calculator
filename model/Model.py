@@ -8,11 +8,10 @@ In this module the general Model class is defined which is used to calculate:
 import importlib
 import inspect
 import os
-
+from logging import Logger
 
 # Local application imports
 from UI.app_globals import get_registered_model
-from UI.errorhandling import app_logger
 from model.NucleiCounter import NucleiCounter
 from model.utils import (
     calculate_alive_percentage,
@@ -27,6 +26,9 @@ DETECTOR_MODEL_TYPE = "cellcounter"
 NO_NUCLEI_METRIC = -100
 
 class Model:
+
+    _logger: Logger
+
     """
     The class for object of general model.
     To use the class instances, define a new instance and use
@@ -45,13 +47,14 @@ class Model:
     - '%': the target percentage value obtained.
     """
     def __init__(
-        self, 
+        self,
+        logger: Logger,
         path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
         threshold=100, eps=5, min_samples=10,
         object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
         model_type = "",
         model_data = None,
-        model_name = None
+        model_name = None,
     ):
         """
         Initialize the general cell analysis model.
@@ -69,6 +72,7 @@ class Model:
             model_data (dict): Model-specific configuration parameters. Optional.
             model_name (str): Human-readable model name for reporting. Optional.
         """
+        self._logger = logger
         self.nuclei_counter = NucleiCounter(
             threshold=threshold,
             eps=eps,
@@ -111,7 +115,7 @@ class Model:
         }
         sig = inspect.signature(cell_counter_class)
         if 'logger' in sig.parameters:
-            init_kwargs["logger"] = app_logger()
+            init_kwargs["logger"] = self._logger
 
         self.cell_counter = cell_counter_class(**init_kwargs)
 
