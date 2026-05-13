@@ -32,23 +32,13 @@ from skimage.color import rgb2gray
 from skimage.io import imread
 
 # Local application imports
-from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_GRID,
-    IMAGE_FILE_NAME_INGFERENCE,
-    IMAGE_FILE_NAME_TMP,
-)
 from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
     plot_mask,
-    plot_predictions,
-    plot_predictions_with_alignment,
     process_loaded_image,
-    resize_and_pad_cv,
     safe_image_read,
     safegray2rgb,
-    safe_image_write,
 )
 
 
@@ -117,31 +107,19 @@ class CellposeSegmenter(BaseModel):
     def count_x20(
         self,
         input_image,
-        plot=True,
-        colormap="tab20",
         tracking=False,
-        filename=IMAGE_FILE_NAME_DETECTION,
         min_score=0.05,
-        alpha=0.75,
-        store_bin_mask=False,
-        **kwargs,
     ):
         """
         Segment cells in image using Cellpose at x20 magnification.
         
-        Loads image, applies preprocessing, runs Cellpose segmentation, converts
-        results to structured format, and optionally visualizes segmentations.
+        Loads image, applies preprocessing, runs Cellpose segmentation, and converts
+        results to structured detection data.
         
         Args:
             input_image (str): Path to input microscopy image
-            plot (bool): Whether to generate visualization image. Defaults to True.
-            colormap (str): Matplotlib colormap for mask visualization. Defaults to 'tab20'.
             tracking (bool): Whether in tracking mode (affects CSV output). Defaults to False.
-            filename (str): Output path for visualization. Defaults to IMAGE_FILE_NAME_DETECTION.
             min_score (float): Minimum confidence score (0-1) to keep detections. Defaults to 0.05.
-            alpha (float): Transparency for mask overlay (0-1). Defaults to 0.75.
-            store_bin_mask (bool): Whether to store binary masks in DataFrame. Defaults to False.
-            **kwargs: Additional arguments (unused, for API compatibility)
         
         Returns:
             pd.DataFrame: Segmentation results with columns:
@@ -165,7 +143,6 @@ class CellposeSegmenter(BaseModel):
         img_inference = process_loaded_image(
             image=image, settings=image_preprocess_settings
         )
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
         self.original_image = safegray2rgb(image)
         channels_to_use = [0, 0]  # Adapt!
         try:
@@ -178,7 +155,7 @@ class CellposeSegmenter(BaseModel):
                 masks,
                 cellprob_map=cellprob,
                 image_shape_for_norm=image.shape[:2], # Or masks.shape[:2] if appropriate
-                store_bin_mask=False # Set to True if you need the binary masks in the DataFrame
+                store_bin_mask=False
             )
             detections = self.detections[self.detections["confidence"] >= min_score]
             if tracking is False:
@@ -194,34 +171,19 @@ class CellposeSegmenter(BaseModel):
                     sep=";",
                     index=False,
                 )
-            original_image = self.original_image.copy()
-
             filtered_detections = detections
 
             self.prediction_image = None
-            if plot:
-                self.prediction_image = plot_predictions_with_alignment(
-                    original_image,
-                    img_inference,
-                    filtered_detections["mask"].tolist(),
-                    filename=filename,
-                    colormap=colormap,
-                    alpha=self.object_size.get("alpha", 0.75),
-                )
-            return filtered_detections
+            return self._prediction_result(
+                filtered_detections,
+                original_image=self.original_image,
+                inference_image=img_inference,
+            )
         except Exception as e:
             raise RuntimeError(f"Помилка інференсу Cellpose: {e}")
         
 
-    def count_x10(
-        self,
-        input_image: str,
-        filename=IMAGE_FILE_NAME_DETECTION,
-        colormap="tab20",
-        min_score=0.01,
-        alpha=0.75,
-        **kwargs,
-    ):
+    def count_x10(self, input_image: str):
         """
         Segment cells using Cellpose at x10 magnification.
         
@@ -229,16 +191,13 @@ class CellposeSegmenter(BaseModel):
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output path (unused)
-            colormap (str): Colormap (unused)
-            min_score (float): Minimum score (unused)
-            alpha (float): Transparency (unused)
-            **kwargs: Additional arguments (unused)
             
         Raises:
             NotImplementedError: Always raised
         """
-        raise NotImplementedError
+        raise NotImplementedError(
+            f"{self.__class__.__name__}.count_x10 is not implemented for {input_image}"
+        )
 
     def image_preprocess(self, image):
         """

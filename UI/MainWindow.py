@@ -30,13 +30,13 @@ from UI.app_globals import get_global
 from UI.errorhandling import connect_to_log_events
 from UI.ImageNormalizeDialog import ImageNormalizeDialog
 from UI.menubar import MenuBar
+from UI.prediction_rendering import COLOR_NUMBER as color_number
 from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin as CellDetector_plugin
 from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugin
 from UI.right_layout.right_layout import right_layout
 from UI.SettingsWindow import SettingsWindow
 from UI.table import calculate_table
 from model.utils import (
-    COLOR_NUMBER as color_number,
     clear_cache,
     lsm_to_channels_last,
     read_lsm_array,

@@ -17,12 +17,6 @@ import pandas as pd
 # Local application imports
 from model.YOLOSegmenter import YoloSegmenter
 from model.utils import compute_iou, plot_mask, pandas_to_ultralytics, safe_image_read
-from UI.app_globals import ( 
-    IMAGE_FILE_NAME_DETECTION, 
-    IMAGE_FILE_NAME_GRID, 
-    IMAGE_FILE_NAME_INGFERENCE, 
-    IMAGE_FILE_NAME_TMP
-)
 
 
 class Tracker:
@@ -121,8 +115,6 @@ class Tracker:
             filename = str(self.img_dir / ("frame_" + str(i).zfill(3) + ".png"))
             output = self.model.count_x20(
                 path,
-                plot=False,
-                filename=filename,
                 store_bin_mask=True,
                 tracking=True
             )

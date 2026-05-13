@@ -6,12 +6,6 @@ This test ensures that models don't crash when running on various test images.
 import pytest
 from pathlib import Path
 
-from model.YOLOSegmenter import YoloSegmenter
-from model.CellposeSegmenter import CellposeSegmenter
-from model.InstanSegSegmenter import InstansegSegmenter
-from model.StardistSegmenter import StardistSegmenter
-from model.CellCounter import CellCounter
-
 def load_model(model_path: str, model_type: str):
     if not Path(model_path).exists():
         raise FileNotFoundError(f"Model file not found: {model_path}")
@@ -30,14 +24,30 @@ def load_model(model_path: str, model_type: str):
     }
     match model_type.lower():
         case "yolo":
+            pytest.importorskip("ultralytics")
+            pytest.importorskip("sahi")
+            from model.YOLOSegmenter import YoloSegmenter
+
             return YoloSegmenter(model_path, object_size=object_size, model_data={})
         case "cellpose":
+            pytest.importorskip("cellpose")
+            from model.CellposeSegmenter import CellposeSegmenter
+
             return CellposeSegmenter(model_path, object_size=object_size, model_data={})
         case "instanseg":
+            pytest.importorskip("instanseg")
+            from model.InstanSegSegmenter import InstansegSegmenter
+
             return InstansegSegmenter(model_path, object_size=object_size, model_data={})
         case "stardist":
+            pytest.importorskip("pkg_resources")
+            pytest.importorskip("stardist")
+            from model.StardistSegmenter import StardistSegmenter
+
             return StardistSegmenter(model_path, object_size=object_size, model_data={})
         case "cellcounter":
+            from model.CellCounter import CellCounter
+
             return CellCounter(model_path, object_size=object_size, model_data={})
         case _:
             raise ValueError(f"Unsupported model type: {model_type}. "
@@ -60,7 +70,7 @@ def run_model_on_image(model_path: str, image_path: str, model_type: str = "yolo
     elif hasattr(model, 'calculate'):
         results = model.calculate(image_path)
     elif hasattr(model, 'count_x20'):
-        results = model.count_x20(input_image=image_path, tracking=True, plot=False)
+        results = model.count_x20(input_image=image_path, tracking=True)
     else:
         raise AttributeError(f"Class {type(model).__name__} doesn't have methods 'predict', 'calculate' or 'count_x20'")
     return {

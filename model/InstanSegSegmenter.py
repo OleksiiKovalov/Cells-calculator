@@ -32,19 +32,20 @@ from shapely.geometry import shape
 from skimage.io import imread
 
 # Local application imports
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_INGFERENCE, set_global
 from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
     filter_segmentation_detections,
     plot_mask, 
-    plot_predictions,
-    plot_predictions_with_alignment,
     process_loaded_image,
     resize_and_pad_cv, 
     safegray2rgb, 
-    safe_image_write
 )
+
+
+INSTANSEG_DEFAULT_OVERLAP = 200
+INSTANSEG_MIN_WINDOW_SIZE = INSTANSEG_DEFAULT_OVERLAP + 1
+INSTANSEG_MAX_PADDING_FLOOR = 512
 
 
 class InstansegSegmenter(BaseModel):
@@ -118,18 +119,35 @@ class InstansegSegmenter(BaseModel):
         """
         pass
 
+    def _ensure_eval_window_size(self, image, method_name, tile_size):
+        """Pad very narrow inputs so InstanSeg's fixed overlap is valid."""
+        if method_name != 'eval_medium_image':
+            return image
+
+        height, width = image.shape[:2]
+        padding_floor = max(
+            min(int(tile_size), INSTANSEG_MAX_PADDING_FLOOR),
+            INSTANSEG_MIN_WINDOW_SIZE,
+        )
+        target_height = max(height, padding_floor)
+        target_width = max(width, padding_floor)
+
+        if target_height == height and target_width == width:
+            return image
+
+        app_logger().info(
+            "Padding InstanSeg inference image from "
+            f"{width}x{height} to {target_width}x{target_height} "
+            "to keep overlap smaller than the inference window."
+        )
+        return resize_and_pad_cv(image, target_width, target_height)
+
     def count_x20(
         self,
         input_image,
-        plot=True,
-        colormap='tab20',
         tracking=False,
-        filename=IMAGE_FILE_NAME_DETECTION,
         min_score=0.05,
-        alpha=0.75,
-        store_bin_mask=False,
         x10=False,
-        **kwargs,
     ):
         """
         Segment cells/nuclei using InstanSeg at specified magnification.
@@ -139,15 +157,9 @@ class InstansegSegmenter(BaseModel):
         
         Args:
             input_image (str): Path to input microscopy image
-            plot (bool): Whether to generate visualization. Defaults to True.
-            colormap (str): Matplotlib colormap for visualization. Defaults to 'tab20'.
             tracking (bool): Whether in tracking mode. Defaults to False.
-            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
             min_score (float): Minimum confidence threshold (0-1). Defaults to 0.05.
-            alpha (float): Mask overlay transparency (0-1). Defaults to 0.75.
-            store_bin_mask (bool): Whether to store binary mask arrays. Defaults to False.
             x10 (bool): Use x10 configuration if True, else x10. Defaults to False.
-            **kwargs: Additional inference arguments
         
         Returns:
             pd.DataFrame: Instance segmentation results with columns:
@@ -202,7 +214,11 @@ class InstansegSegmenter(BaseModel):
             image=image,
             settings=image_preprocess_settings
         )
-        safe_image_write(img_inference, IMAGE_FILE_NAME_INGFERENCE)
+        img_inference = self._ensure_eval_window_size(
+            img_inference,
+            method_name,
+            tile_size,
+        )
         self.original_image = safegray2rgb(image)
 
         try:
@@ -215,7 +231,7 @@ class InstansegSegmenter(BaseModel):
             has_tile_size = 'tile_size' in sig.parameters
             
             # Prepare base arguments
-            kwargs = {
+            inference_kwargs = {
                 'image': img_inference,
                 'return_image_tensor': False,
                 'target': 'cells',
@@ -224,9 +240,9 @@ class InstansegSegmenter(BaseModel):
             
             # Add tile_size only if method supports it and x10 is True
             if has_tile_size and x10:
-                kwargs['tile_size'] = tile_size
+                inference_kwargs['tile_size'] = tile_size
             
-            labeled_output = method(**kwargs)
+            labeled_output = method(**inference_kwargs)
 
             self.detections = self.instanseg_results_to_pandas(labeled_output)
             detections = self.detections[self.detections['confidence'] >= min_score]
@@ -242,7 +258,6 @@ class InstansegSegmenter(BaseModel):
                     index=False,
                 )
 
-            original_image = self.original_image.copy()
             #todo restore tracking feature
             if tracking is False:
                 signal_fn = self.object_size.get('signal')
@@ -292,36 +307,17 @@ class InstansegSegmenter(BaseModel):
 
             #filtered_detections = detections
 
-            set_global('detections', filtered_detections)
-            set_global('image_inference', img_inference.copy())
-            set_global('image_original', original_image.copy())
-            set_global('image_detections', None)
             self.prediction_image = None
 
-            if plot:
-                self.prediction_image = plot_predictions_with_alignment(
-                    original_image,
-                    img_inference,
-                    filtered_detections['mask'].tolist(),
-                    filename=filename,
-                    colormap=self.object_size.get("color_map"),
-                    alpha=self.object_size.get('alpha', 0.75),
-                    color_ids=filtered_detections['id_label'].tolist()
-                )
-
-            return filtered_detections
+            return self._prediction_result(
+                filtered_detections,
+                original_image=self.original_image,
+                inference_image=img_inference,
+            )
         except Exception as e:
             raise RuntimeError(f"Error when inferrecing InstanSeg: {e}")
 
-    def count_x10(
-        self,
-        input_image: str,
-        filename=IMAGE_FILE_NAME_DETECTION,
-        colormap='tab20',
-        min_score=0.01,
-        alpha=0.75,
-        **kwargs,
-    ):
+    def count_x10(self, input_image: str, min_score=0.01):
         """
         Segment cells/nuclei using InstanSeg at x10 magnification with tiling.
         
@@ -329,26 +325,16 @@ class InstansegSegmenter(BaseModel):
         
         Args:
             input_image (str): Path to input microscopy image
-            filename (str): Output visualization path. Defaults to IMAGE_FILE_NAME_DETECTION.
-            colormap (str): Matplotlib colormap for visualization. Defaults to 'tab20'.
             min_score (float): Minimum confidence threshold (0-1). Defaults to 0.01.
-            alpha (float): Mask overlay transparency (0-1). Defaults to 0.75.
-            **kwargs: Additional inference arguments
         
         Returns:
             pd.DataFrame: Instance segmentation results (same format as count_x20)
         """
         return self.count_x20(
             input_image,
-            plot=True,
-            colormap=colormap,
             tracking=False,
-            filename=filename,
             min_score=min_score,
-            alpha=alpha,
-            store_bin_mask=False,
             x10=True,
-            **kwargs,
         )
     def _extract_polygon_from_geometry(self, geometry):
         """

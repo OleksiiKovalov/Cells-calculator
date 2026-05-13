@@ -202,6 +202,8 @@ class WaitWindow(QDialog):
         
         # Worker thread for non-blocking operations
         self.worker_thread: Optional[WorkerThread] = None
+        self.result = None
+        self.error_message = None
         
         # Timer for duration counter
         self.duration_timer = QTimer()
@@ -288,11 +290,15 @@ class WaitWindow(QDialog):
     
     def _on_process_completed(self, result):
         """Handle threaded process completion"""
+        self.result = result
+        self.error_message = None
         self.stop_wait()
         self.process_completed.emit(result)
     
     def _on_process_failed(self, error_message):
         """Handle threaded process failure"""
+        self.result = None
+        self.error_message = error_message
         self.stop_wait()
         self.process_failed.emit(error_message)
     
@@ -458,7 +464,8 @@ def show_wait_window(title="Processing", info_text="Processing, please wait...",
 
 def run_with_wait_window(target_function, *args, title="Processing", 
                         info_text="Processing, please wait...", 
-                        cancellable=True, parent=None, threaded=True, **kwargs):
+                        cancellable=True, parent=None, threaded=True,
+                        on_completed=None, on_failed=None, **kwargs):
     """
     Run a function with a wait window, handling UI responsiveness automatically.
     
@@ -485,6 +492,10 @@ def run_with_wait_window(target_function, *args, title="Processing",
         result = run_with_wait_window(my_function, arg1, arg2, threaded=False)
     """
     wait_window = WaitWindow(title, info_text, cancellable, parent)
+    if on_completed is not None:
+        wait_window.process_completed.connect(on_completed)
+    if on_failed is not None:
+        wait_window.process_failed.connect(on_failed)
     
     if threaded:
         # Run in separate thread

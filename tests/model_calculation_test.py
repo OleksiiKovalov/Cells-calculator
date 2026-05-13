@@ -9,6 +9,7 @@ import model.Model as model_module
 from model import BaseModel as base_model_module
 from model.CellCounter import CellCounter
 from model.Model import Model, calculate_standard
+from model.PredictionResult import PredictionResult
 from model.utils import (
     calculate_alive_percentage,
     extract_nuclei_channel,
@@ -23,6 +24,24 @@ class StubCellCounter:
 
     def count_cells(self, img_path):
         return pd.DataFrame({"box": [np.array([0, 0, 1, 1]) for _ in range(4)]})
+
+
+class ResultCellCounter:
+    """Cell counter stub that returns an explicit prediction result."""
+
+    inference_duration = 0.25
+
+    def __init__(self):
+        self.original_image = np.full((6, 7, 3), 10, dtype=np.uint8)
+        self.inference = np.full((8, 9, 3), 20, dtype=np.uint8)
+
+    def count_cells(self, img_path):
+        detections = pd.DataFrame({"box": [np.array([0, 0, 1, 1])]})
+        return PredictionResult(
+            cells=detections,
+            original_image=self.original_image,
+            inference_image=self.inference,
+        )
 
 
 class StubNucleiCounter:
@@ -42,7 +61,7 @@ class StubNucleiCounter:
 class StubBaseModel(base_model_module.BaseModel):
     """Small BaseModel subclass for exercising count_cells."""
 
-    def count_x20(self, input_image, filename):
+    def count_x20(self, input_image):
         return pd.DataFrame({"box": [np.array([0, 0, 1, 1])]})
 
 
@@ -77,6 +96,22 @@ def test_calculate_standard_fills_nuclei_and_alive_for_regular_images(tmp_path):
     assert result["%"] == 75.0
 
 
+def test_calculate_standard_counts_prediction_result_for_alive_percentage(tmp_path):
+    image_path = tmp_path / "stained.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    assert cv2.imwrite(str(image_path), image)
+
+    result = calculate_standard(
+        ResultCellCounter(),
+        str(image_path),
+        nuclei_count=1,
+    )
+
+    assert isinstance(result["Cells"], PredictionResult)
+    assert result["Cells"].shape[0] == 1
+    assert result["%"] == 0.0
+
+
 def test_count_cells_allows_input_that_is_already_temp_path(tmp_path, monkeypatch):
     temp_image_path = tmp_path / "cell_tmp_img.png"
     image = np.zeros((16, 16, 3), dtype=np.uint8)
@@ -103,11 +138,16 @@ def test_cellcounter_returns_empty_dataframe_when_nms_has_no_boxes(tmp_path):
     counter.object_size = {"signal": lambda *args, **kwargs: None}
     counter.out_dir = tmp_path
 
-    result = counter.count_x20(str(image_path), filename=str(output_path))
+    result = counter.count_x20(str(image_path))
 
-    assert list(result.columns) == ["class_id", "class_name", "confidence", "box", "scale"]
+    assert isinstance(result, PredictionResult)
+    assert list(result.cells.columns) == ["class_id", "class_name", "confidence", "box", "scale"]
     assert result.empty
-    assert output_path.exists()
+    assert result.original_image.shape == image.shape
+    assert result.inference_image.shape == image.shape
+    assert not output_path.exists()
+    assert getattr(counter, "inference_image", None) is None
+    assert counter.prediction_image is None
 
 
 def test_calculate_standard_omits_nuclei_metrics_when_not_provided(tmp_path):
@@ -120,6 +160,31 @@ def test_calculate_standard_omits_nuclei_metrics_when_not_provided(tmp_path):
     assert result["Nuclei"] == -100
     assert result["Cells"].shape[0] == 4
     assert result["%"] == -100
+
+
+def test_model_calculate_preserves_prediction_result_images(tmp_path):
+    image_path = tmp_path / "cells.png"
+    image = np.zeros((16, 16, 3), dtype=np.uint8)
+    assert cv2.imwrite(str(image_path), image)
+
+    cell_counter = ResultCellCounter()
+    model = Model.__new__(Model)
+    model.model_type = "yolo"
+    model.cell_counter = cell_counter
+    model.nuclei_counter = StubNucleiCounter()
+
+    result = model.calculate(str(image_path), nuclei_channel=1)
+
+    assert isinstance(result["Cells"], PredictionResult)
+    assert np.array_equal(
+        result["Cells"].original_image,
+        cell_counter.original_image,
+    )
+    assert np.array_equal(
+        result["Cells"].inference_image,
+        cell_counter.inference,
+    )
+    assert model.inference_duration == cell_counter.inference_duration
 
 
 def test_calculate_skips_nuclei_count_for_regular_images(tmp_path):
