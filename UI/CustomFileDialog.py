@@ -30,6 +30,15 @@ from PyQt5.QtWidgets import (
     QScrollArea, QSplitter, QFrame
 )
 
+# Constants
+DEFAULT_DIALOG_WIDTH = 1000
+DEFAULT_DIALOG_HEIGHT = 650
+PREVIEW_MAX_SIZE = 280
+PREVIEW_MIN_SIZE = 180
+ALTERNATING_ROW_COLOR = QColor(245, 245, 245)
+IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'tif', 'webp', 'ico'}
+DRIVE_REFRESH_ICON = "🔄"
+
 class FileTableModel(QAbstractTableModel):
     """Custom table model for file listing with configurable columns"""
     
@@ -127,18 +136,14 @@ class FileTableModel(QAbstractTableModel):
             self.files.append(parent_info)
         
         # Add directories first
-        for entry in self.current_dir.entryInfoList(QDir.Dirs | QDir.NoDotAndDotDot, QDir.Name):
+        dir_filters = QDir.Dirs | QDir.NoDotAndDotDot
+        for entry in self.current_dir.entryInfoList(dir_filters, QDir.Name):
             self.files.append(entry)
         
-        # Add files with optional filtering
-        #TODO: fix filtering
-        #parent_dialog = self.parent()
-        #allowed_extensions = parent_dialog.get_current_file_extensions()
-        # all_files = self.current_dir.entryInfoList(allowed_extensions, QDir.Files, QDir.Name)
-        #all_files = [f for f in  self.current_dir.entryInfoList(QDir.Files, QDir.Name) if f.suffix().lower() in allowed_extensions]
-        all_files = self.current_dir.entryInfoList(QDir.Files, QDir.Name)
-        self.files.extend(all_files)
-        pass
+        # Add files
+        file_filters = QDir.Files
+        for entry in self.current_dir.entryInfoList(file_filters, QDir.Name):
+            self.files.append(entry)
     
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self.files)
@@ -160,43 +165,56 @@ class FileTableModel(QAbstractTableModel):
         column_config = self.columns[index.column()]
         
         if role == Qt.DisplayRole:
-            try:
-                return column_config['data_func'](file_info)
-            except:
-                return ""
+            return self._get_display_data(file_info, column_config)
         elif role == Qt.DecorationRole and index.column() == 0:
-            # Show file/folder icons in first column
             return self.icon_provider.icon(file_info)
         elif role == Qt.TextAlignmentRole:
-            # Right-align size columns, center others except name
-            if 'size' in column_config['name'].lower():
-                return Qt.AlignRight | Qt.AlignVCenter
-            elif index.column() == 0:
-                return Qt.AlignLeft | Qt.AlignVCenter
-            else:
-                return Qt.AlignCenter | Qt.AlignVCenter
+            return self._get_text_alignment(column_config, index)
         elif role == Qt.ForegroundRole:
-            # Apply custom color rules if set
-            if hasattr(self, 'color_rule') and self.color_rule:
-                try:
-                    color = self.color_rule(file_info)
-                    if color:
-                        return QBrush(color)
-                except:
-                    pass
+            return self._get_foreground_color(file_info, index)
         elif role == Qt.BackgroundRole:
-            # Apply custom background color rules if set
-            if hasattr(self, 'background_color_rule') and self.background_color_rule:
-                try:
-                    color = self.background_color_rule(file_info)
-                    if color:
-                        return QBrush(color)
-                except:
-                    pass
-            # Apply alternating row colors if enabled
-            elif hasattr(self, 'alternating_colors') and self.alternating_colors:
-                if index.row() % 2 == 1:
-                    return QBrush(QColor(245, 245, 245))  # Light gray for odd rows
+            return self._get_background_color(file_info, index)
+        return None
+    
+    def _get_display_data(self, file_info: QFileInfo, column_config: Dict[str, Any]) -> str:
+        """Get display text for a cell"""
+        try:
+            return column_config['data_func'](file_info)
+        except:
+            return ""
+    
+    def _get_text_alignment(self, column_config: Dict[str, Any], index: QModelIndex) -> int:
+        """Get text alignment for a cell"""
+        if 'size' in column_config['name'].lower():
+            return Qt.AlignRight | Qt.AlignVCenter
+        elif index.column() == 0:
+            return Qt.AlignLeft | Qt.AlignVCenter
+        else:
+            return Qt.AlignCenter | Qt.AlignVCenter
+    
+    def _get_foreground_color(self, file_info: QFileInfo, index: QModelIndex) -> Optional[QBrush]:
+        """Get foreground color for a cell"""
+        if hasattr(self, 'color_rule') and self.color_rule:
+            try:
+                color = self.color_rule(file_info)
+                if color:
+                    return QBrush(color)
+            except:
+                pass
+        return None
+    
+    def _get_background_color(self, file_info: QFileInfo, index: QModelIndex) -> Optional[QBrush]:
+        """Get background color for a cell"""
+        if hasattr(self, 'background_color_rule') and self.background_color_rule:
+            try:
+                color = self.background_color_rule(file_info)
+                if color:
+                    return QBrush(color)
+            except:
+                pass
+        elif hasattr(self, 'alternating_colors') and self.alternating_colors:
+            if index.row() % 2 == 1:
+                return QBrush(ALTERNATING_ROW_COLOR)
         return None
     
     def get_file_info(self, index: QModelIndex) -> Optional[QFileInfo]:
@@ -233,7 +251,7 @@ class CustomFileDialog(QDialog):
         super().__init__(parent)
         self.setModal(True)
         self.setWindowTitle(caption)
-        self.setMinimumSize(1000, 650)  # Increased width for preview panel
+        self.setMinimumSize(DEFAULT_DIALOG_WIDTH, DEFAULT_DIALOG_HEIGHT)
         
         # Initialize properties
         self.selected_file = None
@@ -250,13 +268,9 @@ class CustomFileDialog(QDialog):
         self.setup_ui()
         
         # Set initial directory
-        if directory:
-            self.set_directory(directory)
-        else:
-            self.set_directory(Path.home())
-        
-        # Set initial drive selection
-        self.update_drive_selection(Path(self.model.current_dir.absolutePath()))
+        initial_dir = directory or Path.home()
+        self.set_directory(initial_dir)
+        self.update_drive_selection(initial_dir)
     
     def setup_default_columns(self) -> None:
         """Set up default columns configuration"""
@@ -316,7 +330,17 @@ class CustomFileDialog(QDialog):
         """Create the user interface"""
         layout = QVBoxLayout(self)
         
-        # Drive selection (Windows-style)
+        self._setup_drive_selection(layout)
+        self._setup_navigation(layout)
+        self._setup_main_splitter(layout)
+        self._setup_filename_input(layout)
+        self._setup_filter_selection(layout)
+        self._setup_buttons(layout)
+        
+        self.setup_column_widths()
+    
+    def _setup_drive_selection(self, layout: QVBoxLayout) -> None:
+        """Setup drive selection controls"""
         drive_layout = QHBoxLayout()
         drive_layout.addWidget(QLabel("Drive:"))
         self.drive_combo = QComboBox()
@@ -327,8 +351,7 @@ class CustomFileDialog(QDialog):
         self.drive_combo.currentTextChanged.connect(self.on_drive_changed)
         drive_layout.addWidget(self.drive_combo)
         
-        # Add refresh button for drives
-        refresh_button = QPushButton("🔄")
+        refresh_button = QPushButton(DRIVE_REFRESH_ICON)
         refresh_button.setToolTip("Refresh drive list")
         refresh_button.setMaximumWidth(30)
         refresh_button.clicked.connect(self.refresh_drives)
@@ -336,8 +359,9 @@ class CustomFileDialog(QDialog):
         
         drive_layout.addStretch()
         layout.addLayout(drive_layout)
-        
-        # Directory navigation
+    
+    def _setup_navigation(self, layout: QVBoxLayout) -> None:
+        """Setup directory navigation controls"""
         nav_layout = QHBoxLayout()
         self.path_label = QLabel()
         self.up_button = QPushButton("Up")
@@ -346,11 +370,19 @@ class CustomFileDialog(QDialog):
         nav_layout.addWidget(self.path_label, 1)
         nav_layout.addWidget(self.up_button)
         layout.addLayout(nav_layout)
-        
-        # Create main horizontal splitter for file view and preview
+    
+    def _setup_main_splitter(self, layout: QVBoxLayout) -> None:
+        """Setup main splitter with file view and preview"""
         main_splitter = QSplitter(Qt.Horizontal)
         
-        # Left side: File view
+        self._setup_file_view(main_splitter)
+        self._setup_preview_panel(main_splitter)
+        
+        main_splitter.setSizes([500, 300])
+        layout.addWidget(main_splitter, 1)
+    
+    def _setup_file_view(self, splitter: QSplitter) -> None:
+        """Setup file list view"""
         left_widget = QFrame()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
@@ -362,7 +394,7 @@ class CustomFileDialog(QDialog):
         self.tree_view.setSortingEnabled(True)
         self.tree_view.doubleClicked.connect(self.on_double_click)
         self.tree_view.clicked.connect(self.on_click)
-        self.tree_view.selectionModel().currentChanged.connect(self.current_file_changed)   
+        self.tree_view.selectionModel().currentChanged.connect(self.current_file_changed)
         
         
         # Always show selection even when tree view is not focused
@@ -386,8 +418,10 @@ class CustomFileDialog(QDialog):
         self.tree_view.installEventFilter(self)
         
         left_layout.addWidget(self.tree_view)
-        
-        # Right side: Image preview
+        splitter.addWidget(left_widget)
+    
+    def _setup_preview_panel(self, splitter: QSplitter) -> None:
+        """Setup image preview panel"""
         right_widget = QFrame()
         right_widget.setMaximumWidth(300)
         right_widget.setMinimumWidth(200)
@@ -416,7 +450,7 @@ class CustomFileDialog(QDialog):
             }
         """)
         self.preview_label.setText("No preview available")
-        self.preview_label.setMinimumSize(180, 180)
+        self.preview_label.setMinimumSize(PREVIEW_MIN_SIZE, PREVIEW_MIN_SIZE)
         
         self.preview_scroll.setWidget(self.preview_label)
         right_layout.addWidget(self.preview_scroll)
@@ -428,24 +462,18 @@ class CustomFileDialog(QDialog):
         right_layout.addWidget(self.image_info_label)
         
         right_layout.addStretch()
-        
-        # Add both sides to splitter
-        main_splitter.addWidget(left_widget)
-        main_splitter.addWidget(right_widget)
-        
-        # Set splitter proportions (70% file view, 30% preview)
-        main_splitter.setSizes([500, 300])
-        
-        layout.addWidget(main_splitter, 1)
-        
-        # File name input
+        splitter.addWidget(right_widget)
+    
+    def _setup_filename_input(self, layout: QVBoxLayout) -> None:
+        """Setup filename input field"""
         name_layout = QHBoxLayout()
         name_layout.addWidget(QLabel("File name:"))
         self.filename_edit = QLineEdit()
         name_layout.addWidget(self.filename_edit)
         layout.addLayout(name_layout)
-        
-        # File type filter
+    
+    def _setup_filter_selection(self, layout: QVBoxLayout) -> None:
+        """Setup file type filter selection"""
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Files of type:"))
         self.filter_combo = QComboBox()
@@ -453,8 +481,9 @@ class CustomFileDialog(QDialog):
         self.filter_combo.currentTextChanged.connect(self.on_filter_changed)
         filter_layout.addWidget(self.filter_combo)
         layout.addLayout(filter_layout)
-        
-        # Buttons
+    
+    def _setup_buttons(self, layout: QVBoxLayout) -> None:
+        """Setup dialog buttons"""
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
@@ -468,9 +497,6 @@ class CustomFileDialog(QDialog):
         button_layout.addWidget(self.open_button)
         button_layout.addWidget(self.cancel_button)
         layout.addLayout(button_layout)
-        
-        # Set up column widths
-        self.setup_column_widths()
     
     def setup_column_widths(self) -> None:
         """Configure column widths based on column configuration"""
@@ -498,29 +524,25 @@ class CustomFileDialog(QDialog):
         drives = QDir.drives()
         for drive in drives:
             drive_path = drive.absolutePath()
-            
-            # Format drive display (e.g., "C:\ (System)")
-            display_text = drive_path
-            
-            # Try to get volume label on Windows
-            try:
-                if sys.platform == "win32":
-                    try:
-                        import win32api
-                        volume_name = win32api.GetVolumeInformation(drive_path)[0]
-                        if volume_name:
-                            display_text = f"{drive_path} ({volume_name})"
-                    except ImportError:
-                        # win32api not available, use basic format
-                        if len(drive_path) >= 2 and drive_path[1] == ':':
-                            display_text = f"{drive_path} (Local Disk)"
-                    except Exception:
-                        # Any other error, just use the drive path
-                        pass
-            except:
-                pass
-            
+            display_text = self._get_drive_display_text(drive_path)
             self.drive_combo.addItem(display_text, drive_path)
+    
+    def _get_drive_display_text(self, drive_path: str) -> str:
+        """Get display text for a drive"""
+        if sys.platform != "win32":
+            return drive_path
+        
+        try:
+            import win32api
+            volume_name = win32api.GetVolumeInformation(drive_path)[0]
+            if volume_name:
+                return f"{drive_path} ({volume_name})"
+        except (ImportError, Exception):
+            pass
+        
+        if len(drive_path) >= 2 and drive_path[1] == ':':
+            return f"{drive_path} (Local Disk)"
+        return drive_path
     
     def update_drive_selection(self, path: Union[str, Path]) -> None:
         """Update drive combo selection based on current path"""
@@ -722,10 +744,7 @@ class CustomFileDialog(QDialog):
         """Check if the file is a supported image format"""
         if not file_info.isFile():
             return False
-        
-        image_extensions = {'jpg', 'jpeg', 'png', 'bmp', 'gif', 'tiff', 'tif', 'webp', 'ico'}
-        extension = file_info.suffix().lower()
-        return extension in image_extensions
+        return file_info.suffix().lower() in IMAGE_EXTENSIONS
     
     def update_current_file_preview(self) -> None:
         file_info = self.model.get_file_info(self.tree_view.currentIndex()) 
@@ -746,40 +765,35 @@ class CustomFileDialog(QDialog):
             return
         
         try:
-            # Load the image
-            image_path = file_info.absoluteFilePath()
-            pixmap = QPixmap(image_path)
-            
+            pixmap = QPixmap(file_info.absoluteFilePath())
             if pixmap.isNull():
                 self.clear_image_preview("Failed to load image")
                 return
             
-            # Scale image to fit preview area while maintaining aspect ratio
-            preview_size = 280  # Maximum size for preview
             scaled_pixmap = pixmap.scaled(
-                preview_size, preview_size, 
-                Qt.KeepAspectRatio, 
-                Qt.SmoothTransformation
+                PREVIEW_MAX_SIZE, PREVIEW_MAX_SIZE, 
+                Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             
             # Update preview label
             self.preview_label.setPixmap(scaled_pixmap)
             self.preview_label.setMinimumSize(scaled_pixmap.size())
-            
-            # Update image info
-            file_size = self.model.format_size(file_info.size())
-            dimensions = f"{pixmap.width()} × {pixmap.height()}"
-            info_text = f"Size: {file_size}\nDimensions: {dimensions}\nFormat: {file_info.suffix().upper()}"
-            self.image_info_label.setText(info_text)
+            self.image_info_label.setText(self._get_image_info_text(file_info, pixmap))
             
         except Exception as e:
             self.clear_image_preview(f"Error loading image: {str(e)}")
+    
+    def _get_image_info_text(self, file_info: QFileInfo, pixmap: QPixmap) -> str:
+        """Get formatted image information text"""
+        file_size = self.model.format_size(file_info.size())
+        dimensions = f"{pixmap.width()} × {pixmap.height()}"
+        return f"Size: {file_size}\nDimensions: {dimensions}\nFormat: {file_info.suffix().upper()}"
     
     def clear_image_preview(self, message: str = "No preview available") -> None:
         """Clear the image preview and show a message"""
         self.preview_label.clear()
         self.preview_label.setText(message)
-        self.preview_label.setMinimumSize(180, 180)
+        self.preview_label.setMinimumSize(PREVIEW_MIN_SIZE, PREVIEW_MIN_SIZE)
         self.image_info_label.clear()
     
     def set_file_filters(self, filters: List[str]) -> None:
