@@ -10,6 +10,7 @@ Key components:
 """
 
 # Third-party imports
+from typing import List, Tuple, Optional
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QListWidget, QListWidgetItem,
@@ -21,7 +22,7 @@ class ModelsCheckListDialog(QDialog):
     Dialog for selecting models from a checklist.
     """
 
-    def __init__(self, items, checked_indices=None, parent=None):
+    def __init__(self, items: List[str], checked_indices: Optional[List[int]] = None, parent=None) -> None:
         """
         Initialize the dialog.
 
@@ -36,12 +37,11 @@ class ModelsCheckListDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        layout.addWidget(QLabel(text="ground truth model"))
+        layout.addWidget(QLabel("ground truth model"))
         self.ground_model = QComboBox()
         layout.addWidget(self.ground_model)
-        
-        
-        layout.addWidget(QLabel(text="available models"))
+
+        layout.addWidget(QLabel("available models"))
         self.list_widget = QListWidget()
         
         for i, text in enumerate(items):
@@ -58,7 +58,7 @@ class ModelsCheckListDialog(QDialog):
         self.button_box.rejected.connect(self.reject)
         layout.addWidget(self.button_box)
 
-    def get_checked_items(self):
+    def get_checked_items(self) -> List[Tuple[int, str]]:
         """
         Get the list of checked items.
 
@@ -70,7 +70,8 @@ class ModelsCheckListDialog(QDialog):
             for i in range(self.list_widget.count())
             if self.list_widget.item(i).checkState() == Qt.Checked
         ]
-    def getGroundTruthModel(self):
+
+    def get_ground_truth_model(self) -> str:
         """
         Get the selected ground truth model.
 
@@ -78,17 +79,17 @@ class ModelsCheckListDialog(QDialog):
             str: The current text of the ground truth model combo box.
         """
         return self.ground_model.currentText()
-    
-    def Execute(self, defaultgroundmodel=None):
+
+    def execute(self, default_ground_model: Optional[str] = None) -> bool:
         """
         Execute the dialog.
 
         Args:
-            defaultgroundmodel: Default model to select.
+            default_ground_model: Default model to select.
 
         Returns:
             bool: True if accepted.
         """
-        if defaultgroundmodel is not None:
-            self.ground_model.setCurrentText(defaultgroundmodel)
+        if default_ground_model is not None:
+            self.ground_model.setCurrentText(default_ground_model)
         return self.exec_() == QDialog.Accepted

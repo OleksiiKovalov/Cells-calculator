@@ -20,7 +20,7 @@ import sys
 from UI.app_globals import FILENAME_MODEL_CONFIG, get_global, register_model, set_global
 import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QIcon
 from UI.splashscreen import splash_manager
 
@@ -83,10 +83,16 @@ if __name__ == '__main__':
         app_logger().info("Exiting application event loop...")
     except Exception as e:
         traceback.print_exc()
-        # Show error on splash screen briefly before showing dialog
-        splash_manager.show_error(str(e))
-        QTimer.singleShot(2000, splash_manager.close_splash)  # Close splash after 2 seconds
+        # Close splash screen immediately to show error dialog on top
+        splash_manager.close_splash()
         
-        # If an exception occurs, display a critical error message and exit the application
-        QMessageBox.critical(None, "Critical Error", f"Failed to initialize or run application:\n\n{str(e)}", QMessageBox.Ok)
+        # Create error dialog with WindowStaysOnTopHint to ensure it appears in front
+        error_box = QMessageBox()
+        error_box.setWindowFlags(error_box.windowFlags() | Qt.WindowStaysOnTopHint)
+        error_box.setIcon(QMessageBox.Critical)
+        error_box.setWindowTitle("Critical Error")
+        error_box.setText(f"Failed to initialize or run application:\n\n{str(e)}")
+        error_box.setStandardButtons(QMessageBox.Ok)
+        error_box.exec_()
+        
         sys.exit(1)

@@ -25,7 +25,7 @@ from typing import Callable, Optional
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-    QPushButton, QFrame, QApplication
+    QPushButton, QFrame, QApplication, QSizePolicy
 )
 
 # Local application imports
@@ -334,12 +334,16 @@ class WaitWindow(QDialog):
         self.duration_label = QLabel("Elapsed: 00:00")
         self.duration_label.setAlignment(Qt.AlignCenter)
         self.duration_label.setStyleSheet(DURATION_LABEL_STYLE)
+        self.duration_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.duration_label.setMinimumWidth(220)
         time_layout.addWidget(self.duration_label)
         
         # Last duration label
         self.last_duration_label = QLabel("Estimated: Unknown")
         self.last_duration_label.setAlignment(Qt.AlignCenter)
         self.last_duration_label.setStyleSheet(LAST_DURATION_LABEL_STYLE)
+        self.last_duration_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self.last_duration_label.setMinimumWidth(220)
         time_layout.addWidget(self.last_duration_label)
         
         content_layout.addWidget(time_frame)
@@ -404,6 +408,7 @@ class WaitWindow(QDialog):
             minutes = int(elapsed // 60)
             seconds = int(elapsed % 60)
             self.duration_label.setText(f"Elapsed: {minutes:02d}:{seconds:02d}")
+            self.duration_label.adjustSize()
     
     def load_last_duration(self):
         """Load last duration from settings and display estimated time"""
