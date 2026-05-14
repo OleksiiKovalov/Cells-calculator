@@ -285,17 +285,3 @@ class SplashScreenManager:
 
 # Global manager instance (better than raw globals)
 splash_manager = SplashScreenManager()
-
-# Backward compatibility functions
-def init_splash() -> None:
-    splash_manager.init_splash()
-
-def close_splash() -> None:
-    splash_manager.close_splash()
-
-def update_splash(value: int, message: str = "") -> None:
-    splash_manager.update_splash(value, message)
-
-def show_splash_error(message: str) -> None:
-    splash_manager.show_error(message)        
-        

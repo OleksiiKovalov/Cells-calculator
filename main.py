@@ -22,7 +22,7 @@ import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QIcon
-from UI.splashscreen import init_splash,close_splash, show_splash_error,update_splash
+from UI.splashscreen import splash_manager
 
 if __name__ == '__main__':
     from UI.errorhandling import app_logger
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     
     # Create and show splash screen
     app_logger().info("Creating splash screen...")
-    init_splash()
+    splash_manager.init_splash()
 
     app_logger().info("Loading modules...")
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
     try:
         # Create progress callback function
         def progress_callback(value, message):
-            update_splash(value, message)
+            splash_manager.update_splash(value, message)
         
         # Attempt to create the main window with progress callback
         app_logger().info("Initializing main window...")
@@ -71,7 +71,7 @@ if __name__ == '__main__':
         # Show main window and close splash screen
         def show_main_window():
             #globalsplash.finish(window)
-            close_splash()
+            splash_manager.close_splash()
             window.showMaximized()
         
         # Brief delay to ensure splash screen is visible and initialization complete
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     except Exception as e:
         traceback.print_exc()
         # Close splash screen immediately to show error dialog on top
-        close_splash()
+        splash_manager.close_splash()
         
         # Create error dialog with WindowStaysOnTopHint to ensure it appears in front
         error_box = QMessageBox()

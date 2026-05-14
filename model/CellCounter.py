@@ -3,20 +3,14 @@ In this module the CellCounter class is defined which is used
 to calculate cells on a given contrast microimage.
 """
 
-# Standard library imports
-import os
-
 # Third-party imports
 import cv2
 import numpy as np
 import pandas as pd
 
-# Local application imports
-from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE, set_global
 from model.BaseModel import BaseModel
-from model.utils import safe_image_read, safe_image_write
-from model.utils import draw_bounding_box, filter_detections
-from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
+# Local application imports
+from model.utils import safe_image_read
 
 
 CLASSES = ["Cell"]
@@ -62,7 +56,7 @@ class CellCounter(BaseModel):
         """
         self.model_x10 = None
 
-    def count_x10(self, input_image, filename):
+    def count_x10(self, input_image):
         """
         Count cells at x10 magnification.
         
@@ -70,15 +64,14 @@ class CellCounter(BaseModel):
         
         Args:
             input_image (str): Path to input image
-            filename (str): Output path for detection visualization
-            
+
         Returns:
             pd.DataFrame: Detection results
         """
-        return self.count_x20(input_image, filename)
+        return self.count_x20(input_image)
 
 
-    def count_x20(self, input_image, filename):
+    def count_x20(self, input_image):
         """
         Perform inference on x20 magnification image using ONNX model.
         
@@ -86,12 +79,11 @@ class CellCounter(BaseModel):
         an ultralytics-based inference pipeline for improved performance and simplicity.
         
         Loads image, preprocesses for model input, runs ONNX inference, applies NMS,
-        and saves results both as visualization and CSV data.
+        and saves CSV data for downstream UI/reporting use.
         
         Args:
             input_image (str): Path to input microscopy image
-            filename (str): Output path for detection visualization
-        
+
         Returns:
             pd.DataFrame: Detection results with columns:
                 - class_id, class_name, confidence
@@ -104,6 +96,7 @@ class CellCounter(BaseModel):
             - Confidence threshold: 0.2
         """
         # Read the input image
+        inference_image = getattr(self, "_last_inference_image", None)
         if self.detections is None:
             original_image: np.ndarray = safe_image_read(
                 input_image, color_mode="color"
@@ -117,6 +110,7 @@ class CellCounter(BaseModel):
             length = max((height, width))
             image = np.zeros((length, length, 3), np.uint8)
             image[0:height, 0:width] = original_image
+            inference_image = image
 
             # Calculate scale factor
             scale = length / 512
@@ -126,9 +120,6 @@ class CellCounter(BaseModel):
                 image, scalefactor=1 / 255, size=(512, 512), swapRB=True
             )
             self.model.setInput(blob)
-
-            set_global("image_inference", image)
-            safe_image_write(image, IMAGE_FILE_NAME_INGFERENCE, preserve_dtype=False)
 
             # Perform inference
             outputs = self.model.forward()
@@ -206,9 +197,6 @@ class CellCounter(BaseModel):
 
         detections = self.detections
         self.object_size["signal"]("set_size", detections["box"].copy())
-        original_image = self.original_image.copy()
-        scale = self.scale
-
         # TODO: in this codeline, calculate max and min squares of obtained bboxes
         # and automatically set them as lower and upper bounds for the filtering
         # sliders if the sliders currently have default values (0 and 10) set up.
@@ -225,36 +213,12 @@ class CellCounter(BaseModel):
         #     max_size=self.object_size["max_size"],
         # )
         filtered_detections = detections
-        for i in range(filtered_detections.shape[0]):
-            draw_bounding_box(
-                original_image,
-                filtered_detections.iloc[i, 0],
-                filtered_detections.iloc[i, 2],
-                round(filtered_detections.iloc[i, 3][0] * scale),
-                round(filtered_detections.iloc[i, 3][1] * scale),
-                round(
-                    (
-                        filtered_detections.iloc[i, -2][0]
-                        + filtered_detections.iloc[i, -2][2]
-                    )
-                    * filtered_detections.iloc[i, -1]
-                ),
-                round(
-                    (
-                        filtered_detections.iloc[i, -2][1]
-                        + filtered_detections.iloc[i, -2][3]
-                    )
-                    * filtered_detections.iloc[i, -1]
-                ),
-            )
-
-        self.prediction_image = original_image
         self.detectionCount = filtered_detections.shape[0]
-        try:
-            os.remove(filename)
-        except:
-            pass
-        safe_image_write(original_image, filename)
+        self.prediction_image = None
 
-        return filtered_detections
+        return self._prediction_result(
+            filtered_detections,
+            original_image=self.original_image,
+            inference_image=inference_image,
+        )
 

@@ -9,8 +9,6 @@ from typing import Any
 
 # Third-party imports
 import cv2
-import matplotlib.colors as mcolors
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
@@ -24,33 +22,15 @@ from skimage.transform import resize
 from ultralytics.engine.results import Results
 
 # Local application imports
-from UI.app_globals import set_global
 from UI.app_globals import (
-    IMAGE_FILE_NAME_DETECTION,
-    IMAGE_FILE_NAME_GRID,
-    IMAGE_FILE_NAME_INGFERENCE,
     IMAGE_FILE_NAME_TMP,
     CASH_DIRECTORY
 )
+from model.PredictionResult import unwrap_prediction_cells
 
 
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'bmp', 'lsm']
-CLASSES = ['Cell']
-COLORS = [(3, 177, 252)]
-COLOR_NUMBER = {
-    "gist_rainbow": 20,
-    "tab20": 20,
-    "tab20b": 20,
-    "tab20c": 20,
-    "tab10": 10,
-    "Set1": 9,
-    "Set2": 8,
-    "Set3": 12,
-    "Paired": 12,
-    "viridis": 10,
-    "plasma": 10
-}
 
 
 def read_lsm_array(img_path):
@@ -154,6 +134,9 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
         if image is None:
             print("Cannot save None image")
             return False
+
+        filename = os.fspath(filename)
+        image = np.asarray(image)
             
         # Ensure output directory exists
         output_dir = os.path.dirname(filename)
@@ -175,24 +158,37 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
         else:
             image_to_save = image
         
+        write_success = False
+
         # Save based on file extension
         if extension in ['jpg', 'jpeg']:
             # JPEG with quality control
-            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            write_success = cv2.imwrite(
+                filename,
+                image_to_save,
+                [cv2.IMWRITE_JPEG_QUALITY, quality],
+            )
         elif extension == 'png':
             # PNG with compression
-            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+            write_success = cv2.imwrite(
+                filename,
+                image_to_save,
+                [cv2.IMWRITE_PNG_COMPRESSION, 1],
+            )
+        elif extension == 'bmp':
+            write_success = cv2.imwrite(filename, image_to_save)
         elif extension in ['tif', 'tiff']:
             # Use skimage for better TIFF support
             if len(image_to_save.shape) == 3 and image_to_save.shape[2] == 3:
                 # Convert BGR to RGB for skimage
                 image_to_save = cv2.cvtColor(image_to_save, cv2.COLOR_BGR2RGB)
             imsave(filename, image_to_save)
+            write_success = os.path.exists(filename)
         else:
-            # Default to OpenCV for other formats
-            cv2.imwrite(filename, image_to_save)
+            print(f"Unsupported image extension: {extension}")
+            return False
         
-        return True
+        return bool(write_success and os.path.exists(filename))
         
     except Exception as e:
         print(f"Error saving image {filename}: {str(e)}")
@@ -266,6 +262,7 @@ def extract_nuclei_channel(img_path, nuclei_channel=1):
 
 def count_detected_objects(detections) -> int:
     """Returns the number of detected objects for detector- and segmenter-style outputs."""
+    detections = unwrap_prediction_cells(detections)
     if detections is None:
         return 0
     if hasattr(detections, "shape"):
@@ -278,6 +275,25 @@ def calculate_alive_percentage(cell_count: int, nuclei_count: int):
     if cell_count <= 0 or nuclei_count == -100:
         return -100
     return round((1 - nuclei_count / cell_count) * 100, 3)
+
+def _select_channel(image, channel, *, empty_on_missing=False):
+    """Return a valid channel, falling back to channel 0 or an empty image."""
+    try:
+        channel = int(channel)
+    except (TypeError, ValueError):
+        channel = -1
+
+    if image.ndim == 2:
+        if empty_on_missing and channel not in (0, None):
+            return np.zeros(image.shape, dtype=image.dtype)
+        return image
+
+    if 0 <= channel < image.shape[-1]:
+        return image[:, :, channel]
+    if empty_on_missing:
+        return np.zeros(image.shape[:2], dtype=image.dtype)
+    return image[:, :, 0]
+
 
 def calculate_lsm(cell_counter, nuclei_counter,
                   img_path, cell_channel=0, nuclei_channel=1, nuclei_count=None):
@@ -293,9 +309,12 @@ def calculate_lsm(cell_counter, nuclei_counter,
     - Cells: count for all the cells detected;
     - %: the target percentage for alive cells.
     """
-    img = read_lsm_img(img_path)
+    img = lsm_to_channels_last(read_lsm_array(img_path))
 
-    cell_img = cv2.cvtColor(img[:,:,cell_channel], cv2.COLOR_GRAY2BGR)
+    cell_img = cv2.cvtColor(
+        _select_channel(img, cell_channel),
+        cv2.COLOR_GRAY2BGR
+    )
     tmp_path = IMAGE_FILE_NAME_TMP
     safe_image_write(cell_img, tmp_path)
     cell_count = cell_counter.count_cells(tmp_path)
@@ -304,33 +323,13 @@ def calculate_lsm(cell_counter, nuclei_counter,
     except FileNotFoundError:
         pass
     if nuclei_count is None:
-        nuclei_count = nuclei_counter.countNuclei(img[:, :, nuclei_channel])
+        nuclei_img = _select_channel(img, nuclei_channel, empty_on_missing=True)
+        nuclei_count = nuclei_counter.countNuclei(nuclei_img)
     percentage = calculate_alive_percentage(
         count_detected_objects(cell_count),
         nuclei_count
     )
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
-
-
-
-def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
-    """
-    Draws bounding boxes on the input image.
-
-    Args:
-        img (numpy.ndarray): The input image to draw the bounding box on.
-        x (int): X-coordinate of the top-left corner of the bounding box.
-        y (int): Y-coordinate of the top-left corner of the bounding box.
-        x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
-        y_plus_h (int): Y-coordinate of the bottom-right corner of the bounding box.
-        draw_mode (int): 0 for rectangle, other for circle.
-    """
-    color = COLORS[0]
-    thickness = 1 if img.shape[0] < 800 else 2
-    if draw_mode == 0:
-        cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
-    else:
-        cv2.circle(img, (x, y), 2, color, -1)
 
 def filter_detections(
     detections: pd.DataFrame, 
@@ -546,148 +545,45 @@ def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]
     - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
     the foreground (the polygon for the given mask).
     """
-    if in_mask.max() > 1.0:
-        in_mask = in_mask / np.array([image_size[1], image_size[0]])
-    coords: NDArray = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
-    coords = coords.astype(np.int32)
     bin_mask: NDArray[np.uint8] = np.zeros(image_size, dtype=np.uint8)
-    cv2.fillPoly(bin_mask, [coords], [1])
-    bin_mask = np.zeros(image_size, dtype=np.uint8)
     if in_mask is None:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
-    
-    coords = np.asarray(in_mask, dtype=np.float32).reshape(-1, 2)
+
+    try:
+        coords = np.asarray(in_mask, dtype=np.float32)
+    except (TypeError, ValueError):
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    if coords.size < 6:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    if coords.ndim == 1 and coords.size % 2 == 1:
+        coords = coords[:-1]
+
+    try:
+        coords = coords.reshape(-1, 2)
+    except ValueError:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    coords = coords[np.isfinite(coords).all(axis=1)]
 
     if coords.shape[0] < 3:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
     
-    if coords.max() > 1.0:
-        coords = coords / np.array([image_size[1], image_size[0]], dtype=np.float32)
-
-    coords = coords * np.array([image_size[1], image_size[0]], dtype=np.float32)
+    if coords.max() <= 1.0 and coords.min() >= 0.0:
+        coords = coords * np.array([image_size[1], image_size[0]], dtype=np.float32)
 
     coords[:, 0] = np.clip(coords[:, 0], 0, image_size[1] - 1)
     coords[:, 1] = np.clip(coords[:, 1], 0, image_size[0] - 1)
 
     coords = np.round(coords).astype(np.int32)
 
-    coords = np.unique(coords, axis=0)
-    if coords.shape[0] < 3:
+    if np.unique(coords, axis=0).shape[0] < 3:
         return bin_mask.astype(bool), calculate_morphology(bin_mask)
     
     cv2.fillPoly(bin_mask, [coords], (1,))
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
-
-def colormap_to_hex(cmap_name):
-    """
-    Convert a matplotlib colormap into a list of discrete HEX colors.
-    
-    Parameters:
-        cmap_name (str): Name of the colormap (e.g., 'viridis', 'plasma', etc.).        
-    Returns:
-        List[str]: List of HEX color strings.
-    """
-    color_number = COLOR_NUMBER
-    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
-    num_colors = color_number[cmap_name]
-    # Get the colormap object
-    cmap = plt.get_cmap(cmap_name)
-    color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
-    hex_colors = [mcolors.to_hex(c) for c in color_values]
-    return hex_colors
-
-def hex_to_bgr(hex_colors):
-    """
-    Convert a HEX color string to a BGR tuple for OpenCV.
-
-    Parameters:
-        hex_color (str): HEX color string (e.g., '#FF5733').
-    Returns:
-        Tuple[int, int, int]: BGR color tuple.
-    """
-    # Convert HEX to RGB
-    if isinstance(hex_colors, str):  # Single color
-        hex_colors = [hex_colors]
-    bgr_colors = []
-    for hex_color in hex_colors:
-        rgb = [int(c * 255) for c in mcolors.hex2color(hex_color)]
-        bgr_colors.append(tuple(reversed(rgb)))
-    return bgr_colors
-
-def denormalize_coordinates(coords, image_shape):
-    """Converts normalized coords to given image coordinates."""
-    return coords * np.array([image_shape[1], image_shape[0]])
-
-def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=0.75, colormap="tab20", color_ids=None):
-    """Draws predicted masks on the image."""
-    hex_colors = hex_to_bgr(colormap_to_hex(colormap))
-    if not pred_masks:
-        print("No masks found.")
-        safe_image_write(image, filename)
-        return image
-    overlay = image.copy()
-    for i, mask in enumerate(pred_masks):
-        coords = np.asarray(mask, dtype=np.float32).reshape(-1, 2)
-        if coords.shape[0] < 3:
-            continue
-        color_index = i if color_ids is None else int(color_ids[i])
-        color = hex_colors[color_index % len(hex_colors)]
-        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
-            coords = denormalize_coordinates(coords, image.shape)
-        coords[:, 0] = np.clip(coords[:, 0], 0, image.shape[1] - 1)
-        coords[:, 1] = np.clip(coords[:, 1], 0, image.shape[0] - 1)
-        coords = np.round(coords).astype(np.int32)
-        if len(np.unique(coords, axis=0)) < 3:
-            continue
-        cv2.fillPoly(overlay, [coords], color)
-    cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
-    safe_image_write(image, filename)
-    return image
-
-
-def plot_predictions_with_alignment(
-    original_image,
-    img_inference,
-    pred_masks,
-    filename: str = IMAGE_FILE_NAME_DETECTION,
-    colormap="tab20",
-    alpha=0.75,
-    color_ids=None
-):
-    """
-    Plot predictions with automatic dimension alignment.
-    
-    Resizes original image to match inference dimensions if needed, then
-    overlays predicted masks. Useful when inference uses different image
-    size than original.
-    
-    Args:
-        original_image (np.ndarray): Original input image
-        img_inference (np.ndarray): Image dimensions used for inference
-        pred_masks (list): List of mask contours (normalized coordinates)
-        filename (str): Output image path. Defaults to IMAGE_FILE_NAME_DETECTION.
-        colormap (str): Matplotlib colormap. Defaults to 'tab20'.
-        alpha (float): Mask transparency (0-1). Defaults to 0.75.
-    
-    Returns:
-        np.ndarray: Image with overlaid masks
-    """
-    h, w = img_inference.shape[:2]
-    o_h, o_w = original_image.shape[:2]
-    if h != o_h or w != o_w:
-        original_image = resize_and_pad_cv(original_image, w, h)
-    set_global('image_display_base', original_image.copy())
-    return plot_predictions(
-        original_image,
-        pred_masks,
-        filename=filename,
-        colormap=colormap,
-        alpha=alpha,
-        color_ids=color_ids
-    )
-
 
 def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     """
@@ -700,11 +596,18 @@ def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     - volume - relative to the image volume (image area multiplied by square root of image area).
     """
     img_area = bin_mask.shape[0] * bin_mask.shape[1]
-    area = np.sum(bin_mask)
+    if img_area == 0:
+        return {'diameter': 0.0, 'area': 0.0, 'volume': 0.0}
+
+    area = float(np.sum(bin_mask))
     diameter = 2 * np.sqrt(area / np.pi)
     radius = diameter / 2
     volume = (4/3) * np.pi * radius**3
-    return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
+    return {
+        'diameter': float(diameter / np.sqrt(img_area)),
+        'area': float(area / img_area),
+        'volume': float(volume / (img_area * np.sqrt(img_area))),
+    }
 
 def create_image_grid(
     images, 
@@ -855,16 +758,27 @@ def process_loaded_image(image, settings: OrderedDict):
 
 def safegray2rgb(image):
     """
-    Convert grayscale to RGB if needed, otherwise return unchanged.
+    Convert image-like arrays to a 3-channel RGB-compatible array.
     
     Args:
         image (np.ndarray): Input image array
         
     Returns:
-        np.ndarray: RGB image if input was grayscale, otherwise unchanged
+        np.ndarray: 3-channel RGB-compatible image
     """
+    image = np.asarray(image)
     if image.ndim == 2:
         return gray2rgb(image)
+    if image.ndim == 3:
+        channels = image.shape[2]
+        if channels == 1:
+            return gray2rgb(image[:, :, 0])
+        if channels == 2:
+            return gray2rgb(image[:, :, 0])
+        if channels == 3:
+            return image
+        if channels > 3:
+            return image[:, :, :3]
     return image
 
 

@@ -51,8 +51,19 @@ class NucleiCounter():
         Returns:
             np.ndarray: Preprocessed binary image with same shape as input
         """
-        _, img = cv2.threshold(channel,
-                               np.median(channel[channel > threshold]), 255, cv2.THRESH_BINARY)
+        if channel is None:
+            return np.zeros((0, 0), dtype=np.uint8)
+
+        channel = np.asarray(channel)
+        foreground = channel[channel > threshold]
+        if foreground.size == 0:
+            return np.zeros(channel.shape, dtype=np.uint8)
+
+        threshold_value = np.median(foreground)
+        if not np.isfinite(threshold_value):
+            return np.zeros(channel.shape, dtype=np.uint8)
+
+        _, img = cv2.threshold(channel, threshold_value, 255, cv2.THRESH_BINARY)
         kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
         opened_img = cv2.dilate(img, kernel)
         eroded_img = cv2.erode(opened_img, kernel)
@@ -96,7 +107,7 @@ class NucleiCounter():
         if points.shape[0] == 0:
             return 0
         cluster_labels = dbscan.fit_predict(points[['x', 'y']])
-        return np.max(cluster_labels) + 1
+        return int(np.max(cluster_labels) + 1)
 
     def countNuclei(self, img_channel):
         """
@@ -111,4 +122,3 @@ class NucleiCounter():
             int: Total count of distinct nuclei detected
         """
         return self.groupNuclei(self.channel2points(self.preprocess(img_channel)))
-    

@@ -12,10 +12,10 @@ Usage:
 """
 
 from UI.app_globals import get_registered_model
-from  UI.splashscreen import update_splash
+from UI.splashscreen import splash_manager
 curpc = 25
 
-update_splash(curpc, "Loading System and OS...")
+splash_manager.update_splash(curpc, "Loading System and OS...")
 curpc += 1
 import os
 import sys
@@ -32,12 +32,12 @@ import time
 import re
 from datetime import datetime
 
-update_splash(curpc, "Loading Path and File Handling...")
+splash_manager.update_splash(curpc, "Loading Path and File Handling...")
 curpc += 1
 from pathlib import Path, PureWindowsPath, PurePosixPath
 from contextlib import redirect_stdout, redirect_stderr
 
-update_splash(curpc, "Loading Collections and Data Structures...")
+splash_manager.update_splash(curpc, "Loading Collections and Data Structures...")
 curpc += 1
 from collections import OrderedDict
 import json
@@ -57,13 +57,13 @@ except ImportError:
 
 ## Third-Party Scientific Libraries
 
-update_splash(curpc, "Loading NumPy and Data Processing...")
+splash_manager.update_splash(curpc, "Loading NumPy and Data Processing...")
 curpc += 1
 import numpy as np
 import pandas as pd
 import cv2  # OpenCV for image processing
 
-update_splash(curpc, "Loading Image Processing...")
+splash_manager.update_splash(curpc, "Loading Image Processing...")
 curpc += 1
 
 import tifffile
@@ -73,17 +73,17 @@ from skimage.color import rgb2gray, gray2rgb
 from skimage.measure import regionprops
 from skimage.transform import resize
 
-update_splash(curpc, "Loading Scientific Computing...")
+splash_manager.update_splash(curpc, "Loading Scientific Computing...")
 curpc += 1
 
 from scipy.ndimage import find_objects
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-update_splash(curpc, "Loading Machine Learning and Deep Learning...")
+splash_manager.update_splash(curpc, "Loading Machine Learning and Deep Learning...")
 curpc += 1
 
-update_splash(curpc, "Loading torch...")
+splash_manager.update_splash(curpc, "Loading torch...")
 curpc += 1
 import torch
 
@@ -94,14 +94,14 @@ try:
 except ImportError:
     DBSCAN = None
 
-update_splash(curpc, "Loading YOLO Models...")
+splash_manager.update_splash(curpc, "Loading YOLO Models...")
 curpc += 1
 
 r = get_registered_model('yolo')
 if r is not None and r['preload'] is True:
     from ultralytics import YOLO
     from ultralytics.engine.results import Results, Masks
-    update_splash(curpc, "Loading SAHI Models...")
+    splash_manager.update_splash(curpc, "Loading SAHI Models...")
     curpc += 1
     from sahi.utils.cv import read_image
     from sahi.predict import get_sliced_prediction
@@ -151,13 +151,13 @@ except ImportError:
     pass  # Already imported individual modules above
 
 ### Specialized AI Libraries
-update_splash(curpc, "Loading Cellpose Models...")
+splash_manager.update_splash(curpc, "Loading Cellpose Models...")
 curpc += 1
 r = get_registered_model('cellpose')
 if r is not None and r['preload'] is True:
     from cellpose import models as cp_models
 
-update_splash(curpc, "Loading InstanSeg Models...")
+splash_manager.update_splash(curpc, "Loading InstanSeg Models...")
 curpc += 1
 r = get_registered_model('instanseg')
 if r is not None and r['preload'] is True:
@@ -166,23 +166,23 @@ if r is not None and r['preload'] is True:
 
 r = get_registered_model('stardist')
 if r is not None and r['preload'] is True:
-    update_splash(curpc, "Loading tensorflow...")
+    splash_manager.update_splash(curpc, "Loading tensorflow...")
     curpc += 1
     import tensorflow as tf
-    update_splash(curpc, "Loading Stardist Models...")
+    splash_manager.update_splash(curpc, "Loading Stardist Models...")
     curpc += 1
     from stardist.models import StarDist2D
     from csbdeep.utils import normalize
 
 
-update_splash(curpc, "Loading Geometry Processing...")
+splash_manager.update_splash(curpc, "Loading Geometry Processing...")
 curpc += 1
 
 from shapely.geometry import shape
 
 ## PyQt5 GUI Framework
 
-update_splash(curpc, "Loading GUI Framework...")
+splash_manager.update_splash(curpc, "Loading GUI Framework...")
 curpc += 1
 
 ### Core PyQt5 Modules
@@ -199,7 +199,7 @@ from PyQt5.QtGui import (
 )
 
 
-update_splash(curpc, "Loading PyQt5 Widgets...")
+splash_manager.update_splash(curpc, "Loading PyQt5 Widgets...")
 curpc += 1
 
 from PyQt5.QtWidgets import (
@@ -218,7 +218,7 @@ from PyQt5.QtWidgets import (
 
 ## Project-Specific Local Imports
 
-update_splash(curpc, "Loading UI Components...")
+splash_manager.update_splash(curpc, "Loading UI Components...")
 curpc += 1
 
 from UI.splashscreen import *
@@ -235,7 +235,7 @@ from UI.ModelsCheckList import *
 from UI.ImageNormalizeDialog import *
 from UI.WaitWindow import *
 
-update_splash(curpc, "Loading UI Layout Components...")
+splash_manager.update_splash(curpc, "Loading UI Layout Components...")
 curpc += 1
 
 from UI.right_layout.right_layout import *
@@ -244,12 +244,12 @@ from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin as Cel
 from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugin
 from UI.right_layout.plugins.SpheroidSegmenterPlugin import *
 
-update_splash(curpc, "Loading Model Components...")
+splash_manager.update_splash(curpc, "Loading Model Components...")
 curpc += 1
 from model.BaseModel import BaseModel
 from model.Model import Model
 
-update_splash(curpc, "Loading Model Utilities and SAHI...")
+splash_manager.update_splash(curpc, "Loading Model Utilities and SAHI...")
 curpc += 1
 
 from model.utils import *
@@ -257,7 +257,7 @@ from model.utils import *
 # Additional imports from InstanSeg utilities
 from instanseg.utils.utils import export_to_torchscript
 
-update_splash(curpc, "Import loading complete!")
+splash_manager.update_splash(curpc, "Import loading complete!")
 curpc += 1
 
 # Note: This file consolidates all imports used across the Cells-Calculator project
