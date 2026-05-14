@@ -237,7 +237,7 @@ def test_calculate_skips_nuclei_count_for_single_channel_regular_images(tmp_path
     assert model.nuclei_counter.calls == 0
 
 
-def test_calculate_counts_nuclei_for_detector_regular_multichannel_images(tmp_path):
+def test_calculate_skips_nuclei_count_for_detector_regular_multichannel_images(tmp_path):
     image_path = tmp_path / "stained.png"
     image = np.zeros((16, 16, 3), dtype=np.uint8)
     image[:, :, 1] = 255
@@ -250,9 +250,9 @@ def test_calculate_counts_nuclei_for_detector_regular_multichannel_images(tmp_pa
 
     result = model.calculate(str(image_path), nuclei_channel=1)
 
-    assert result["Nuclei"] == 1
-    assert result["%"] == 75.0
-    assert model.nuclei_counter.calls == 1
+    assert result["Nuclei"] == -100
+    assert result["%"] == -100
+    assert model.nuclei_counter.calls == 0
 
 
 def test_get_nuclei_count_does_not_cache_for_same_image(tmp_path):

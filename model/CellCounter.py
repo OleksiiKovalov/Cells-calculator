@@ -204,6 +204,7 @@ class CellCounter(BaseModel):
                 detections,
                 columns=["class_id", "class_name", "confidence", "box", "scale"],
             )
+            detections.attrs["image_size"] = (width, height)
             self.detections = detections
             csv_data = self.detections.copy()
             csv_data["width"] = csv_data["box"].apply(
@@ -226,10 +227,10 @@ class CellCounter(BaseModel):
             )
             self.scale = scale
             # Change object_size for detection
-            self.object_size["signal"]("set_size", detections["box"].copy())
+            self.object_size["signal"]("set_size", detections.copy())
 
         detections = self.detections
-        self.object_size["signal"]("set_size", detections["box"].copy())
+        self.object_size["signal"]("set_size", detections.copy())
         # TODO: in this codeline, calculate max and min squares of obtained bboxes
         # and automatically set them as lower and upper bounds for the filtering
         # sliders if the sliders currently have default values (0 and 10) set up.
