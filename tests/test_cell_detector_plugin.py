@@ -20,11 +20,18 @@ class _RangeSliderStub:
 
 
 class _SignalStub:
+    """Mock of PyQt5 Signal for testing without GUI."""
+    
     def __init__(self):
         self.calls = []
 
     def emit(self, *args):
+        """Record emitted signal arguments."""
         self.calls.append(args)
+    
+    def connect(self, handler):
+        """Mock connect to accept signal handlers."""
+        pass
 
 
 class _ReusableModelStub:
@@ -123,7 +130,7 @@ def test_call_inference_reuses_loaded_model_with_same_name(monkeypatch):
     }
     plugin.lsm_path = "sample.lsm"
     plugin.parametrs = {"Cell": 3, "Nuclei": 2}
-    monkeypatch.setattr(plugin, 'plugin_signal', _SignalStub())
+    plugin.plugin_signal = _SignalStub()  # type: ignore
     plugin.draw_bounding = 0
     monkeypatch.setattr(
         "UI.right_layout.plugins.CellDetectorPlugin.Model",
@@ -177,7 +184,7 @@ def test_call_inference_publishes_returned_inference_image(monkeypatch, tmp_path
     }
     plugin.lsm_path = "sample.png"
     plugin.parametrs = {"Cell": 3, "Nuclei": 2}
-    monkeypatch.setattr(plugin, 'plugin_signal', _SignalStub())
+    plugin.plugin_signal = _SignalStub()
     plugin.draw_bounding = 0
     output_path = tmp_path / "inference.png"
 
@@ -190,7 +197,11 @@ def test_call_inference_publishes_returned_inference_image(monkeypatch, tmp_path
             filename=str(output_path),
         ),
     )
-    monkeypatch.setattr(plugin, 'render_model_result', lambda model, result: None)
+    monkeypatch.setattr(
+        CellDetectorPlugin, 
+        'render_model_result',
+        lambda self, model, result, *args, **kwargs: None
+    )
     set_global("image_inference", None)
 
     result = plugin.call_inference("Detector")
