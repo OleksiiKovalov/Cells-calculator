@@ -386,7 +386,7 @@ def filter_detections(
 
     def _area_ratio(row):
         try:
-            box = np.asarray(row["box"], dtype=np.float32).reshape(-1)
+            box = np.asarray(row["box"], dtype=np.float64).reshape(-1)
             scale = float(row["scale"]) if "scale" in row else 1.0
         except (TypeError, ValueError, KeyError):
             return np.nan

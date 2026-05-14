@@ -427,7 +427,7 @@ class CellDetectorPlugin(BasePlugin):
             if image_size is not None and len(image_size) == 2:
                 return int(image_size[0]), int(image_size[1])
 
-        current_model = getattr(self, "model", None)
+        current_model = self.__dict__.get("model")
         cell_counter = getattr(current_model, "cell_counter", None)
         image_size = self._shape_to_filter_size(
             getattr(cell_counter, "original_image", None)
@@ -501,7 +501,7 @@ class CellDetectorPlugin(BasePlugin):
 
             for cell, scale in box_rows:
                 try:
-                    box = np.asarray(cell, dtype=np.float32).reshape(-1)
+                    box = np.asarray(cell, dtype=np.float64).reshape(-1)
                 except (TypeError, ValueError):
                     continue
                 if box.size < 4 or not np.isfinite(box[:4]).all():
