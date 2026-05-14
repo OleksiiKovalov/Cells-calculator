@@ -17,7 +17,12 @@ class right_layout(QVBoxLayout):
     """
     rightLayout_signal = pyqtSignal(str, object)
     current_plugin_name = None
-    
+
+    ACTION_SHOW_WARNING = "show_warning"
+    ACTION_CHANGE_PLUGIN = "change_plugin"
+    ACTION_OPEN_LSM = "open_lsm"
+    ACTION_OPEN_FOLDER = "open_folder"
+
     def __init__(self, current_plugin_name, plugin_list):
         """
         Initialize the right layout.
@@ -76,15 +81,19 @@ class right_layout(QVBoxLayout):
         self.current_plugin_name = plugin_name
         self.plugin_list = plugin_list
         self.clear()
-        del self.current_plugin
+        self.current_plugin = None
         self.init_rightLayout()
 
     def init_rightLayout(self):
         """
         Initialize the right layout with the current plugin.
         """
-        plugin =  self.plugin_list[self.current_plugin_name]['init']
-        arg = self.plugin_list[self.current_plugin_name]['arg']
+        plugin_config = self.plugin_list.get(self.current_plugin_name)
+        if plugin_config is None:
+            raise ValueError(f"Unknown plugin: {self.current_plugin_name!r}")
+
+        plugin = plugin_config["init"]
+        arg = plugin_config["arg"]
         self.current_plugin = plugin(self.handel_plugin_signal, self, *arg)
 
     @pyqtSlot(str, object)
@@ -96,9 +105,10 @@ class right_layout(QVBoxLayout):
             action_name: Name of the action.
             value: Value associated with the action.
         """
+        if self.current_plugin is None:
+            return
+
         self.current_plugin.handle_action(action_name, value)
-        if action_name == "open_lsm":
-            pass 
     # TODO: signal with current_plugin
     @pyqtSlot(str, object)
     def handel_plugin_signal(self, action_name, value):
@@ -109,13 +119,10 @@ class right_layout(QVBoxLayout):
             action_name: Name of the action.
             value: Value associated with the action.
         """
-        if action_name == "show_warning":
-            self.rightLayout_signal.emit("show_warning", value)
-        elif action_name == "":
-            pass
-        else:
+        if action_name == self.ACTION_SHOW_WARNING:
+            self.rightLayout_signal.emit(self.ACTION_SHOW_WARNING, value)
+        elif action_name:
             self.rightLayout_signal.emit(action_name, value)
-        pass
 
     @pyqtSlot(str, object)
     def handle_menubar_action(self, action_name, value):
@@ -126,8 +133,11 @@ class right_layout(QVBoxLayout):
             action_name: Name of the action.
             value: Value associated with the action.
         """
-        if action_name == "change_plugin":
-            #self.set_current_plugin(plugin_name = value)
-            pass
-        else:
-            self.current_plugin.handle_action(action_name, value)
+        if action_name == self.ACTION_CHANGE_PLUGIN and value in self.plugin_list:
+            self.set_current_plugin(plugin_name=value, plugin_list=self.plugin_list)
+            return
+
+        if self.current_plugin is None:
+            return
+
+        self.current_plugin.handle_action(action_name, value)
