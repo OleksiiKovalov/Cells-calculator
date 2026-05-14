@@ -5,7 +5,7 @@ import math
 import os
 import shutil
 from collections import OrderedDict
-from typing import Any
+from typing import Any, Iterable
 
 # Third-party imports
 import cv2
@@ -529,7 +529,7 @@ def compute_iou(masks_1: list, masks_2: list) -> tuple[NDArray, list]:
             iou_matrix[i, j] = intersection / union
     return iou_matrix, mask_2_morphologies
 
-def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]:
+def plot_mask(in_mask: NDArray | None, image_size=(1000, 1000)) -> tuple[NDArray[np.bool_], dict[str, float]]:
     """
     Rasterizes a polygon mask safely and calculates morphology.
     Handles normalized and denormalized coordinates.
@@ -698,7 +698,7 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
     return padded
 
 
-def process_loaded_image(image, settings: OrderedDict):
+def process_loaded_image(image, settings: list[dict[str, str]] | dict[str, str]):
     """
     Apply sequence of preprocessing operations to image.
     
@@ -722,8 +722,11 @@ def process_loaded_image(image, settings: OrderedDict):
     Raises:
         RuntimeError: If unknown operation specified
     """
-    for step in settings:
-        key, value = next(iter(step.items()))    
+    if isinstance(settings, dict):
+        iterable: Iterable[tuple[str, str]] = settings.items()
+    else:
+        iterable = (next(iter(step.items())) for step in settings)
+    for key, value in iterable:    
         match key:
             case "resize":
                 target_width, target_height = map(int, value.strip().split(":"))

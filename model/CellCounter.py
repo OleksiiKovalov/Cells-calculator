@@ -8,6 +8,12 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
+from typing import Protocol, Any
+
+
+class DnnProtocol(Protocol):
+    def setInput(self, blob) -> None: ...
+    def forward(self) -> Any: ...
 
 from model.BaseModel import BaseModel
 # Local application imports
@@ -31,6 +37,7 @@ class CellCounter(BaseModel):
 
     Output value is the number of cells detected.
     """
+    model: DnnProtocol
     # def __init__(self, path, object_size):
     #     super().__init__(path, object_size)
 

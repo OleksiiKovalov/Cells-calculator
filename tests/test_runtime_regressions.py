@@ -4,6 +4,7 @@ import importlib
 import json
 import sys
 import types
+from typing import Any
 
 import cv2
 import numpy as np
@@ -16,7 +17,7 @@ import model.utils as model_utils
 
 class _RecordingCellCounter:
     def __init__(self):
-        self.image = None
+        self.image: Any = None
 
     def count_cells(self, img_path):
         self.image = cv2.imread(str(img_path), cv2.IMREAD_UNCHANGED)
@@ -25,7 +26,7 @@ class _RecordingCellCounter:
 
 class _RecordingNucleiCounter:
     def __init__(self):
-        self.channel = None
+        self.channel: Any = None
 
     def countNuclei(self, img_channel):
         self.channel = img_channel.copy()
@@ -49,12 +50,25 @@ def _import_with_fakes(request, monkeypatch, module_name, fake_modules):
 
 
 def _fake_instanseg_modules():
-    fake_instanseg = types.ModuleType("instanseg")
-    fake_instanseg.InstanSeg = object
+    class FakeInstanSegModule(types.ModuleType):
+        def __init__(self):
+            super().__init__("instanseg")
+            self.InstanSeg = object
 
-    fake_utils_pkg = types.ModuleType("instanseg.utils")
-    fake_utils = types.ModuleType("instanseg.utils.utils")
-    fake_utils.labels_to_features = lambda labels: {"features": []}
+    class FakeUtilsPkg(types.ModuleType):
+        def __init__(self):
+            super().__init__("instanseg.utils")
+
+    class FakeUtils(types.ModuleType):
+        def __init__(self):
+            super().__init__("instanseg.utils.utils")
+            def labels_to_features(labels):
+                return {"features": []}
+            self.labels_to_features = labels_to_features
+
+    fake_instanseg = FakeInstanSegModule()
+    fake_utils_pkg = FakeUtilsPkg()
+    fake_utils = FakeUtils()
 
     return {
         "instanseg": fake_instanseg,
@@ -64,10 +78,12 @@ def _fake_instanseg_modules():
 
 
 def _fake_stardist_modules():
-    fake_tf = types.ModuleType("tensorflow")
-    fake_tf.config = types.SimpleNamespace(
-        list_physical_devices=lambda device_name: []
-    )
+    class FakeTf(types.ModuleType):
+        def __init__(self):
+            super().__init__("tensorflow")
+            self.config = types.SimpleNamespace(
+                list_physical_devices=lambda device_name: []
+            )
 
     class _FakeStarDist2D:
         def __init__(self, *args, **kwargs):
@@ -77,31 +93,59 @@ def _fake_stardist_modules():
         def from_pretrained(cls, *args, **kwargs):
             return cls()
 
-    fake_stardist = types.ModuleType("stardist")
-    fake_models = types.ModuleType("stardist.models")
-    fake_models.StarDist2D = _FakeStarDist2D
+    class FakeStardist(types.ModuleType):
+        def __init__(self):
+            super().__init__("stardist")
+            self.models = types.SimpleNamespace()
+            self.models.StarDist2D = _FakeStarDist2D
+
+    fake_tf = FakeTf()
+    fake_stardist = FakeStardist()
 
     return {
         "tensorflow": fake_tf,
         "stardist": fake_stardist,
-        "stardist.models": fake_models,
+        "stardist.models": fake_stardist.models,
     }
 
 
 def _fake_yolo_modules():
-    fake_ultralytics = types.ModuleType("ultralytics")
-    fake_ultralytics.YOLO = object
+    class FakeUltralytics(types.ModuleType):
+        def __init__(self):
+            super().__init__("ultralytics")
+            self.YOLO = object
 
-    fake_sahi = types.ModuleType("sahi")
-    fake_auto_model = types.ModuleType("sahi.auto_model")
-    fake_auto_model.AutoDetectionModel = types.SimpleNamespace(
-        from_pretrained=lambda **kwargs: object()
-    )
-    fake_predict = types.ModuleType("sahi.predict")
-    fake_predict.get_sliced_prediction = None
-    fake_utils_pkg = types.ModuleType("sahi.utils")
-    fake_cv = types.ModuleType("sahi.utils.cv")
-    fake_cv.read_image = None
+    class FakeSahi(types.ModuleType):
+        def __init__(self):
+            super().__init__("sahi")
+
+    class FakeAutoModel(types.ModuleType):
+        def __init__(self):
+            super().__init__("sahi.auto_model")
+            self.AutoDetectionModel = types.SimpleNamespace(
+                from_pretrained=lambda **kwargs: object()
+            )
+
+    class FakePredict(types.ModuleType):
+        def __init__(self):
+            super().__init__("sahi.predict")
+            self.get_sliced_prediction = None
+
+    class FakeUtilsPkg(types.ModuleType):
+        def __init__(self):
+            super().__init__("sahi.utils")
+
+    class FakeCv(types.ModuleType):
+        def __init__(self):
+            super().__init__("sahi.utils.cv")
+            self.read_image = None
+
+    fake_ultralytics = FakeUltralytics()
+    fake_sahi = FakeSahi()
+    fake_auto_model = FakeAutoModel()
+    fake_predict = FakePredict()
+    fake_utils_pkg = FakeUtilsPkg()
+    fake_cv = FakeCv()
 
     return {
         "ultralytics": fake_ultralytics,

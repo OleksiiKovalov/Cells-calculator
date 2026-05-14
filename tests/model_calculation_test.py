@@ -8,6 +8,7 @@ import tiffile
 import model.Model as model_module
 from model import BaseModel as base_model_module
 from model.CellCounter import CellCounter
+from model.NucleiCounter import NucleiCounter
 from model.Model import Model, calculate_standard
 from model.PredictionResult import PredictionResult
 from model.utils import (
@@ -44,14 +45,12 @@ class ResultCellCounter:
         )
 
 
-class StubNucleiCounter:
+class StubNucleiCounter(NucleiCounter):
     """Minimal stub for deterministic nuclei counts."""
 
     def __init__(self):
+        super().__init__()
         self.calls = 0
-        self.threshold = 100
-        self.eps = 2
-        self.min_samples = 5
 
     def countNuclei(self, img_channel):
         self.calls += 1
