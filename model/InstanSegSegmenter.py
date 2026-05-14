@@ -19,6 +19,7 @@ import inspect
 import json
 import os
 from collections import OrderedDict
+from logging import Logger
 from typing import Any
 
 # Third-party imports
@@ -32,7 +33,6 @@ from shapely.geometry import shape
 from skimage.io import imread
 
 # Local application imports
-from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
     filter_segmentation_detections,
@@ -49,6 +49,9 @@ INSTANSEG_MAX_PADDING_FLOOR = 512
 
 
 class InstansegSegmenter(BaseModel):
+
+    _logger: Logger
+
     """
     Cell/nuclei segmentation using InstanSeg deep learning model.
     
@@ -60,11 +63,12 @@ class InstansegSegmenter(BaseModel):
         model (InstanSeg): The InstanSeg model instance
         image_preprocess_settings_default (OrderedDict): Default preprocessing settings
     """
-    def __init__(self, path_to_model: str, object_size, model_data=None):
+    def __init__(self, path_to_model: str, object_size, logger: Logger, model_data=None):
         """
         Initialize InstanSeg segmenter.
         """
         super().__init__(path_to_model, object_size, model_data)
+        self._logger = logger
 
     def init_x20_model(self, path_to_model: str):
         """
@@ -108,7 +112,7 @@ class InstansegSegmenter(BaseModel):
                 )
             self.model = InstanSeg(default_model, verbosity=1)
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            app_logger().warning(f"InstansegSegmenter: Device used: {device}")
+            self._logger.warning(f"InstansegSegmenter: Device used: {device}")
             self.model = self.model.to(device)
 
     def init_x10_model(self, path_to_model):
@@ -135,7 +139,7 @@ class InstansegSegmenter(BaseModel):
         if target_height == height and target_width == width:
             return image
 
-        app_logger().info(
+        self._logger.info(
             "Padding InstanSeg inference image from "
             f"{width}x{height} to {target_width}x{target_height} "
             "to keep overlap smaller than the inference window."
@@ -176,13 +180,13 @@ class InstansegSegmenter(BaseModel):
 
         if x10:
             config_node = self.model_data['x10'] if 'x10' in self.model_data else None
-            app_logger().info('Using x10 configuration for InstanSeg inference.')
+            self._logger.info('Using x10 configuration for InstanSeg inference.')
         else:
             config_node = self.model_data['x20'] if 'x20' in self.model_data else None
-            app_logger().info('Using x20 configuration for InstanSeg inference.')
+            self._logger.info('Using x20 configuration for InstanSeg inference.')
 
         if config_node is not None:
-            app_logger().info('InstanSeg config found')
+            self._logger.info('InstanSeg config found')
             image_preprocess_settings = (
                 config_node['image_preprocess']
                 if 'image_preprocess' in config_node
@@ -194,7 +198,7 @@ class InstansegSegmenter(BaseModel):
                 tile_size = int(int(tile_size[:-1]) * max(image.shape[:2]) / 100)
                 if tile_size < 210:
                     tile_size = 210
-                app_logger().info(
+                self._logger.info(
                     f'Calculated tile_size for InstanSeg inference: {tile_size}'
                 )
             tile_size = int(tile_size)
@@ -204,7 +208,7 @@ class InstansegSegmenter(BaseModel):
                 else 'eval_medium_image'
             )
         else:
-            app_logger().info('InstanSeg config not found, using defaults')
+            self._logger.info('InstanSeg config not found, using defaults')
             image_preprocess_settings = self.image_preprocess_settings_default
             pixel_size = None
             tile_size = 512

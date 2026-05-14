@@ -4,6 +4,7 @@ This test ensures that models don't crash when running on various test images.
 """
 
 import pytest
+import logging
 from pathlib import Path
 
 def load_model(model_path: str, model_type: str):
@@ -22,32 +23,31 @@ def load_model(model_path: str, model_type: str):
         'scale': 20,
         'um_per_px': 0.325,
     }
+
+    dummy_logger = logging.getLogger("dummy_logger")
+    dummy_logger.addHandler(logging.NullHandler())
+
     match model_type.lower():
         case "yolo":
             pytest.importorskip("ultralytics")
             pytest.importorskip("sahi")
             from model.YOLOSegmenter import YoloSegmenter
-
             return YoloSegmenter(model_path, object_size=object_size, model_data={})
         case "cellpose":
             pytest.importorskip("cellpose")
             from model.CellposeSegmenter import CellposeSegmenter
-
-            return CellposeSegmenter(model_path, object_size=object_size, model_data={})
+            return CellposeSegmenter(model_path, object_size=object_size, logger=dummy_logger, model_data={})
         case "instanseg":
             pytest.importorskip("instanseg")
             from model.InstanSegSegmenter import InstansegSegmenter
-
-            return InstansegSegmenter(model_path, object_size=object_size, model_data={})
+            return InstansegSegmenter(model_path, object_size=object_size, logger=dummy_logger, model_data={})
         case "stardist":
             pytest.importorskip("pkg_resources")
             pytest.importorskip("stardist")
             from model.StardistSegmenter import StardistSegmenter
-
-            return StardistSegmenter(model_path, object_size=object_size, model_data={})
+            return StardistSegmenter(model_path, object_size=object_size, logger=dummy_logger, model_data={})
         case "cellcounter":
             from model.CellCounter import CellCounter
-
             return CellCounter(model_path, object_size=object_size, model_data={})
         case _:
             raise ValueError(f"Unsupported model type: {model_type}. "

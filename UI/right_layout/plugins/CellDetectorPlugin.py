@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 
 # Local application imports
 from UI.WaitWindow import run_with_wait_window
-from UI.app_globals import get_global, set_global
+from UI.app_globals import get_global, set_global, get_registered_model
 from UI.errorhandling import app_logger
 from UI.ModelsCheckList import ModelsCheckListDialog
 from UI.prediction_rendering import (
@@ -281,7 +281,9 @@ class CellDetectorPlugin(BasePlugin):
         self.plugin_signal.emit("Settings", False)
         self.plugin_signal.emit("Save_as", False)
         currentModel = self.combo_box.currentText()
-        self.model = Model(path=arg[-1][currentModel]['path'],
+        self.model = Model(logger=app_logger(),
+                           get_registered_model=get_registered_model,
+                           path=arg[-1][currentModel]['path'],
                            object_size=arg[-1][currentModel]['object_size'],
                            model_type = arg[-1][currentModel]['model_type']
                            )
@@ -582,12 +584,14 @@ class CellDetectorPlugin(BasePlugin):
                 if self.model:
                     del self.model
                     self.model = None
-                self.model = Model(path=self.models[model]['path'],
-                                        object_size=self.models[model]['object_size'],
-                                        model_type=self.models[model]['model_type'],
-                                        model_data=self.models[model],
-                                        model_name=model
-                                        )
+                self.model = Model(logger=app_logger(),
+                                   get_registered_model=get_registered_model,
+                                   path=self.models[model]['path'],
+                                   object_size=self.models[model]['object_size'],
+                                   model_type=self.models[model]['model_type'],
+                                   model_data=self.models[model],
+                                   model_name=model
+                                   )
                 self.model.cell_counter.original_image_path = self.lsm_path
                 result = self.model.calculate(
                             img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
@@ -604,11 +608,13 @@ class CellDetectorPlugin(BasePlugin):
                     del self.model
                     self.model = None
                     a_path = self.models[model]['path']
-                    self.model = Model(path=a_path,
-                                            object_size=self.models[model]['object_size'],
-                                            model_type=self.models[model]['model_type'],
-                                            model_data=self.models[model],
-                                            model_name=model)
+                    self.model = Model(logger=app_logger(),
+                                       get_registered_model=get_registered_model,
+                                       path=a_path,
+                                       object_size=self.models[model]['object_size'],
+                                       model_type=self.models[model]['model_type'],
+                                       model_data=self.models[model],
+                                       model_name=model)
                     self.model.cell_counter.original_image_path = self.lsm_path
                     result = self.model.calculate(img_path=self.lsm_path)
             except  Exception as e:
@@ -754,8 +760,13 @@ class CellDetectorPlugin(BasePlugin):
         Returns:
             Tuple of images and data.
         """
-        model = None
-        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model_name)
+        model = Model(logger=app_logger(),
+                      get_registered_model=get_registered_model,
+                      path=modelpath,
+                      object_size=object_size,
+                      model_type=modeltype,
+                      model_data=model_data,
+                      model_name=model_name)
         model.cell_counter.original_image_path = self.lsm_path
         result = None
         try:

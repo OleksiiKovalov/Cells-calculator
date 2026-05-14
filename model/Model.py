@@ -6,11 +6,13 @@ In this module the general Model class is defined which is used to calculate:
 
 # Standard library imports
 import importlib
+import inspect
 import os
-
+from collections.abc import Callable
+from logging import Logger
+from typing import Any
 
 # Local application imports
-from UI.app_globals import get_registered_model
 from model.NucleiCounter import NucleiCounter
 from model.utils import (
     calculate_alive_percentage,
@@ -25,6 +27,9 @@ DETECTOR_MODEL_TYPE = "cellcounter"
 NO_NUCLEI_METRIC = -100
 
 class Model:
+
+    _logger: Logger
+
     """
     The class for object of general model.
     To use the class instances, define a new instance and use
@@ -43,13 +48,15 @@ class Model:
     - '%': the target percentage value obtained.
     """
     def __init__(
-        self, 
+        self,
+        logger: Logger,
+        get_registered_model: Callable[[str], Any],
         path=os.path.join('trainedmodels', 'yolov8m-det.onnx'),
         threshold=100, eps=5, min_samples=10,
         object_size = { 'min_size' : 0, 'max_size' : 1, "scale": 20},
         model_type = "",
         model_data = None,
-        model_name = None
+        model_name = None,
     ):
         """
         Initialize the general cell analysis model.
@@ -67,6 +74,7 @@ class Model:
             model_data (dict): Model-specific configuration parameters. Optional.
             model_name (str): Human-readable model name for reporting. Optional.
         """
+        self._logger = logger
         self.nuclei_counter = NucleiCounter(
             threshold=threshold,
             eps=eps,
@@ -74,7 +82,7 @@ class Model:
         )
         self.path = path
         self.model_type = model_type
-        self.init_counter(path, object_size,model_type,model_data)
+        self.init_counter(path, object_size,model_type, model_data, get_registered_model)
         self.inference_duration = 0
         self.model_name = model_name       
         self.cell_counter.model_name = model_name
@@ -88,7 +96,7 @@ class Model:
         """Returns True when nuclei and alive metrics are meaningful for this model."""
         return self.model_type == DETECTOR_MODEL_TYPE
         
-    def init_counter(self, path, object_size, model_type,model_data = None):
+    def init_counter(self, path, object_size, model_type, model_data, get_registered_model: Callable[[str], Any]):
         """
         Helper constructor method for initializing cell counter param.
         Depending on the model file name, either CellCounter or Segmenter
@@ -101,7 +109,17 @@ class Model:
         module_name, class_name = cell_counter_class_name.rsplit(".", 1)
         module = importlib.import_module(module_name)
         cell_counter_class = getattr(module, class_name)
-        self.cell_counter =cell_counter_class(path, object_size = object_size,model_data = model_data)   
+
+        init_kwargs = {
+            "path_to_model": path,
+            "object_size": object_size,
+            "model_data": model_data
+        }
+        sig = inspect.signature(cell_counter_class)
+        if 'logger' in sig.parameters:
+            init_kwargs["logger"] = self._logger
+
+        self.cell_counter = cell_counter_class(**init_kwargs)
 
     def calculate(self, img_path, cell_channel=0, nuclei_channel=1):
         """
