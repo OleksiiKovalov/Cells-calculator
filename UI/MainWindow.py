@@ -11,6 +11,7 @@ import os
 import string
 import traceback
 from datetime import datetime
+from typing import Any, Dict, Optional, Union
 
 # Third-party imports
 import numpy as np
@@ -28,7 +29,7 @@ from skimage.io import imread
 from UI.app_globals import get_global
 from UI.errorhandling import connect_to_log_events
 from UI.ImageNormalizeDialog import ImageNormalizeDialog
-from UI.menubar import menubar
+from UI.menubar import MenuBar
 from UI.prediction_rendering import COLOR_NUMBER as color_number
 from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin as CellDetector_plugin
 from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugin
@@ -87,7 +88,7 @@ class MainWindow(QMainWindow):
         
         self._update_progress(60, "Initializing menu bar...")
         # Initialize the user interface
-        self.menu_bar = menubar(self, list(self.plugin_list.keys()), self.current_plugin_name)
+        self.menu_bar = MenuBar(self, list(self.plugin_list.keys()), self.current_plugin_name)
         self.setMenuBar(self.menu_bar)
         
         self._update_progress(75, "Setting up right panel...")
@@ -119,26 +120,24 @@ class MainWindow(QMainWindow):
         QApplication.processEvents()
 
     @pyqtSlot(str, object)
-    def handle_menubar_action(self, action_name, value):
+    def handle_menubar_action(self, action_name: str, value: object) -> None:
         """
         Handle actions from the menubar.
         """
         if action_name == "open_file":
             self.open_file(value)
-        if action_name == "open_folder":
+        elif action_name == "open_folder":
             self.open_folder(value)
         elif action_name == "open_settings":
             self.open_settings()
         elif action_name == "open_normalize":
             self.open_normalize()
-
         elif action_name == "show_warning":
             self.show_warning_dialog(value)
         elif action_name == "change_plugin":
             if value in self.plugin_list:
                 self.main_scene.clear()
                 self.current_plugin_name = value
-                self.setWindowTitle(self.current_plugin_name)
                 self.setWindowTitle(value)
                 self.init_value()
                 self.right_layout.set_current_plugin(value, self.plugin_list)
@@ -161,18 +160,21 @@ class MainWindow(QMainWindow):
             self.filter_and_draw_predictions(get_global('predictions'), get_global('image_inference'))
         pass
     
-    def open_normalize(self):
+    def open_normalize(self) -> None:
         """
         Open the image normalization dialog for the current image.
 
         Loads the currently selected image file, converts it to grayscale if needed,
         and opens the normalization dialog for user adjustments.
         """
+        if not self.lsm_path:
+            self.show_warning_dialog("No image selected for normalization.")
+            return
+
         image = imread(self.lsm_path)
         image = safergb2gray(image)
         dlg = ImageNormalizeDialog(image)
-        dlg.exec_()        
-        pass
+        dlg.exec_()
 
     def init_value(self):
         """
@@ -431,12 +433,13 @@ class MainWindow(QMainWindow):
         """
 
         # Create a list of image files within the selected folder
-        lsm_folder = folder_path
-        self.lsm_filesList = [os.path.join(folder_path, file) \
-        for file in os.listdir(folder_path)\
-            if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
+        self.lsm_folder = folder_path
+        self.lsm_filesList = [
+            os.path.join(folder_path, file)
+            for file in os.listdir(folder_path)
+            if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))
+        ]
 
-        # If image files are found
         if self.lsm_filesList:
             # Clear the main scene
             self.main_scene.clear()
@@ -455,7 +458,7 @@ class MainWindow(QMainWindow):
             # If no image files are found, reset variables and show a warning dialog
             self.show_warning_dialog("No Image files found in the selected folder")
 
-    def create_table(self):
+    def create_table(self) -> None:
         """
         Create a table with calculated results for multiple files.
 
@@ -466,6 +469,11 @@ class MainWindow(QMainWindow):
         - If an exception occurs during calculation, disables certain actions, resets file list and data frame, and shows a warning dialog.
         - Configures table properties, populates the table with data from the data frame, sets minimum size, and resizes rows and columns to fit content.
         - Adds the table to the main scene.
+
+
+        
+        ----This method is currently disabled until the table workflow is restored----
+
         """
         print("Expired")
         return
@@ -959,7 +967,7 @@ class MainWindow(QMainWindow):
             # If an error occurs, show a warning dialog
             self.show_warning_dialog("Error during opening image.")
 
-    def open_file(self, lsm_path):
+    def open_file(self, lsm_path: str) -> None:
         """
         Open an image file (*.png *.jpg *.bmp *.lsm *.TIF) and display it.
 
@@ -998,18 +1006,18 @@ class MainWindow(QMainWindow):
                 self.add_image(self.lsm_path)
                 self.setWindowTitle(
                     f"Cells Calculator - {os.path.basename(lsm_path)} ({self.currentImageWidth} x {self.currentImageHeight})")
-                
-                # Update status bar with success
-                self.update_status("File loaded successfully", 
-                                 file_info=f"{os.path.basename(lsm_path)} ({self.currentImageWidth}x{self.currentImageHeight})",
-                                 processing_status="Ready")
-                                 
+                self.update_status(
+                    "File loaded successfully",
+                    file_info=f"{os.path.basename(lsm_path)} ({self.currentImageWidth}x{self.currentImageHeight})",
+                    processing_status="Ready"
+                )
+                self.image_mru[lsm_path] = datetime.min
             except Exception as e:
                 traceback.print_exc()
                 # If an error occurs, show a warning dialog,
                 # reset variables, and clear the main scene
                 self.show_warning_dialog("Error during opening file.")
-                self.setWindowTitle(f"Cells Calculator")
+                self.setWindowTitle("Cells Calculator")
                 self.mainWindow_signal.emit("open_lsm", None)
                 self.lsm_path = None
                 self.lsm_filesList = None
@@ -1018,12 +1026,10 @@ class MainWindow(QMainWindow):
                 
                 # Update status bar with error
                 self.update_status("Error loading file", file_info="No file", processing_status="Error")
-
-                return 0
-        self.image_mru[lsm_path] = datetime.min
+                return
 
 
-    def open_lsm(self, lsm_path):
+    def open_lsm(self, lsm_path: str) -> None:
         """
         Open an image file (*.LSM) and display it.
 
@@ -1059,6 +1065,7 @@ class MainWindow(QMainWindow):
             self.add_image(lsm_file)
             self.setWindowTitle(
                 f"Cells Calculator - {os.path.basename(lsm_path)}")
+            self.image_mru[lsm_path] = datetime.min
         except Exception as e:
             traceback.print_exc()
             # If an error occurs, show a warning dialog,
@@ -1089,14 +1096,12 @@ class MainWindow(QMainWindow):
         try:
            # Check if there are LSM files in the list
             if self.lsm_filesList:
-               # If LSM files are present, set the LSM path and callback function for table creation
-               lsm_path = self.lsm_filesList
-                #TODO refactor callback to depend on plugin
-               call_back = self.plugin_list[self.current_plugin_name]["folder_callback"]
+                lsm_path = self.lsm_filesList
+                call_back = self.plugin_list[self.current_plugin_name]["folder_callback"]
             else:
-               # If no LSM files in the list, set the callback function for image change
-               call_back = self.plugin_list[self.current_plugin_name]["file_callback"]
-               lsm_path = self.lsm_path
+                # If no LSM files in the list, set the callback function for image change
+                call_back = self.plugin_list[self.current_plugin_name]["file_callback"]
+                lsm_path = self.lsm_path
 
             # If there's a valid LSM path
             if lsm_path:
@@ -1231,7 +1236,7 @@ class MainWindow(QMainWindow):
         printable = set(string.printable)
         return ''.join(char for char in text if char in printable)
 
-    def filter_and_draw_predictions(self, image, predictions):
+    def filter_and_draw_predictions(self, image: Any, predictions: Any) -> None:
         """
         Filter and draw predictions on the image.
         

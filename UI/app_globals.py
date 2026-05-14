@@ -5,16 +5,10 @@ This module manages global state and variables that need to be shared
 across different components of the application.
 """
 
-from sys import modules
-
-
 FILENAME_MODEL_CONFIG = "modelconfig.json"
-CASH_DIRECTORY = ".cache"
 
 IMAGE_FILE_NAME_DETECTION = ".cache/cell_tmp_img_with_detections.png"
 IMAGE_FILE_NAME_INGFERENCE = ".cache/cell_tmp_img_inference.png"
-IMAGE_FILE_NAME_TMP = ".cache/cell_tmp_img.png"
-IMAGE_FILE_NAME_INSTANCES = ".cache/instances.jpg"
 IMAGE_FILE_NAME_GRID = ".cache/image_grid_output.png"
 
 

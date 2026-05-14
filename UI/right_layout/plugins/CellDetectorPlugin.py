@@ -23,7 +23,7 @@ from PyQt5.QtWidgets import (
 
 # Local application imports
 from UI.WaitWindow import run_with_wait_window
-from UI.app_globals import get_global, set_global
+from UI.app_globals import get_global, set_global, get_registered_model
 from UI.errorhandling import app_logger
 from UI.ModelsCheckList import ModelsCheckListDialog
 from UI.prediction_rendering import (
@@ -267,6 +267,17 @@ class CellDetectorPlugin(BasePlugin):
     """
     Plugin for cell detection processing.
     """
+
+    DEFAULT_ALPHA_TEXT = "75%"
+    DEFAULT_ALPHA_VALUE = 0.75
+    DISPLAY_MODE_ORIGINAL = 0
+    DISPLAY_MODE_DETECTIONS = 1
+    DISPLAY_MODE_INFERENCE = 2
+    PERMYRIAD_FACTOR = 10000
+    DEFAULT_RANGE_MIN = 0.0
+    DEFAULT_RANGE_MAX = 1.0
+    SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.bmp', '.lsm', '.tif')
+
     def get_name(self):
         return "Cell Processor"
     
@@ -281,7 +292,9 @@ class CellDetectorPlugin(BasePlugin):
         self.plugin_signal.emit("Settings", False)
         self.plugin_signal.emit("Save_as", False)
         currentModel = self.combo_box.currentText()
-        self.model = Model(path=arg[-1][currentModel]['path'],
+        self.model = Model(logger=app_logger(),
+                           get_registered_model=get_registered_model,
+                           path=arg[-1][currentModel]['path'],
                            object_size=arg[-1][currentModel]['object_size'],
                            model_type = arg[-1][currentModel]['model_type']
                            )
@@ -486,14 +499,13 @@ class CellDetectorPlugin(BasePlugin):
         model = self.combo_box.currentText()
 
         # Check if a method and file are selected
-        if model == "" or self.lsm_path is None:
-            # If not, show a warning dialog and return
+        if not model or self.lsm_path is None:
             self.plugin_signal.emit("show_warning", "Warning\n\nChoose model and file.")
             return 0
 
         # If a specific method is selected
         button_enabled = self.button.isEnabled()
-        self.button.setText("Calculating.....")
+        self.button.setText("Calculating...")
         self.button.setEnabled(False)
         self.button.repaint()
         
@@ -573,7 +585,7 @@ class CellDetectorPlugin(BasePlugin):
         """
         try:
                     # Attempt to calculate the result using the selected method
-            if self.model and self.model.model_name == model:
+            if self.model and getattr(self.model, 'model_name', None) == model:
                 self.model.cell_counter.original_image_path = self.lsm_path
                 result = self.model.calculate(
                             img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
@@ -582,12 +594,14 @@ class CellDetectorPlugin(BasePlugin):
                 if self.model:
                     del self.model
                     self.model = None
-                self.model = Model(path=self.models[model]['path'],
-                                        object_size=self.models[model]['object_size'],
-                                        model_type=self.models[model]['model_type'],
-                                        model_data=self.models[model],
-                                        model_name=model
-                                        )
+                self.model = Model(logger=app_logger(),
+                                   get_registered_model=get_registered_model,
+                                   path=self.models[model]['path'],
+                                   object_size=self.models[model]['object_size'],
+                                   model_type=self.models[model]['model_type'],
+                                   model_data=self.models[model],
+                                   model_name=model
+                                   )
                 self.model.cell_counter.original_image_path = self.lsm_path
                 result = self.model.calculate(
                             img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
@@ -604,11 +618,13 @@ class CellDetectorPlugin(BasePlugin):
                     del self.model
                     self.model = None
                     a_path = self.models[model]['path']
-                    self.model = Model(path=a_path,
-                                            object_size=self.models[model]['object_size'],
-                                            model_type=self.models[model]['model_type'],
-                                            model_data=self.models[model],
-                                            model_name=model)
+                    self.model = Model(logger=app_logger(),
+                                       get_registered_model=get_registered_model,
+                                       path=a_path,
+                                       object_size=self.models[model]['object_size'],
+                                       model_type=self.models[model]['model_type'],
+                                       model_data=self.models[model],
+                                       model_name=model)
                     self.model.cell_counter.original_image_path = self.lsm_path
                     result = self.model.calculate(img_path=self.lsm_path)
             except  Exception as e:
@@ -754,8 +770,13 @@ class CellDetectorPlugin(BasePlugin):
         Returns:
             Tuple of images and data.
         """
-        model = None
-        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model_name)
+        model = Model(logger=app_logger(),
+                      get_registered_model=get_registered_model,
+                      path=modelpath,
+                      object_size=object_size,
+                      model_type=modeltype,
+                      model_data=model_data,
+                      model_name=model_name)
         model.cell_counter.original_image_path = self.lsm_path
         result = None
         try:
@@ -822,7 +843,7 @@ class CellDetectorPlugin(BasePlugin):
             dlg = ModelsCheckListDialog(items, self.checked_indices, parent=self.parent())
             #set to resonable height to fit most of models
             dlg.resize(300,383)
-            if dlg.Execute():
+            if dlg.execute():
                 checked = dlg.get_checked_items()
             else:
                 return
@@ -1204,14 +1225,11 @@ class CellDetectorPlugin(BasePlugin):
 
         try:
             # Handle different display modes based on show_boundry flag
-            if self.show_boundry == 0:  # Original
-                # Show the original image
+            if self.show_boundry == self.DISPLAY_MODE_ORIGINAL:
                 self.plugin_signal.emit("add_image", self.lsm_path)
-            elif self.show_boundry == 2:  # Inference
-                # Show the inference image (if available)
-                    self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_INGFERENCE)
-            elif self.show_boundry == 1:  # Detections
-                # Show the image with bounding box detections
+            elif self.show_boundry == self.DISPLAY_MODE_INFERENCE:
+                self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_INGFERENCE)
+            elif self.show_boundry == self.DISPLAY_MODE_DETECTIONS:
                 self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_DETECTION)
             else:
                 # Default to original image
@@ -1232,12 +1250,12 @@ class CellDetectorPlugin(BasePlugin):
         # Get the ID of the selected button (0=Original, 1=Detections, 2=Inference)
         selected_id = self.display_group.id(button)
         
-        if selected_id == 0:  # Original
-            self.show_boundry = 0
-        elif selected_id == 1:  # Detections
-            self.show_boundry = 1
-        elif selected_id == 2:  # Inference
-            self.show_boundry = 2
+        if selected_id == self.DISPLAY_MODE_ORIGINAL:
+            self.show_boundry = self.DISPLAY_MODE_ORIGINAL
+        elif selected_id == self.DISPLAY_MODE_DETECTIONS:
+            self.show_boundry = self.DISPLAY_MODE_DETECTIONS
+        elif selected_id == self.DISPLAY_MODE_INFERENCE:
+            self.show_boundry = self.DISPLAY_MODE_INFERENCE
             
         # Redraw with the new display mode
         self.draw_bounding_box()
@@ -1499,11 +1517,11 @@ class CellDetectorPlugin(BasePlugin):
         # Add alpha values
         alpha_values = ["100%", "75%", "50%", "25%"]
         self.alpha_combo.addItems(alpha_values)
-        self.alpha_combo.setCurrentText("75%")  # Default to 75%
+        self.alpha_combo.setCurrentText(self.DEFAULT_ALPHA_TEXT)  # Default to 75%
         self.alpha_combo.currentTextChanged.connect(self.update_alpha)
         
         # Initialize alpha in object_size
-        self.object_size["alpha"] = 0.75  # Default 75%
+        self.object_size["alpha"] = self.DEFAULT_ALPHA_VALUE  # Default 75%
 
         um_per_px_label = QLabel("um per px:")
         um_per_px_label.setFont(QFont("Arial", 16))

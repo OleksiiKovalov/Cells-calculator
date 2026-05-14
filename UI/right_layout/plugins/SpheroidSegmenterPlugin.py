@@ -30,6 +30,10 @@ class SpheroidSegmenterPlugin(BasePlugin):
     Currently this plugin is not used in the app and is unavailable.
     Instead, Tracker plugin should be used, where a chosen image folder contains just 1 image.
     """
+
+    SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.bmp', '.lsm', '.tif')
+    DEFAULT_IMAGE_SIZE = (512, 512)
+
     def get_name(self):
         return "Spheroid Segmenter"
     def __init__(self, *arg):
@@ -84,10 +88,11 @@ class SpheroidSegmenterPlugin(BasePlugin):
             self.reset_detection()
             self.right_scene.clear()
             if value:
-                self.lsm_filesList = [os.path.join(value, file) \
-        for file in os.listdir(value)\
-            if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
-
+                self.lsm_filesList = [
+                    os.path.join(value, file)
+                    for file in os.listdir(value)
+                    if file.lower().endswith(self.SUPPORTED_IMAGE_EXTENSIONS)
+                ]
                 self.folder_path = value
                 self.max_range_slider.set_default()
                 self.min_range_slider.set_default()
@@ -122,13 +127,20 @@ class SpheroidSegmenterPlugin(BasePlugin):
     def reset_detection(self):
         """
         Reset detection results.
+
+        
+        !!!
+        This method is currently a placeholder to preserve existing
+        plugin behavior until detection reset logic is implemented.
+        !!!
+        
         """
         print("reset_detection")
         return
         for key, model in self.models.items():
             model.cell_counter.detections = None
 
-    def set_size(self, detection, img_size : tuple = (512,512)):
+    def set_size(self, detection, img_size: tuple = DEFAULT_IMAGE_SIZE):
         """
         Set size parameters based on detection results.
         

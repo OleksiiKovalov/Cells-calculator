@@ -17,6 +17,7 @@ Key responsibilities:
 import json
 import os
 import traceback
+from logging import Logger
 from typing import List, Dict, Any
 from collections import OrderedDict
 
@@ -32,7 +33,6 @@ from skimage.transform import resize
 from stardist.models import StarDist2D
 
 # Local application imports
-from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
     plot_mask,
@@ -41,11 +41,13 @@ from model.utils import (
     safe_image_write, 
     safe_image_read, 
 )
-from UI.app_globals import IMAGE_FILE_NAME_INSTANCES
-
+from model.constants import IMAGE_FILE_NAME_INSTANCES
 
 
 class StardistSegmenter(BaseModel):
+
+    _logger: Logger
+
     """
     Cell/nuclei segmentation using StarDist deep learning model.
     
@@ -58,12 +60,13 @@ class StardistSegmenter(BaseModel):
         is_custom_model (bool): Whether model is custom-trained vs. pre-trained
         image_preprocess_settings_default (OrderedDict): Default preprocessing config
     """
-    def __init__(self, path_to_model: str, object_size, model_data=None):
+    def __init__(self, path_to_model: str, object_size, logger: Logger, model_data=None):
         """
         Initialize StarDist segmenter.
         """
         self.is_custom_model = False
         super().__init__(path_to_model, object_size,model_data)
+        self._logger = logger
     
     def init_x20_model(self, path_to_model: str):
         """
@@ -77,7 +80,7 @@ class StardistSegmenter(BaseModel):
             Pre-trained models use 'gray2rgb' preprocessing.
             Custom models use 'rgb2gray' preprocessing.
         """
-        app_logger().warning(
+        self._logger.warning(
             f"Stardist: Num GPUs Available:{len(tf.config.list_physical_devices('GPU'))}"
         )        
         if (path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018")):
@@ -152,7 +155,7 @@ class StardistSegmenter(BaseModel):
         
         except Exception as e:
             traceback.print_exc()
-            app_logger().exception(e)
+            self._logger.exception(e)
             raise RuntimeError(f"Error when inferrecing StardistSegmenter: {e}")
         
 

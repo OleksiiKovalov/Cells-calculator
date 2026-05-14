@@ -2,6 +2,7 @@
 
 import importlib
 import json
+import logging
 import sys
 import types
 from typing import Any
@@ -278,6 +279,9 @@ def test_instanseg_pads_narrow_eval_medium_image_window(request, monkeypatch):
     segmenter = instanseg_module.InstansegSegmenter.__new__(
         instanseg_module.InstansegSegmenter
     )
+    dummy_logger = logging.getLogger("dummy_logger")
+    dummy_logger.addHandler(logging.NullHandler())
+    segmenter._logger = dummy_logger
 
     image = np.zeros((512, 85, 3), dtype=np.uint8)
     padded = segmenter._ensure_eval_window_size(

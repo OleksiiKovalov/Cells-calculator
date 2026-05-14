@@ -22,10 +22,7 @@ from skimage.transform import resize
 from ultralytics.engine.results import Results
 
 # Local application imports
-from UI.app_globals import (
-    IMAGE_FILE_NAME_TMP,
-    CASH_DIRECTORY
-)
+from model.constants import IMAGE_FILE_NAME_TMP, CACHE_DIRECTORY
 from model.PredictionResult import unwrap_prediction_cells
 
 
@@ -841,7 +838,7 @@ def clear_cache():
     """
     Remove and recreate application cache directory.
     """
-    cache_dir = CASH_DIRECTORY
+    cache_dir = CACHE_DIRECTORY
     if os.path.exists(cache_dir):
         shutil.rmtree(cache_dir,ignore_errors=True)
     os.makedirs(cache_dir, exist_ok=True)

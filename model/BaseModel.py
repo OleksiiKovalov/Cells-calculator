@@ -17,7 +17,7 @@ import pandas as pd
 import torch
 
 # Local application imports
-from UI.app_globals import IMAGE_FILE_NAME_TMP
+from model.constants import IMAGE_FILE_NAME_TMP
 from model.PredictionResult import PredictionResult, count_prediction_cells
 
 

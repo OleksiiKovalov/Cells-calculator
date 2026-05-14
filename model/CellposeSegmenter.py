@@ -19,6 +19,7 @@ Key responsibilities:
 # Standard library imports
 import json
 import os
+from logging import Logger
 from typing import Optional, List, Tuple, Dict, Any
 from collections import OrderedDict
 
@@ -32,7 +33,6 @@ from skimage.color import rgb2gray
 from skimage.io import imread
 
 # Local application imports
-from UI.errorhandling import app_logger
 from model.BaseModel import BaseModel
 from model.utils import (
     plot_mask,
@@ -43,6 +43,9 @@ from model.utils import (
 
 
 class CellposeSegmenter(BaseModel):
+
+    _logger: Logger
+
     """
     Cell segmentation using the Cellpose deep learning model.
     
@@ -55,11 +58,12 @@ class CellposeSegmenter(BaseModel):
         cellpose_diam (float | None): Expected cell diameter for inference tuning
         image_preprocess_settings_default (OrderedDict): Default preprocessing config
     """
-    def __init__(self, path_to_model: str, object_size, model_data=None):
+    def __init__(self, path_to_model: str, object_size, logger: Logger, model_data=None):
         """
         Initialize Cellpose segmenter.
         """
         super().__init__(path_to_model, object_size, model_data)
+        self._logger = logger
         self.cellpose_diam = None
     
     def init_x20_model(self, path_to_model: str):
@@ -94,7 +98,7 @@ class CellposeSegmenter(BaseModel):
             self.model = cp_models.CellposeModel(
                 model_type=default_model, gpu=self.use_gpu
             )
-            app_logger().warning(f"CellposeSegmenter: GPU Used: {self.use_gpu}")
+            self._logger.warning(f"CellposeSegmenter: GPU Used: {self.use_gpu}")
 
     def init_x10_model(self, path_to_model):
         """

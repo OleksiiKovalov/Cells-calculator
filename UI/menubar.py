@@ -12,7 +12,7 @@ Key components:
 
 # Standard library imports
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 # Third-party imports
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QFileInfo
@@ -23,14 +23,27 @@ from PyQt5.QtWidgets import QAction, QFileDialog, QMenuBar, QDialog
 from UI.CustomFileDialog import CustomFileDialog
 from UI.settings_manager import get_setting, set_setting
 
-class menubar(QMenuBar):
+class MenuBar(QMenuBar):
     """
     Menu bar for the application with file, settings, and plugin menus.
     """
 
+    # Menu and action labels
+    LABEL_FILE = "File"
+    LABEL_SETTINGS = "Settings"
+    LABEL_PLUGIN = "plugin"
+    LABEL_OPEN_IMAGE = "Open Image"
+    LABEL_OPEN_FOLDER = "Open Folder"
+    LABEL_SAVE_AS = "Save As"
+    LABEL_SETTINGS_ACTION = "Settings"
+    LABEL_NORMALIZE = "normalize"
+
+    # Keyboard shortcuts
+    SHORTCUT_OPEN_FILE = "Ctrl+O"
+
     menubar_signal = pyqtSignal(str, object)
 
-    def __init__(self, parent, plugin_list, current_plugin_name):
+    def __init__(self, parent, plugin_list: List[str], current_plugin_name: str) -> None:
         """
         Initialize the menu bar.
 
@@ -45,24 +58,24 @@ class menubar(QMenuBar):
         self.current_plugin_name = current_plugin_name
         self.init_menubar()
 
-    def init_menubar(self):
+    def init_menubar(self) -> None:
         """
         Initialize the menu bar with menus and actions.
         """
-        file_menu = self.addMenu("File")
-        settings_menu = self.addMenu("Settings")
-        plugin_menu = self.addMenu("plugin")
+        file_menu = self.addMenu(self.LABEL_FILE)
+        settings_menu = self.addMenu(self.LABEL_SETTINGS)
+        plugin_menu = self.addMenu(self.LABEL_PLUGIN)
         
-        self.open_lsm_action = QAction("Open Image", self)
+        self.open_lsm_action = QAction(self.LABEL_OPEN_IMAGE, self)
         self.open_lsm_action.triggered.connect(self.open_file)
-        self.open_lsm_action.setShortcut("Ctrl+O") 
+        self.open_lsm_action.setShortcut(self.SHORTCUT_OPEN_FILE)
         self.open_lsm_action.setEnabled(False)
 
-        self.open_folder_action = QAction("Open Folder", self)
+        self.open_folder_action = QAction(self.LABEL_OPEN_FOLDER, self)
         self.open_folder_action.triggered.connect(self.open_folder)
         self.open_folder_action.setEnabled(False)
 
-        self.save_as_action = QAction("Save As", self)
+        self.save_as_action = QAction(self.LABEL_SAVE_AS, self)
         self.save_as_action.setEnabled(False)
         self.save_as_action.triggered.connect(self.save_as)
 
@@ -70,12 +83,12 @@ class menubar(QMenuBar):
         file_menu.addAction(self.open_folder_action)
         file_menu.addAction(self.save_as_action)
 
-        self.settings_action = QAction("Settings", self)
+        self.settings_action = QAction(self.LABEL_SETTINGS_ACTION, self)
         self.settings_action.setEnabled(False)
         self.settings_action.triggered.connect(self.open_settings)
         settings_menu.addAction(self.settings_action)
 
-        self.normalize_action = QAction("normalize", self)
+        self.normalize_action = QAction(self.LABEL_NORMALIZE, self)
         self.normalize_action.setEnabled(False)
         self.normalize_action.triggered.connect(self.open_normalize)
         settings_menu.addAction(self.normalize_action)
@@ -91,7 +104,7 @@ class menubar(QMenuBar):
             if plugin == self.current_plugin_name:
                 action.setChecked(True)
 
-    def select_plugin(self):
+    def select_plugin(self) -> None:
         """
         Handle plugin selection from the menu.
         """
@@ -107,7 +120,7 @@ class menubar(QMenuBar):
             self.menubar_signal.emit("change_plugin", self.current_plugin_name)
 
     @pyqtSlot(str, object)
-    def handle_mainWindow_action(self, action_name, value):
+    def handle_mainWindow_action(self, action_name: str, value: object) -> None:
         """
         Handle actions from the main window.
 
@@ -140,7 +153,7 @@ class menubar(QMenuBar):
             self.save_as_action.setEnabled(False)
 
     @pyqtSlot(str, object)
-    def handle_rightLayout_action(self, action_name, value):
+    def handle_rightLayout_action(self, action_name: str, value: object) -> None:
         """
         Handle actions from the right layout.
 
@@ -150,14 +163,11 @@ class menubar(QMenuBar):
         """
         if action_name == "Open_lsm":
             self.open_lsm_action.setEnabled(value)
-                 
-        if action_name == "Open_folder":
+        elif action_name == "Open_folder":
             self.open_folder_action.setEnabled(value)
-          
-        if action_name == "Settings":
-           self.settings_action.setEnabled(value)
-
-        if action_name == "Save_as":
+        elif action_name == "Settings":
+            self.settings_action.setEnabled(value)
+        elif action_name == "Save_as":
             self.save_as_action.setEnabled(value)
 
     def get_process_time(self, file_info: QFileInfo) -> str:
@@ -192,7 +202,7 @@ class menubar(QMenuBar):
                     return QColor(0, 0, 150)  # Blue for processed files
         return None  # Use default color
 
-    def open_file(self):
+    def open_file(self) -> None:
         """
         Open file dialog for selecting an image file.
         """
@@ -211,8 +221,7 @@ class menubar(QMenuBar):
             "All files (*.*)"
         ])
         
-        last_opened_file = get_setting("paths.last_opened_file","")
-        dialog.openAt(get_setting("paths.last_opened_file",""),True)
+        dialog.openAt(get_setting("paths.last_opened_file", ""), True)
         
         if dialog.exec_() == QDialog.Accepted:
             set_setting("paths.last_opened_file", str(dialog.get_selected_file()))
@@ -220,7 +229,7 @@ class menubar(QMenuBar):
             self.menubar_signal.emit("open_file", str(selected_file))
         dialog = None
 
-    def open_folder(self):
+    def open_folder(self) -> None:
         """
         Open folder dialog for selecting a directory.
         """
@@ -230,19 +239,19 @@ class menubar(QMenuBar):
         if folder_path:
             self.menubar_signal.emit("open_folder", folder_path)
 
-    def open_settings(self):
+    def open_settings(self) -> None:
         """
         Emit signal to open settings.
         """
         self.menubar_signal.emit("open_settings", None)
 
-    def save_as(self):
+    def save_as(self) -> None:
         """
         Emit signal to save as.
         """
         self.menubar_signal.emit("save_as", None)
 
-    def open_normalize(self):
+    def open_normalize(self) -> None:
         """
         Emit signal to open normalize dialog.
         """
