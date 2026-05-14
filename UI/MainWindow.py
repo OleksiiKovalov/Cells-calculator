@@ -124,17 +124,17 @@ class MainWindow(QMainWindow):
         """
         Handle actions from the menubar.
         """
-        if action_name == "open_file":
+        if action_name == "open_file" and isinstance(value, str):
             self.open_file(value)
-        elif action_name == "open_folder":
+        elif action_name == "open_folder" and isinstance(value, str):
             self.open_folder(value)
         elif action_name == "open_settings":
             self.open_settings()
         elif action_name == "open_normalize":
             self.open_normalize()
-        elif action_name == "show_warning":
+        elif action_name == "show_warning" and isinstance(value, str):
             self.show_warning_dialog(value)
-        elif action_name == "change_plugin":
+        elif action_name == "change_plugin" and isinstance(value, str):
             if value in self.plugin_list:
                 self.main_scene.clear()
                 self.current_plugin_name = value
@@ -1077,7 +1077,7 @@ class MainWindow(QMainWindow):
             self.lsm_path = None
             self.lsm_filesList = None
             self.lsm_folder = None
-            return 0
+            return
 
     def open_settings(self):
         """

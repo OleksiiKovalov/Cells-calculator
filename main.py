@@ -88,7 +88,7 @@ if __name__ == '__main__':
         
         # Create error dialog with WindowStaysOnTopHint to ensure it appears in front
         error_box = QMessageBox()
-        error_box.setWindowFlags(error_box.windowFlags() | Qt.WindowStaysOnTopHint)
+        error_box.setWindowFlags(error_box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         error_box.setIcon(QMessageBox.Critical)
         error_box.setWindowTitle("Critical Error")
         error_box.setText(f"Failed to initialize or run application:\n\n{str(e)}")

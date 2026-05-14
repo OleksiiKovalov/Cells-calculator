@@ -194,7 +194,7 @@ class FileTableModel(QAbstractTableModel):
     
     def _get_foreground_color(self, file_info: QFileInfo, index: QModelIndex) -> Optional[QBrush]:
         """Get foreground color for a cell"""
-        if hasattr(self, 'color_rule') and self.color_rule:
+        if getattr(self, 'color_rule', None) is not None:
             try:
                 color = self.color_rule(file_info)
                 if color:
@@ -205,14 +205,14 @@ class FileTableModel(QAbstractTableModel):
     
     def _get_background_color(self, file_info: QFileInfo, index: QModelIndex) -> Optional[QBrush]:
         """Get background color for a cell"""
-        if hasattr(self, 'background_color_rule') and self.background_color_rule:
+        if getattr(self, 'background_color_rule', None) is not None:
             try:
                 color = self.background_color_rule(file_info)
                 if color:
                     return QBrush(color)
             except:
                 pass
-        elif hasattr(self, 'alternating_colors') and self.alternating_colors:
+        elif getattr(self, 'alternating_colors', False):
             if index.row() % 2 == 1:
                 return QBrush(ALTERNATING_ROW_COLOR)
         return None

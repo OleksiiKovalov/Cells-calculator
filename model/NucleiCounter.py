@@ -35,6 +35,7 @@ class NucleiCounter():
         self.threshold = threshold
         self.eps = eps
         self.min_samples = min_samples
+        self.calls = 0
 
     def preprocess(self, channel, kernel_size=4, threshold=30):
         """

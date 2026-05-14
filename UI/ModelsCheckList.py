@@ -46,8 +46,10 @@ class ModelsCheckListDialog(QDialog):
         
         for i, text in enumerate(items):
             item = QListWidgetItem(text)
-            item.setCheckState(Qt.Checked if checked_indices and i in checked_indices else Qt.Unchecked)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(
+                Qt.CheckState.Checked if checked_indices and i in checked_indices else Qt.CheckState.Unchecked
+            )
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             self.list_widget.addItem(item)
             self.ground_model.addItem(text)
         layout.addWidget(self.list_widget)
@@ -65,11 +67,12 @@ class ModelsCheckListDialog(QDialog):
         Returns:
             List of tuples (index, text) for checked items.
         """
-        return [
-            (i, self.list_widget.item(i).text())
-            for i in range(self.list_widget.count())
-            if self.list_widget.item(i).checkState() == Qt.Checked
-        ]
+        checked_items = []
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item is not None and item.checkState() == Qt.CheckState.Checked:
+                checked_items.append((i, item.text()))
+        return checked_items
 
     def get_ground_truth_model(self) -> str:
         """
