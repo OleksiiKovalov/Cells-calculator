@@ -184,7 +184,7 @@ class CellCounter(BaseModel):
             # Apply NMS (Non-maximum suppression)
             result_boxes: NDArray[np.int64] = np.array(cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)).flatten() # score, nms thresholds
 
-            detections = []
+            detections_list = []
 
             # Iterate through NMS results to draw bounding boxes and labels
             for index in result_boxes:
@@ -203,16 +203,16 @@ class CellCounter(BaseModel):
                     "box": box,
                     "scale": 1.0,
                 }
-                detections.append(detection)
+                detections_list.append(detection)
 
             # Perform square-based filtering of bboxes. Keep the expected
             # columns even when no objects pass the detector/NMS thresholds.
             detections_df = pd.DataFrame(
-                detections,
+                detections_list,
                 columns=["class_id", "class_name", "confidence", "box", "scale"],
             )
-            detections.attrs["image_size"] = (width, height)
-            self.detections = detections
+            detections_df.attrs["image_size"] = (width, height)
+            self.detections = detections_df
             csv_data = self.detections.copy()
             csv_data["width"] = csv_data["box"].apply(
                 lambda b: b[2] / width if b is not None and width else None
@@ -234,7 +234,7 @@ class CellCounter(BaseModel):
             )
             self.scale = scale
             # Change object_size for detection
-            self.object_size["signal"]("set_size", detections.copy())
+            self.object_size["signal"]("set_size", detections_df.copy())
 
         detections = self.detections
         self.object_size["signal"]("set_size", detections.copy())

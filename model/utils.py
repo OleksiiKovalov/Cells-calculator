@@ -4,8 +4,7 @@
 import math
 import os
 import shutil
-from collections import OrderedDict
-from typing import Any, Iterable
+from typing import Any, cast, Iterable, Optional
 
 # Third-party imports
 import cv2
@@ -349,10 +348,10 @@ def calculate_lsm(cell_counter, nuclei_counter,
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
 
 def filter_detections(
-    detections: pd.DataFrame, 
-    min_size: float = 0.0, 
-    max_size: float = 1.0, 
-    img_size: tuple = (512, 512)
+    detections: pd.DataFrame,
+    min_size: float = 0.0,
+    max_size: float = 1.0,
+    img_size: Optional[tuple] = None,
 ) -> pd.DataFrame:
     """
     [DEPRECATED] Filters bounding boxes based on their area.
@@ -369,7 +368,7 @@ def filter_detections(
 
     Returns pd.DataFrame of filtered detections.
     """
-    if detections is None or detections.empty:
+    if detections.empty:
         return detections
 
     if img_size is None:
@@ -398,7 +397,7 @@ def filter_detections(
 
     areas = detections.apply(_area_ratio, axis=1)
     keep = areas.notna() & (areas >= min_size) & (areas <= max_size)
-    filtered_detections = detections.loc[keep].copy()
+    filtered_detections = cast(pd.DataFrame, detections.loc[keep].copy())
     filtered_detections.attrs.update(detections.attrs)
     return filtered_detections
 
@@ -416,7 +415,7 @@ def filter_segmentation_detections(
     - diameter: relative object diameter / sqrt(image area)
     - volume: relative object volume / image volume surrogate
     """
-    if detections is None or detections.empty:
+    if detections.empty:
         return detections
 
     metric = size_metric if size_metric in detections.columns else "area"
@@ -429,7 +428,7 @@ def filter_segmentation_detections(
 
     values = pd.to_numeric(detections[metric], errors="coerce")
     keep = values.notna() & (values >= min_size) & (values <= max_size)
-    return detections.loc[keep].copy()
+    return cast(pd.DataFrame, detections.loc[keep].copy())
 
 def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""

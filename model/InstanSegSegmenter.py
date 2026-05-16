@@ -250,6 +250,7 @@ class InstansegSegmenter(BaseModel):
             labeled_output = method(**inference_kwargs)
 
             self.detections = self.instanseg_results_to_pandas(labeled_output)
+            assert self.detections is not None
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
                 self.object_size['signal']('set_size', self.detections.copy())

@@ -141,7 +141,7 @@ def test_range_slider_filter_uses_display_image_area(monkeypatch):
     plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
     plugin.object_size = {"color_map": "tab20", "alpha": 0.75}
     plugin.model = None
-    plugin.draw_bounding_box = lambda: None
+    setattr(plugin, "draw_bounding_box", lambda: None)
     detections = pd.DataFrame(
         {
             "class_id": [0],
