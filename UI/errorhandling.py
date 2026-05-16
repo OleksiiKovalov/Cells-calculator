@@ -192,16 +192,20 @@ class LoggerWriter:
         
         # Also write to original stdout/stderr for console visibility
         if self.level == logging.INFO:
-            sys.__stdout__.write(message)
+            if sys.__stdout__ is not None:
+                sys.__stdout__.write(message)
         else:
-            sys.__stderr__.write(message)
+            if sys.__stderr__ is not None:
+                sys.__stderr__.write(message)
 
     def flush(self):
         # Flush the original streams
         if self.level == logging.INFO:
-            sys.__stdout__.flush()
+            if sys.__stdout__ is not None:
+                sys.__stdout__.flush()
         else:
-            sys.__stderr__.flush()
+            if sys.__stderr__ is not None:
+                sys.__stderr__.flush()
 
 def setup_console_logging():
     """

@@ -83,4 +83,4 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Run mypy
-        run: mypy model/
+        run: mypy .

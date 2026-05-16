@@ -45,7 +45,7 @@ TITLE_COLOR = QColor(25, 25, 112)  # Midnight blue
 SUBTITLE_COLOR = QColor(70, 70, 70)
 ICON_BG_COLOR = QColor(70, 130, 180)  # Steel blue
 ICON_BORDER_COLOR = QColor(25, 25, 112)  # Midnight blue
-GRADIENT_START = Qt.white
+GRADIENT_START = Qt.GlobalColor.white
 GRADIENT_END = QColor(240, 248, 255)  # Light blue
 
 # Styles
@@ -107,7 +107,7 @@ class SplashPixmapPainter:
     def create_pixmap(self) -> QPixmap:
         """Create the splash screen pixmap with background and content."""
         pixmap = QPixmap(WINDOW_WIDTH, WINDOW_HEIGHT)
-        pixmap.fill(Qt.white)
+        pixmap.fill(Qt.GlobalColor.white)
         
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -127,7 +127,7 @@ class SplashPixmapPainter:
         gradient.setColorAt(0, GRADIENT_START)
         gradient.setColorAt(1, GRADIENT_END)
         painter.setBrush(gradient)
-        painter.setPen(Qt.NoPen)
+        painter.setPen(Qt.PenStyle.NoPen)
         painter.drawRect(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
     
     def _draw_icon(self, painter: QPainter) -> None:
@@ -136,9 +136,9 @@ class SplashPixmapPainter:
             icon_pixmap = QPixmap("UI/Cells-calculator-v3-icon2.png")
             if not icon_pixmap.isNull():
                 icon_pixmap = icon_pixmap.scaled(
-                    ICON_SIZE, ICON_SIZE, 
-                    Qt.KeepAspectRatio, 
-                    Qt.SmoothTransformation
+                    ICON_SIZE, ICON_SIZE,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
                 )
                 icon_x = (WINDOW_WIDTH - icon_pixmap.width()) // 2
                 painter.drawPixmap(icon_x, 40, icon_pixmap)
@@ -152,9 +152,9 @@ class SplashPixmapPainter:
         painter.drawEllipse(185, 40, ICON_SIZE, ICON_SIZE)
         
         # Draw "CC" text in the circle
-        painter.setPen(Qt.white)
+        painter.setPen(Qt.GlobalColor.white)
         painter.setFont(QFont("Arial", 24, QFont.Bold))
-        painter.drawText(185, 40, ICON_SIZE, ICON_SIZE, Qt.AlignCenter, "CC")
+        painter.drawText(185, 40, ICON_SIZE, ICON_SIZE, Qt.AlignmentFlag.AlignCenter, "CC")
     
     def _draw_text(self, painter: QPainter) -> None:
         """Draw the title and subtitle text."""
@@ -162,13 +162,13 @@ class SplashPixmapPainter:
         painter.setPen(TITLE_COLOR)
         title_font = QFont("Arial", 20, QFont.Bold)
         painter.setFont(title_font)
-        painter.drawText(0, 140, WINDOW_WIDTH, 40, Qt.AlignCenter, "Cells Calculator v3")
+        painter.drawText(0, 140, WINDOW_WIDTH, 40, Qt.AlignmentFlag.AlignCenter, "Cells Calculator v3")
         
         # Subtitle
         painter.setPen(SUBTITLE_COLOR)
         subtitle_font = QFont("Arial", 12)
         painter.setFont(subtitle_font)
-        painter.drawText(0, 175, WINDOW_WIDTH, 25, Qt.AlignCenter, "Advanced Cell Analysis Tool")
+        painter.drawText(0, 175, WINDOW_WIDTH, 25, Qt.AlignmentFlag.AlignCenter, "Advanced Cell Analysis Tool")
 
 
 class SplashScreen(QSplashScreen):
@@ -190,7 +190,7 @@ class SplashScreen(QSplashScreen):
         painter = SplashPixmapPainter(self.logger)
         splash_pixmap = painter.create_pixmap()
         
-        super().__init__(splash_pixmap, Qt.WindowStaysOnTopHint)
+        super().__init__(splash_pixmap, Qt.WindowType.WindowStaysOnTopHint)
         
         # Setup UI components
         self._setup_progress_bar()
@@ -211,7 +211,7 @@ class SplashScreen(QSplashScreen):
     def _setup_status_label(self) -> None:
         """Setup the status label widget."""
         self.status_label = QLabel("Initializing...")
-        self.status_label.setAlignment(Qt.AlignCenter)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setStyleSheet(STATUS_LABEL_STYLE)
         
         self.status_label.setParent(self)
