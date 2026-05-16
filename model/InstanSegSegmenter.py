@@ -443,7 +443,7 @@ class InstansegSegmenter(BaseModel):
 
             data['id_label'].append(i)
             data['box'].append(box)
-            data['mask'].append(p_mask)
+            data['mask'].append(norm_mask)
             #todo restore confidence
             data['confidence'].append(
                 1 #outputs.boxes.conf[i].cpu().detach().numpy()

@@ -221,6 +221,18 @@ def test_countnuclei_blank_channel_is_empty():
     assert NucleiCounter().countNuclei(np.zeros((32, 32), dtype=np.uint8)) == 0
 
 
+def test_lsm_to_channels_last_accepts_tiny_channel_first_arrays():
+    image = np.arange(3, dtype=np.uint8).reshape(3, 1, 1)
+
+    channels_last = model_utils.lsm_to_channels_last(image)
+
+    assert channels_last.shape == (1, 1, 3)
+    assert channels_last[0, 0].tolist() == [0, 1, 2]
+    assert model_utils.lsm_to_channels_last(
+        np.array([7, 8, 9], dtype=np.uint8)
+    ).shape == (1, 1, 3)
+
+
 def test_groupnuclei_result_is_json_serializable_python_int():
     points = pd.DataFrame(
         {
@@ -302,6 +314,98 @@ def test_instanseg_preprocess_keeps_rgba_input_to_three_channels():
     )
 
     assert processed.shape[2] == 3
+
+
+def test_instanseg_results_store_masks_in_normalized_inference_space(
+    request,
+    monkeypatch,
+):
+    instanseg_module = _import_with_fakes(
+        request,
+        monkeypatch,
+        "model.InstanSegSegmenter",
+        _fake_instanseg_modules(),
+    )
+    monkeypatch.setattr(
+        instanseg_module,
+        "labels_to_features",
+        lambda labels: {
+            "features": [
+                {
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [100, 50],
+                                [200, 50],
+                                [200, 150],
+                                [100, 150],
+                                [100, 50],
+                            ]
+                        ],
+                    }
+                }
+            ]
+        },
+    )
+    segmenter = instanseg_module.InstansegSegmenter.__new__(
+        instanseg_module.InstansegSegmenter
+    )
+    labeled_output = np.zeros((1, 1, 512, 512), dtype=np.int32)
+
+    result = segmenter.instanseg_results_to_pandas(labeled_output)
+    mask = np.asarray(result["mask"].iloc[0])
+
+    assert result.shape[0] == 1
+    assert mask.min() >= 0.0
+    assert mask.max() <= 1.0
+    assert np.allclose(mask[0], [100 / 512, 50 / 512])
+
+
+def test_results_to_pandas_skips_degenerate_yolo_masks():
+    class _TensorLike:
+        def __init__(self, value):
+            self.value = np.asarray(value, dtype=np.float32)
+
+        def cpu(self):
+            return self
+
+        def detach(self):
+            return self
+
+        def numpy(self):
+            return self.value.copy()
+
+    outputs = types.SimpleNamespace(
+        orig_shape=(8, 8),
+        masks=types.SimpleNamespace(
+            xyn=[
+                np.array([[0.25, 0.25], [0.25, 0.25]], dtype=np.float32),
+                np.array(
+                    [
+                        [0.25, 0.25],
+                        [0.75, 0.25],
+                        [0.75, 0.75],
+                        [0.25, 0.75],
+                    ],
+                    dtype=np.float32,
+                ),
+            ]
+        ),
+        boxes=types.SimpleNamespace(
+            xyxyn=[
+                _TensorLike([0.2, 0.2, 0.3, 0.3]),
+                _TensorLike([0.25, 0.25, 0.75, 0.75]),
+            ],
+            conf=[_TensorLike(0.1), _TensorLike(0.9)],
+        ),
+    )
+
+    result = model_utils.results_to_pandas(outputs)
+
+    assert result.shape[0] == 1
+    assert result["id_label"].tolist() == [1]
+    assert np.asarray(result["mask"].iloc[0]).shape == (4, 2)
 
 
 def test_stardist_skips_instance_when_no_usable_contour_exists(

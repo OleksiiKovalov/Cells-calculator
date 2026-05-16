@@ -42,20 +42,40 @@ def read_lsm_array(img_path):
 def lsm_to_channels_last(image):
     """Normalizes LSM arrays to (height, width, channels)."""
     image = np.asarray(image)
-    if image.ndim == 2:
-        return image[:, :, np.newaxis]
-
-    image = np.squeeze(image)
+    if image.ndim == 0:
+        return image.reshape(1, 1, 1)
+    if image.ndim == 1:
+        return image.reshape(1, 1, image.shape[0])
     if image.ndim == 2:
         return image[:, :, np.newaxis]
 
     if image.ndim > 3:
+        image = np.squeeze(image)
+        if image.ndim == 0:
+            return image.reshape(1, 1, 1)
+        if image.ndim == 1:
+            return image.reshape(1, 1, image.shape[0])
+        if image.ndim == 2:
+            return image[:, :, np.newaxis]
         image = image.reshape((-1, image.shape[-2], image.shape[-1]))
 
     if image.ndim != 3:
         raise ValueError(f"Unsupported LSM image shape: {image.shape}")
 
+    if (
+        image.shape[0] <= 8
+        and (
+            image.shape[1] > 8
+            or image.shape[2] > 8
+            or (image.shape[0] > 1 and image.shape[2] <= 1)
+        )
+    ):
+        return np.transpose(image, (1, 2, 0))
+
     if image.shape[-1] <= 8 and image.shape[0] > 8 and image.shape[1] > 8:
+        return image
+
+    if image.shape[-1] in (3, 4):
         return image
 
     return np.transpose(image, (1, 2, 0))
@@ -349,10 +369,37 @@ def filter_detections(
 
     Returns pd.DataFrame of filtered detections.
     """
-    if detections.empty:
+    if detections is None or detections.empty:
         return detections
+
+    if img_size is None:
+        img_size = detections.attrs.get("image_size", (512, 512))
+
+    min_size = 0.0 if min_size is None else float(min_size)
+    max_size = 1.0 if max_size is None else float(max_size)
+    if min_size > max_size:
+        min_size, max_size = max_size, min_size
+
     img_sq = img_size[0] * img_size[1]
-    filtered_detections: pd.DataFrame = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
+    if img_sq <= 0:
+        return detections.iloc[0:0].copy()
+
+    def _area_ratio(row):
+        try:
+            box = np.asarray(row["box"], dtype=np.float64).reshape(-1)
+            scale = float(row["scale"]) if "scale" in row else 1.0
+        except (TypeError, ValueError, KeyError):
+            return np.nan
+        if box.size < 4 or not np.isfinite(box[:4]).all() or not np.isfinite(scale):
+            return np.nan
+        width = max(0.0, float(box[2]) * scale)
+        height = max(0.0, float(box[3]) * scale)
+        return width * height / img_sq
+
+    areas = detections.apply(_area_ratio, axis=1)
+    keep = areas.notna() & (areas >= min_size) & (areas <= max_size)
+    filtered_detections = detections.loc[keep].copy()
+    filtered_detections.attrs.update(detections.attrs)
     return filtered_detections
 
 def filter_segmentation_detections(
@@ -408,21 +455,28 @@ def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataF
             "bin_mask": []
         }
     for i, _ in enumerate(outputs.masks.xyn):
-        if len(outputs.masks.xyn[i]) == 0:
-            pass
-        else:
-            data['id_label'].append(i)
-            box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
-            box[2:] -= box[:2]
-            data['box'].append(box)
-            data['mask'].append(outputs.masks.xyn[i])
-            data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
-            bin_mask, morphology = plot_mask(outputs.masks.xyn[i], image_size=outputs.orig_shape)
-            data['diameter'].append(morphology['diameter'])
-            data['area'].append(morphology['area'])
-            data['volume'].append(morphology['volume'])
-            if store_bin_mask is True:
-                data['bin_mask'].append(bin_mask)
+        try:
+            mask = np.asarray(outputs.masks.xyn[i], dtype=np.float32).reshape(-1, 2)
+        except (TypeError, ValueError):
+            continue
+        if mask.shape[0] < 3 or not np.isfinite(mask).all():
+            continue
+
+        bin_mask, morphology = plot_mask(mask, image_size=outputs.orig_shape)
+        if not bin_mask.any():
+            continue
+
+        data['id_label'].append(i)
+        box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
+        box[2:] -= box[:2]
+        data['box'].append(box)
+        data['mask'].append(mask)
+        data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
+        data['diameter'].append(morphology['diameter'])
+        data['area'].append(morphology['area'])
+        data['volume'].append(morphology['volume'])
+        if store_bin_mask is True:
+            data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
 def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:

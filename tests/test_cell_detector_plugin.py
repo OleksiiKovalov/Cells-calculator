@@ -118,6 +118,58 @@ def test_set_size_falls_back_to_normalized_box_area_for_series():
     assert plugin.range_slider.calls[-1] == (0.06, 0.2)
 
 
+def test_set_size_uses_original_image_area_for_detector_boxes():
+    plugin = _build_plugin()
+    plugin.model = SimpleNamespace(
+        cell_counter=SimpleNamespace(
+            original_image=np.zeros((2048, 2048, 3), dtype=np.uint8)
+        )
+    )
+    detections = pd.DataFrame(
+        {
+            "box": [np.array([0.0, 0.0, 1024.0, 1024.0])],
+            "scale": [1.0],
+        }
+    )
+
+    plugin.set_size(detections)
+
+    assert plugin.range_slider.calls[-1] == (0.25, 0.25)
+
+
+def test_range_slider_filter_uses_display_image_area(monkeypatch):
+    plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
+    plugin.object_size = {"color_map": "tab20", "alpha": 0.75}
+    plugin.model = None
+    plugin.draw_bounding_box = lambda: None
+    detections = pd.DataFrame(
+        {
+            "class_id": [0],
+            "confidence": [0.9],
+            "box": [np.array([0.0, 0.0, 1024.0, 1024.0])],
+            "scale": [1.0],
+        }
+    )
+    captured = {}
+
+    def fake_render_detector_predictions(image, filtered, filename):
+        captured["filtered"] = filtered
+        return image
+
+    monkeypatch.setattr(
+        plugin_module,
+        "render_detector_predictions",
+        fake_render_detector_predictions,
+    )
+    set_global("detections", detections)
+    set_global("image_display_base", np.zeros((2048, 2048, 3), dtype=np.uint8))
+    set_global("image_inference", None)
+
+    plugin.on_range_slider_changed(0.0, 0.25)
+
+    assert captured["filtered"].shape[0] == 1
+
+
 def test_call_inference_reuses_loaded_model_with_same_name(monkeypatch):
     plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
     plugin.model = _ReusableModelStub("Detector")
