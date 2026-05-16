@@ -17,6 +17,28 @@ CLASSES = ["Cell"]
 colors = np.random.uniform(0, 255, size=(len(CLASSES), 3))
 
 
+def _scale_and_clip_box(box, scale, image_width, image_height):
+    """Convert a model-space xywh box to a clipped image-space xywh box."""
+    box_array = np.asarray(box, dtype=np.float32).reshape(-1)
+    if box_array.size != 4 or not np.isfinite(box_array).all():
+        return None
+
+    x, y, width, height = box_array * float(scale)
+    if width <= 0 or height <= 0:
+        return None
+
+    x1 = np.clip(x, 0.0, float(image_width))
+    y1 = np.clip(y, 0.0, float(image_height))
+    x2 = np.clip(x + width, 0.0, float(image_width))
+    y2 = np.clip(y + height, 0.0, float(image_height))
+    clipped_width = x2 - x1
+    clipped_height = y2 - y1
+    if clipped_width <= 0 or clipped_height <= 0:
+        return None
+
+    return np.array([x1, y1, clipped_width, clipped_height], dtype=np.float32)
+
+
 class CellCounter(BaseModel):
     """
     The class for object which performs cell counting.
@@ -112,7 +134,7 @@ class CellCounter(BaseModel):
             image[0:height, 0:width] = original_image
             inference_image = image
 
-            # Calculate scale factor
+            # Calculate scale factor from model input pixels back to image pixels.
             scale = length / 512
 
             # Preprocess the image and prepare blob for model
@@ -159,13 +181,20 @@ class CellCounter(BaseModel):
 
             # Iterate through NMS results to draw bounding boxes and labels
             for index in result_boxes:
-                box = boxes[index]
+                box = _scale_and_clip_box(
+                    boxes[index],
+                    scale,
+                    image_width=width,
+                    image_height=height,
+                )
+                if box is None:
+                    continue
                 detection = {
                     "class_id": class_ids[index],
                     "class_name": CLASSES[class_ids[index]],
                     "confidence": scores[index],
-                    "box": np.array(box),
-                    "scale": scale,
+                    "box": box,
+                    "scale": 1.0,
                 }
                 detections.append(detection)
 
@@ -175,16 +204,21 @@ class CellCounter(BaseModel):
                 detections,
                 columns=["class_id", "class_name", "confidence", "box", "scale"],
             )
+            detections.attrs["image_size"] = (width, height)
             self.detections = detections
             csv_data = self.detections.copy()
             csv_data["width"] = csv_data["box"].apply(
-                lambda b: b[2] / length if b is not None else None
+                lambda b: b[2] / width if b is not None and width else None
             )
             csv_data["height"] = csv_data["box"].apply(
-                lambda b: b[3] / length if b is not None else None
+                lambda b: b[3] / height if b is not None and height else None
             )
             csv_data["bbox_area"] = (
-                csv_data["width"] * csv_data["height"] / length**2
+                csv_data["box"].apply(
+                    lambda b: (b[2] * b[3]) / (width * height)
+                    if b is not None and width and height
+                    else None
+                )
             )
             csv_data[
                 ["confidence", "width", "height", "bbox_area"]
@@ -193,10 +227,10 @@ class CellCounter(BaseModel):
             )
             self.scale = scale
             # Change object_size for detection
-            self.object_size["signal"]("set_size", detections["box"].copy())
+            self.object_size["signal"]("set_size", detections.copy())
 
         detections = self.detections
-        self.object_size["signal"]("set_size", detections["box"].copy())
+        self.object_size["signal"]("set_size", detections.copy())
         # TODO: in this codeline, calculate max and min squares of obtained bboxes
         # and automatically set them as lower and upper bounds for the filtering
         # sliders if the sliders currently have default values (0 and 10) set up.

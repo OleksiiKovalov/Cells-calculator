@@ -13,6 +13,7 @@ import traceback
 
 # Third-party imports
 import matplotlib.pyplot as plt
+import numpy as np
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
@@ -243,7 +244,17 @@ class RangeSliderWrapper(QWidget):
             if max_size is None:
                 max_size = 1.0
 
-            # Keep normalized metrics within sane bounds
+            min_size = float(min_size)
+            max_size = float(max_size)
+            if min_size > max_size:
+                min_size, max_size = max_size, min_size
+
+            # Keep the detected extrema inclusive after slider rounding/filtering.
+            slider_step = 1.0 / float(self.round_parametr_slider)
+            min_size = min_size - max(abs(min_size) * 0.01, slider_step)
+            max_size = max_size + max(abs(max_size) * 0.01, slider_step)
+
+            # Keep normalized metrics within sane bounds.
             min_size = max(0.0, min(min_size, 1.0))
             max_size = max(0.0, min(max_size, 1.0))
             
@@ -401,6 +412,35 @@ class CellDetectorPlugin(BasePlugin):
 
         if getattr(self, 'result', None) is not None:
             self.print_result(self.result)
+
+    def _shape_to_filter_size(self, image):
+        if image is None or not hasattr(image, "shape") or len(image.shape) < 2:
+            return None
+        return int(image.shape[1]), int(image.shape[0])
+
+    def _get_detection_filter_size(self, detection=None, fallback=(512, 512)):
+        """
+        Return image size as (width, height) for detector bbox area filtering.
+        """
+        if hasattr(detection, "attrs"):
+            image_size = detection.attrs.get("image_size")
+            if image_size is not None and len(image_size) == 2:
+                return int(image_size[0]), int(image_size[1])
+
+        current_model = self.__dict__.get("model")
+        cell_counter = getattr(current_model, "cell_counter", None)
+        image_size = self._shape_to_filter_size(
+            getattr(cell_counter, "original_image", None)
+        )
+        if image_size is not None:
+            return image_size
+
+        for key in ("image_display_base", "image_inference"):
+            image_size = self._shape_to_filter_size(get_global(key))
+            if image_size is not None:
+                return image_size
+
+        return fallback
     # def update_lineWidth(self):
     #     # Get value from QLineEdit
     #     input_text = self.LineWidth_edit.text()
@@ -448,16 +488,39 @@ class CellDetectorPlugin(BasePlugin):
 
             # Series/list of boxes
             values = []
-            if all(len(cell) >= 4 for cell in detection):
-                for cell in detection:
-                    area = float(cell[2]) * float(cell[3])
+            image_size = self._get_detection_filter_size(detection, img_size)
+            img_sq = image_size[0] * image_size[1]
 
-                    # If widths/heights are normalized, area is already normalized
-                    if 0.0 <= float(cell[2]) <= 1.0 and 0.0 <= float(cell[3]) <= 1.0:
-                        values.append(area)
-                    else:
-                        img_sq = img_size[0] * img_size[1]
-                        values.append(area / img_sq)
+            if hasattr(detection, "columns") and "box" in detection.columns:
+                box_rows = (
+                    (row["box"], row["scale"] if "scale" in row else 1.0)
+                    for _, row in detection.iterrows()
+                )
+            else:
+                box_rows = ((cell, 1.0) for cell in detection)
+
+            for cell, scale in box_rows:
+                try:
+                    box = np.asarray(cell, dtype=np.float64).reshape(-1)
+                except (TypeError, ValueError):
+                    continue
+                if box.size < 4 or not np.isfinite(box[:4]).all():
+                    continue
+
+                width = max(0.0, float(box[2]))
+                height = max(0.0, float(box[3]))
+                try:
+                    scale = float(scale)
+                except (TypeError, ValueError):
+                    scale = 1.0
+                if not np.isfinite(scale):
+                    scale = 1.0
+
+                # If widths/heights are normalized, area is already normalized.
+                if 0.0 <= width <= 1.0 and 0.0 <= height <= 1.0 and scale == 1.0:
+                    values.append(width * height)
+                elif img_sq > 0:
+                    values.append((width * scale) * (height * scale) / img_sq)
 
             if values:
                 self.range_slider.change_default(min(values), max(values))
@@ -1284,7 +1347,8 @@ class CellDetectorPlugin(BasePlugin):
             filtered_detections = filter_detections(
                 detections,
                 min_size=min_value,
-                max_size=max_value
+                max_size=max_value,
+                img_size=self._get_detection_filter_size(detections)
             )
 
         current_model = getattr(self, "model", None)
