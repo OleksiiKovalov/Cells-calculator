@@ -1,0 +1,165 @@
+{
+  "models": {
+    "Detector": {
+      "images": {
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
+          "confidence_mean": 0.465745,
+          "confidence_sum": 93.148962,
+          "count": 200
+        }
+      },
+      "model_type": "cellcounter",
+      "path": "trainedmodels/yolov8m-det.onnx"
+    },
+    "InstanSeg Flu_nc": {
+      "images": {
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
+          "area_mean": 0.001479,
+          "area_sum": 0.241154,
+          "confidence_mean": 1.0,
+          "confidence_sum": 163.0,
+          "count": 163,
+          "diameter_mean": 0.041557
+        }
+      },
+      "model_type": "instanseg",
+      "path": "fluorescence_nuclei_and_cells"
+    },
+    "InstanSeg V3 (512)": {
+      "images": {
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
+          "area_mean": 0.000808,
+          "area_sum": 0.109921,
+          "confidence_mean": 1.0,
+          "confidence_sum": 136.0,
+          "count": 136,
+          "diameter_mean": 0.030895
+        }
+      },
+      "model_type": "instanseg",
+      "path": "trainedmodels/instanseg_20250605.pt"
+    },
+    "Neuroblastoma Inst V3.1": {
+      "images": {
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
+          "area_mean": 0.001043,
+          "area_sum": 0.27639,
+          "confidence_mean": 1.0,
+          "confidence_sum": 265.0,
+          "count": 265,
+          "diameter_mean": 0.032693
+        }
+      },
+      "model_type": "instanseg",
+      "path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt"
+    },
+    "Neuroblastoma Inst V3.1(512)": {
+      "images": {
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
+          "area_mean": 0.001043,
+          "area_sum": 0.27639,
+          "confidence_mean": 1.0,
+          "confidence_sum": 265.0,
+          "count": 265,
+          "diameter_mean": 0.032693
+        }
+      },
+      "model_type": "instanseg",
+      "path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt"
+    },
+    "YOLO-512 Segmenter": {
+      "images": {
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
+          "area_mean": 0.00142,
+          "area_sum": 0.258373,
+          "confidence_mean": 0.549148,
+          "confidence_sum": 99.945,
+          "count": 182,
+          "diameter_mean": 0.040882
+        }
+      },
+      "model_type": "yolo",
+      "path": "trainedmodels/YOLO11x-512-seg.pt"
+    }
+  },
+  "nuclei": {
+    "testimages/Color Check Images/Solid_black.png": {
+      "channel": {
+        "dtype": "uint8",
+        "max": 0,
+        "min": 0,
+        "shape": [
+          200,
+          200
+        ],
+        "sum": 0
+      },
+      "count": 0
+    },
+    "testimages/LSM images/good_lsm/0_detections.lsm": {
+      "channel": {
+        "dtype": "uint8",
+        "max": 226,
+        "min": 61,
+        "shape": [
+          512,
+          512
+        ],
+        "sum": 30509577
+      },
+      "count": 134
+    },
+    "testimages/LSM images/good_lsm/B3.lsm": {
+      "channel": {
+        "dtype": "uint8",
+        "max": 126,
+        "min": 30,
+        "shape": [
+          512,
+          512
+        ],
+        "sum": 16125220
+      },
+      "count": 39
+    },
+    "testimages/Stained Nuclei Images/A1_1.TIF": {
+      "channel": {
+        "dtype": "uint8",
+        "max": 255,
+        "min": 0,
+        "shape": [
+          512,
+          512
+        ],
+        "sum": 9479
+      },
+      "count": 1
+    },
+    "testimages/Stained Nuclei Images/B3_3.TIF": {
+      "channel": {
+        "dtype": "uint8",
+        "max": 203,
+        "min": 0,
+        "shape": [
+          512,
+          512
+        ],
+        "sum": 16303
+      },
+      "count": 4
+    },
+    "testimages/Stained Nuclei Images/D2x101.TIF": {
+      "channel": {
+        "dtype": "uint8",
+        "max": 255,
+        "min": 0,
+        "shape": [
+          512,
+          512
+        ],
+        "sum": 335582
+      },
+      "count": 37
+    }
+  }
+}

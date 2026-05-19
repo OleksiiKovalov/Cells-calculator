@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - dev/development2026Spring
+  push:
+    branches:
+      - main
+      - dev/development2026Spring
 
 jobs:
   check-requirements:
@@ -59,6 +63,11 @@ jobs:
         shell: bash
         run: |
           pip install -r requirements-dev.txt
+
+      - name: Download Trained Models
+        shell: bash
+        run: |
+          python scripts/download_models.py
 
       - name: Run pytest
         run: pytest tests/

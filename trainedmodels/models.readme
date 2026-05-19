@@ -2,3 +2,6 @@ you can download trained models at https://1drv.ms/f/c/e18062ed90005113/ElDioqwH
 place downloaded models under "trainedmodels" folder at the root app folder
 CellsCalculatorV3.1 models files: TrainedModels.v3.1.Full.zip (all available models) TrainedModels.v3.1.zip (default models)
 
+CI downloads the default public archive with:
+python scripts/download_models.py
+
