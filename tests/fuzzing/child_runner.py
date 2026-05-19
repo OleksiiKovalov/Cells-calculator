@@ -85,5 +85,3 @@ def run_case_in_child(
         stop_python_coverage(python_coverage_state)
         traceback.print_exc()
         return 1
-
-

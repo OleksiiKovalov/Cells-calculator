@@ -208,5 +208,7 @@ class Slider(QWidget):
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
-    ex = Slider()
+    object_size = {'round_parametr_slider': 1, 'round_parametr_value_input': 1, 'min_size': 10, 'max_size': 100}
+    default_object_size = {'min_size': 10, 'max_size': 100}
+    ex = Slider(object_size, default_object_size, 'min_size')
     sys.exit(app.exec_())

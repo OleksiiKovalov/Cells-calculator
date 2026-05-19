@@ -21,6 +21,7 @@ import os
 from collections import OrderedDict
 from logging import Logger
 from typing import Any
+from shapely.geometry import Polygon, MultiPolygon
 
 # Third-party imports
 import cv2  # OpenCV for findContours
@@ -249,6 +250,7 @@ class InstansegSegmenter(BaseModel):
             labeled_output = method(**inference_kwargs)
 
             self.detections = self.instanseg_results_to_pandas(labeled_output)
+            assert self.detections is not None
             detections = self.detections[self.detections['confidence'] >= min_score]
             if tracking is False:
                 self.object_size['signal']('set_size', self.detections.copy())
@@ -364,12 +366,15 @@ class InstansegSegmenter(BaseModel):
         if geom.is_empty:
             return None, None
 
-        if geom.geom_type == "Polygon":
+        if isinstance(geom, Polygon):
             poly = geom
-        elif geom.geom_type == "MultiPolygon":
+
+        elif isinstance(geom, MultiPolygon):
             if len(geom.geoms) == 0:
                 return None, None
+
             poly = max(geom.geoms, key=lambda g: g.area)
+
         else:
             return None, None
 

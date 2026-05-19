@@ -50,9 +50,9 @@ class FileTableModel(QAbstractTableModel):
             parent: Parent object.
         """
         super().__init__(parent)
-        self.files = []
+        self.files: list[QFileInfo] = []
         self.current_dir = QDir.home()
-        self.columns = []
+        self.columns: list[Dict[str, Any]] = []
         self.icon_provider = QFileIconProvider()
     
     def set_columns(self, columns: List[Dict[str, Any]]) -> None:
@@ -110,7 +110,7 @@ class FileTableModel(QAbstractTableModel):
         """
         # Get the parent dialog if available
         parent_dialog = self.parent()
-        if hasattr(parent_dialog, 'get_current_file_extensions'):
+        if parent_dialog is not None and hasattr(parent_dialog, 'get_current_file_extensions'):
             extensions = parent_dialog.get_current_file_extensions()
             if extensions:
                 # Apply custom filtering - we'll filter in refresh_files method
@@ -151,28 +151,28 @@ class FileTableModel(QAbstractTableModel):
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return len(self.columns)
     
-    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole) -> Optional[str]:
-        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole) -> Optional[str]:
+        if role == Qt.ItemDataRole.DisplayRole and orientation == Qt.Orientation.Horizontal:
             if 0 <= section < len(self.columns):
                 return self.columns[section]['name']
         return None
     
-    def data(self, index: QModelIndex, role: int = Qt.DisplayRole) -> Any:
+    def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole) -> Any:
         if not index.isValid() or index.row() >= len(self.files):
             return None
         
         file_info = self.files[index.row()]
         column_config = self.columns[index.column()]
         
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return self._get_display_data(file_info, column_config)
-        elif role == Qt.DecorationRole and index.column() == 0:
+        elif role == Qt.ItemDataRole.DecorationRole and index.column() == 0:
             return self.icon_provider.icon(file_info)
-        elif role == Qt.TextAlignmentRole:
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
             return self._get_text_alignment(column_config, index)
-        elif role == Qt.ForegroundRole:
+        elif role == Qt.ItemDataRole.ForegroundRole:
             return self._get_foreground_color(file_info, index)
-        elif role == Qt.BackgroundRole:
+        elif role == Qt.ItemDataRole.BackgroundRole:
             return self._get_background_color(file_info, index)
         return None
     
@@ -186,15 +186,15 @@ class FileTableModel(QAbstractTableModel):
     def _get_text_alignment(self, column_config: Dict[str, Any], index: QModelIndex) -> int:
         """Get text alignment for a cell"""
         if 'size' in column_config['name'].lower():
-            return Qt.AlignRight | Qt.AlignVCenter
+            return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
         elif index.column() == 0:
-            return Qt.AlignLeft | Qt.AlignVCenter
+            return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         else:
-            return Qt.AlignCenter | Qt.AlignVCenter
+            return Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter
     
     def _get_foreground_color(self, file_info: QFileInfo, index: QModelIndex) -> Optional[QBrush]:
         """Get foreground color for a cell"""
-        if hasattr(self, 'color_rule') and self.color_rule:
+        if getattr(self, 'color_rule', None) is not None:
             try:
                 color = self.color_rule(file_info)
                 if color:
@@ -205,14 +205,14 @@ class FileTableModel(QAbstractTableModel):
     
     def _get_background_color(self, file_info: QFileInfo, index: QModelIndex) -> Optional[QBrush]:
         """Get background color for a cell"""
-        if hasattr(self, 'background_color_rule') and self.background_color_rule:
+        if getattr(self, 'background_color_rule', None) is not None:
             try:
                 color = self.background_color_rule(file_info)
                 if color:
                     return QBrush(color)
             except:
                 pass
-        elif hasattr(self, 'alternating_colors') and self.alternating_colors:
+        elif getattr(self, 'alternating_colors', False):
             if index.row() % 2 == 1:
                 return QBrush(ALTERNATING_ROW_COLOR)
         return None
@@ -254,7 +254,7 @@ class CustomFileDialog(QDialog):
         self.setMinimumSize(DEFAULT_DIALOG_WIDTH, DEFAULT_DIALOG_HEIGHT)
         
         # Initialize properties
-        self.selected_file = None
+        self.selected_file: Optional[str] = None
         self.file_filters = ["All files (*.*)"]
         self.current_filter_index = 0
         
@@ -345,7 +345,7 @@ class CustomFileDialog(QDialog):
         drive_layout.addWidget(QLabel("Drive:"))
         self.drive_combo = QComboBox()
         self.drive_combo.setMinimumWidth(100)
-        self.drive_combo.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.drive_combo.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.drive_combo.customContextMenuRequested.connect(self.show_drive_context_menu)
         self.populate_drives()
         self.drive_combo.currentTextChanged.connect(self.on_drive_changed)
@@ -373,7 +373,7 @@ class CustomFileDialog(QDialog):
     
     def _setup_main_splitter(self, layout: QVBoxLayout) -> None:
         """Setup main splitter with file view and preview"""
-        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         
         self._setup_file_view(main_splitter)
         self._setup_preview_panel(main_splitter)
@@ -394,7 +394,9 @@ class CustomFileDialog(QDialog):
         self.tree_view.setSortingEnabled(True)
         self.tree_view.doubleClicked.connect(self.on_double_click)
         self.tree_view.clicked.connect(self.on_click)
-        self.tree_view.selectionModel().currentChanged.connect(self.current_file_changed)
+        selection_model = self.tree_view.selectionModel()
+        if selection_model is not None:
+            selection_model.currentChanged.connect(self.current_file_changed)
         
         
         # Always show selection even when tree view is not focused
@@ -412,7 +414,7 @@ class CustomFileDialog(QDialog):
         """)
         
         # Alternative approach: Set focus policy to maintain visual selection
-        self.tree_view.setFocusPolicy(Qt.StrongFocus)
+        self.tree_view.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         
         # Install event filter to handle keyboard navigation
         self.tree_view.installEventFilter(self)
@@ -436,12 +438,12 @@ class CustomFileDialog(QDialog):
         # Image preview area
         self.preview_scroll = QScrollArea()
         self.preview_scroll.setWidgetResizable(True)
-        self.preview_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.preview_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        self.preview_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.preview_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.preview_scroll.setMinimumHeight(200)
         
         self.preview_label = QLabel()
-        self.preview_label.setAlignment(Qt.AlignCenter)
+        self.preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.preview_label.setStyleSheet("""
             QLabel {
                 border: 1px solid #cccccc;
@@ -501,13 +503,14 @@ class CustomFileDialog(QDialog):
     def setup_column_widths(self) -> None:
         """Configure column widths based on column configuration"""
         header = self.tree_view.header()
-        for i, column in enumerate(self.model.columns):
-            if i < len(self.model.columns) - 1:
-                header.setSectionResizeMode(i, QHeaderView.Interactive)
-                self.tree_view.setColumnWidth(i, column['width'])
-            else:
-                # Last column stretches
-                header.setSectionResizeMode(i, QHeaderView.Stretch)
+        if header is not None:
+            for i, column in enumerate(self.model.columns):
+                if i < len(self.model.columns) - 1:
+                    header.setSectionResizeMode(i, QHeaderView.Interactive)
+                    self.tree_view.setColumnWidth(i, column['width'])
+                else:
+                    # Last column stretches
+                    header.setSectionResizeMode(i, QHeaderView.Stretch)
     
     def set_directory(self, path: Union[str, Path]) -> None:
         """Set the current directory"""
@@ -707,7 +710,8 @@ class CustomFileDialog(QDialog):
         self.tree_view.setFocus()
         
         # Optionally, select the first item if no selection exists
-        if not self.tree_view.selectionModel().hasSelection() and self.model.rowCount() > 0:
+        selection_model = self.tree_view.selectionModel()
+        if selection_model is not None and not selection_model.hasSelection() and self.model.rowCount() > 0:
             first_index = self.model.index(0, 0)
             self.tree_view.setCurrentIndex(first_index)
             self.on_click(first_index)
@@ -720,7 +724,8 @@ class CustomFileDialog(QDialog):
         self.tree_view.setFocus()
         
         # Select the first item if no selection exists
-        if not self.tree_view.selectionModel().hasSelection() and self.model.rowCount() > 0:
+        selection_model = self.tree_view.selectionModel()
+        if selection_model is not None and not selection_model.hasSelection() and self.model.rowCount() > 0:
             first_index = self.model.index(0, 0)
             self.tree_view.setCurrentIndex(first_index)
             self.on_click(first_index)
@@ -772,7 +777,8 @@ class CustomFileDialog(QDialog):
             
             scaled_pixmap = pixmap.scaled(
                 PREVIEW_MAX_SIZE, PREVIEW_MAX_SIZE, 
-                Qt.KeepAspectRatio, Qt.SmoothTransformation
+                Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
             )
             
             # Update preview label

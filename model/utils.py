@@ -4,8 +4,7 @@
 import math
 import os
 import shutil
-from collections import OrderedDict
-from typing import Any
+from typing import Any, cast, Iterable, Optional
 
 # Third-party imports
 import cv2
@@ -349,10 +348,10 @@ def calculate_lsm(cell_counter, nuclei_counter,
     return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
 
 def filter_detections(
-    detections: pd.DataFrame, 
-    min_size: float = 0.0, 
-    max_size: float = 1.0, 
-    img_size: tuple = (512, 512)
+    detections: pd.DataFrame,
+    min_size: float = 0.0,
+    max_size: float = 1.0,
+    img_size: Optional[tuple] = None,
 ) -> pd.DataFrame:
     """
     [DEPRECATED] Filters bounding boxes based on their area.
@@ -369,7 +368,7 @@ def filter_detections(
 
     Returns pd.DataFrame of filtered detections.
     """
-    if detections is None or detections.empty:
+    if detections.empty:
         return detections
 
     if img_size is None:
@@ -398,7 +397,7 @@ def filter_detections(
 
     areas = detections.apply(_area_ratio, axis=1)
     keep = areas.notna() & (areas >= min_size) & (areas <= max_size)
-    filtered_detections = detections.loc[keep].copy()
+    filtered_detections = cast(pd.DataFrame, detections.loc[keep].copy())
     filtered_detections.attrs.update(detections.attrs)
     return filtered_detections
 
@@ -416,7 +415,7 @@ def filter_segmentation_detections(
     - diameter: relative object diameter / sqrt(image area)
     - volume: relative object volume / image volume surrogate
     """
-    if detections is None or detections.empty:
+    if detections.empty:
         return detections
 
     metric = size_metric if size_metric in detections.columns else "area"
@@ -429,7 +428,7 @@ def filter_segmentation_detections(
 
     values = pd.to_numeric(detections[metric], errors="coerce")
     keep = values.notna() & (values >= min_size) & (values <= max_size)
-    return detections.loc[keep].copy()
+    return cast(pd.DataFrame, detections.loc[keep].copy())
 
 def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
@@ -580,7 +579,7 @@ def compute_iou(masks_1: list, masks_2: list) -> tuple[NDArray, list]:
             iou_matrix[i, j] = intersection / union
     return iou_matrix, mask_2_morphologies
 
-def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]:
+def plot_mask(in_mask: NDArray | None, image_size=(1000, 1000)) -> tuple[NDArray[np.bool_], dict[str, float]]:
     """
     Rasterizes a polygon mask safely and calculates morphology.
     Handles normalized and denormalized coordinates.
@@ -743,13 +742,13 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
         padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
     # For color or multi-channel
     elif resized.ndim == 3:
-        pad_width = pad_width + ((0, 0),)  # no padding on channels
-        padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
-        
+        pad_width_3d = pad_width + ((0, 0),)  # no padding on channels
+        padded = np.pad(resized, pad_width_3d, mode='constant', constant_values=0)
+
     return padded
 
 
-def process_loaded_image(image, settings: OrderedDict):
+def process_loaded_image(image, settings: list[dict[str, str]] | dict[str, str]):
     """
     Apply sequence of preprocessing operations to image.
     
@@ -773,8 +772,11 @@ def process_loaded_image(image, settings: OrderedDict):
     Raises:
         RuntimeError: If unknown operation specified
     """
-    for step in settings:
-        key, value = next(iter(step.items()))    
+    if isinstance(settings, dict):
+        iterable: Iterable[tuple[str, str]] = settings.items()
+    else:
+        iterable = (next(iter(step.items())) for step in settings)
+    for key, value in iterable:    
         match key:
             case "resize":
                 target_width, target_height = map(int, value.strip().split(":"))

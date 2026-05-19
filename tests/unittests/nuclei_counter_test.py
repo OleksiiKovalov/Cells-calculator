@@ -110,7 +110,7 @@ def test_countnuclei_detects_two_blobs():
     The circles are far enough apart that two DBSCAN clusters emerge.
     """
     channel = np.full((200, 200), 100, dtype=np.uint8)
-    cv2.circle(channel, (50, 50), 15, 200, -1)
-    cv2.circle(channel, (150, 150), 15, 200, -1)
+    cv2.circle(channel, (50, 50), 15, (200.0,), -1)
+    cv2.circle(channel, (150, 150), 15, (200.0,), -1)
     counter = NucleiCounter()
     assert counter.countNuclei(channel) == 2

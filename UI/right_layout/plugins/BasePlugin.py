@@ -5,8 +5,23 @@ Defines BasePlugin, the parent class for right-layout plugins. It standardizes
 signal handling, initialization behavior, and required plugin methods.
 """
 
+# Standard library imports
+from typing import Protocol, Any
+
 # Third-party imports
 from PyQt5.QtCore import QObject, pyqtSignal
+
+
+class SignalLike(Protocol):
+    """Protocol for signal-like objects used in testing and production."""
+    
+    def emit(self, *args: Any) -> None:
+        """Emit a signal with given arguments."""
+        ...
+    
+    def connect(self, handler: Any) -> None:
+        """Connect a handler to the signal."""
+        ...
 
 
 class BasePlugin(QObject):
@@ -23,7 +38,7 @@ class BasePlugin(QObject):
         """
         raise NotImplementedError
     
-    plugin_signal = pyqtSignal(str, object)
+    plugin_signal: Any = pyqtSignal(str, object)
 
     def __init__(self, handel_plugin_signal, *arg):
         """

@@ -2,13 +2,14 @@
 
 from dataclasses import dataclass
 from typing import Any
+import pandas as pd
 
 
 @dataclass
 class PredictionResult:
     """Raw model output plus the images used to produce/display it."""
 
-    cells: Any
+    cells: pd.DataFrame
     original_image: Any = None
     inference_image: Any = None
 

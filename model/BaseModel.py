@@ -9,6 +9,7 @@ import shutil
 import time
 from collections import OrderedDict
 from pathlib import Path
+from typing import Any
 
 # Third-party imports
 import numpy as np
@@ -32,7 +33,7 @@ class BaseModel:
     original_image: np.ndarray | None
     inference_image: np.ndarray | None
     detections: pd.DataFrame | None
-    image_preprocess_settings_default: object
+    image_preprocess_settings_default: OrderedDict
 
     def __init__(self, path_to_model: str, object_size, model_data=None):
         """
@@ -40,10 +41,10 @@ class BaseModel:
 
         Args:
             path_to_model (str): Path to .pt YOLO model file
-            object_size: UI configuration object with callbacks and settings
+            object_size (dict): UI configuration object with callbacks and settings
             model_data (dict): Model-specific configuration parameters. Optional.
         """
-        self.original_image_path = None
+        self.original_image_path: str
         self.model_name = "<not specified>"
         self.model_data = model_data
         self.image_preprocess_settings_default = OrderedDict()

@@ -312,4 +312,3 @@ def minimize_failure(
     update_saved_case_paths(minimized_dir)
     shutil.rmtree(work_dir, ignore_errors=True)
     return minimized_dir
-

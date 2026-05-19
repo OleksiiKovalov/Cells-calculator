@@ -639,5 +639,3 @@ def stop_memory_monitor(stop_event, state, max_rss_mb: float) -> float:
     if max_rss_mb > 0 and peak_mb > max_rss_mb:
         raise AssertionError(f"Peak RSS {peak_mb:.1f} MB exceeded limit {max_rss_mb:.1f} MB")
     return peak_mb
-
-

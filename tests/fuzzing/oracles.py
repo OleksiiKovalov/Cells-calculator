@@ -985,5 +985,3 @@ def run_stateful_workflow(
             raise AssertionError(f"Unknown workflow operation: {operation!r}")
 
     return result
-
-

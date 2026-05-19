@@ -2436,5 +2436,3 @@ def build_generation_error_case(
             "image_recipe": {},
         },
     }
-
-

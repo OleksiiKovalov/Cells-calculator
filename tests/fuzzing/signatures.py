@@ -603,4 +603,3 @@ def save_failure(
         encoding="utf-8",
     )
     return target
-

@@ -12,7 +12,7 @@ Key components:
 
 # Standard library imports
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Optional, List, Any
 
 # Third-party imports
 from PyQt5.QtCore import pyqtSignal, pyqtSlot, QFileInfo
@@ -41,19 +41,19 @@ class MenuBar(QMenuBar):
     # Keyboard shortcuts
     SHORTCUT_OPEN_FILE = "Ctrl+O"
 
-    menubar_signal = pyqtSignal(str, object)
+    menubar_signal: Any = pyqtSignal(str, object)
 
     def __init__(self, parent, plugin_list: List[str], current_plugin_name: str) -> None:
         """
         Initialize the menu bar.
 
         Args:
-            parent: Parent widget.
+            parent_: Parent widget.
             plugin_list: List of available plugins.
             current_plugin_name: Name of the current plugin.
         """
         super().__init__()
-        self.parent = parent
+        self.parent_ = parent
         self.plugin_list = plugin_list
         self.current_plugin_name = current_plugin_name
         self.init_menubar()
@@ -63,8 +63,11 @@ class MenuBar(QMenuBar):
         Initialize the menu bar with menus and actions.
         """
         file_menu = self.addMenu(self.LABEL_FILE)
+        assert file_menu is not None
         settings_menu = self.addMenu(self.LABEL_SETTINGS)
+        assert settings_menu is not None
         plugin_menu = self.addMenu(self.LABEL_PLUGIN)
+        assert plugin_menu is not None
         
         self.open_lsm_action = QAction(self.LABEL_OPEN_IMAGE, self)
         self.open_lsm_action.triggered.connect(self.open_file)
@@ -97,7 +100,8 @@ class MenuBar(QMenuBar):
 
         # Add plugins to menu
         for plugin in self.plugin_list:
-            action = QAction(plugin, self, checkable=True)
+            action = QAction(plugin, self)
+            action.setCheckable(True)
             action.triggered.connect(self.select_plugin)
             plugin_menu.addAction(action)
             self.plugin_actions[plugin] = action
@@ -110,7 +114,7 @@ class MenuBar(QMenuBar):
         """
         # Get the action that triggered the signal
         action = self.sender()
-        if action and action.isCheckable():
+        if isinstance(action, QAction) and action.isCheckable():
             # Reset state of all actions
             for act in self.plugin_actions.values():
                 act.setChecked(False)
@@ -161,6 +165,8 @@ class MenuBar(QMenuBar):
             action_name: Name of the action.
             value: Value associated with the action.
         """
+        if not isinstance(value, bool):
+            return
         if action_name == "Open_lsm":
             self.open_lsm_action.setEnabled(value)
         elif action_name == "Open_folder":
@@ -192,11 +198,14 @@ class MenuBar(QMenuBar):
 
         if file_info.isFile():
             filename = str(Path(file_info.absoluteFilePath()))
-            val = self.parent.image_mru.get(filename)
-            if val is not None:
-                if val.year == 1:
-                    return QColor(0, 150, 0)  # Green for recently opened files
-                return QColor(0, 0, 150)  # Blue for processed files
+            parent_object = self.parent_()
+            if parent_object is not None and hasattr(parent_object, 'image_mru'):
+                image_mru = getattr(parent_object, 'image_mru')
+                val = image_mru.get(filename)
+                if val is not None:
+                    if val.year == 1:
+                        return QColor(0, 150, 0)  # Green for recently opened files
+                    return QColor(0, 0, 150)  # Blue for processed files
         return None  # Use default color
 
     def open_file(self) -> None:
@@ -206,7 +215,7 @@ class MenuBar(QMenuBar):
         dialog = CustomFileDialog(
             caption="Select Image File",
             directory=Path.home(),
-            parent=self.parent
+            parent=self.parent_
         )
         dialog.add_custom_column("Process Time", 100, self.get_process_time)
         dialog.set_color_rule(self.example_text_color_rule)
@@ -219,12 +228,12 @@ class MenuBar(QMenuBar):
         ])
         
         dialog.openAt(get_setting("paths.last_opened_file", ""), True)
-        
+
         if dialog.exec_() == QDialog.Accepted:
-            set_setting("paths.last_opened_file", str(dialog.get_selected_file()))
-            selected_file =  str(Path(dialog.get_selected_file()))
-            self.menubar_signal.emit("open_file", str(selected_file))
-        dialog = None
+            selected_file = dialog.get_selected_file()
+            if selected_file is not None:
+                set_setting("paths.last_opened_file", selected_file)
+                self.menubar_signal.emit("open_file", selected_file)
 
     def open_folder(self) -> None:
         """
