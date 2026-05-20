@@ -64,9 +64,9 @@ class StardistSegmenter(BaseModel):
         """
         Initialize StarDist segmenter.
         """
+        self._logger = logger
         self.is_custom_model = False
         super().__init__(path_to_model, object_size,model_data)
-        self._logger = logger
     
     def init_x20_model(self, path_to_model: str):
         """
