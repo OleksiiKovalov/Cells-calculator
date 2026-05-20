@@ -180,7 +180,8 @@ def test_cellcounter_reuses_cached_detections_without_unbound_local(tmp_path):
         "signal": lambda action, value: signal_calls.append((action, value))
     }
     counter.original_image = np.zeros((8, 8, 3), dtype=np.uint8)
-    counter._last_inference_image = np.ones((8, 8, 3), dtype=np.uint8)
+    inference_image = np.ones((8, 8, 3), dtype=np.uint8)
+    setattr(counter, "_last_inference_image", inference_image)
 
     result = counter.count_x20(str(tmp_path / "unused.png"))
 
@@ -190,7 +191,7 @@ def test_cellcounter_reuses_cached_detections_without_unbound_local(tmp_path):
     assert counter.prediction_image is None
     assert np.array_equal(result.cells.iloc[0]["box"], detections.iloc[0]["box"])
     assert np.array_equal(result.original_image, counter.original_image)
-    assert np.array_equal(result.inference_image, counter._last_inference_image)
+    assert np.array_equal(result.inference_image, inference_image)
     assert signal_calls[0][0] == "set_size"
     assert signal_calls[0][1].equals(detections)
 
