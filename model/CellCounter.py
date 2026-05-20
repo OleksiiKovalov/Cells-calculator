@@ -253,7 +253,7 @@ class CellCounter(BaseModel):
         #     min_size=self.object_size["min_size"],
         #     max_size=self.object_size["max_size"],
         # )
-        filtered_detections = detections_df
+        filtered_detections = detections
         self.detectionCount = filtered_detections.shape[0]
         self.prediction_image = None
 
