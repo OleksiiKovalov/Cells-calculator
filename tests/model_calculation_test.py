@@ -162,6 +162,39 @@ def test_cellcounter_returns_empty_dataframe_when_nms_has_no_boxes(tmp_path):
     assert counter.prediction_image is None
 
 
+def test_cellcounter_reuses_cached_detections_without_unbound_local(tmp_path):
+    detections = pd.DataFrame(
+        {
+            "class_id": [0],
+            "class_name": ["Cell"],
+            "confidence": [0.9],
+            "box": [np.array([1, 2, 3, 4], dtype=np.float32)],
+            "scale": [1.0],
+        }
+    )
+    signal_calls = []
+
+    counter = CellCounter.__new__(CellCounter)
+    counter.detections = detections
+    counter.object_size = {
+        "signal": lambda action, value: signal_calls.append((action, value))
+    }
+    counter.original_image = np.zeros((8, 8, 3), dtype=np.uint8)
+    counter._last_inference_image = np.ones((8, 8, 3), dtype=np.uint8)
+
+    result = counter.count_x20(str(tmp_path / "unused.png"))
+
+    assert isinstance(result, PredictionResult)
+    assert result.shape[0] == 1
+    assert counter.detectionCount == 1
+    assert counter.prediction_image is None
+    assert np.array_equal(result.cells.iloc[0]["box"], detections.iloc[0]["box"])
+    assert np.array_equal(result.original_image, counter.original_image)
+    assert np.array_equal(result.inference_image, counter._last_inference_image)
+    assert signal_calls[0][0] == "set_size"
+    assert signal_calls[0][1].equals(detections)
+
+
 def test_cellcounter_scales_and_clips_detector_boxes_to_original_image(tmp_path):
     image_path = tmp_path / "narrow.png"
     image = np.zeros((31, 3, 3), dtype=np.uint8)
