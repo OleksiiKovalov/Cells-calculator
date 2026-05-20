@@ -22,7 +22,7 @@ import model.utils as model_utils
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GOLDEN_PATH = ROOT / "tests" / "golden" / "image_regression_baseline.json"
+GOLDEN_PATH = ROOT / "tests_local" / "golden" / "image_regression_baseline.json"
 MODEL_CONFIG_PATH = ROOT / "modelconfig.json"
 KNOWN_MODELS = {
     "cellcounter": "model.CellCounter.CellCounter",
