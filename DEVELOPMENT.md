@@ -57,6 +57,22 @@ This focused command is also suitable for bisecting a batch of patches:
 git bisect run python -m pytest -q tests_local/test_image_golden_regressions.py
 ```
 
+Smoke tests run as part of the same `tests_local` suite. They load every model
+listed in `tests_local/test_smoke.py` and run each one against the committed
+sample images from that file. These tests only check that model loading and
+inference complete without exceptions; they do not validate prediction counts,
+metrics, masks, or image output correctness.
+For a focused run, use:
+```commandline
+python -m pytest -q tests_local/test_smoke.py
+```
+
+To run one model or image while debugging, combine the focused command with a
+pytest keyword expression:
+```commandline
+python -m pytest -q tests_local/test_smoke.py -k "StarDist and SK-N-DZ"
+```
+
 ## Visual Studio Code
 
 #### Running tests
