@@ -20,6 +20,18 @@ review, easier to revert, and easier to bisect later.
 If you have a good reason to combine changes, describe it in the PR
 description.
 
+### New functionality is covered by tests
+
+New behavior should come with tests. For most code, that means a unit test
+under `tests/`. For changes that are hard to unit-test in isolation — model
+integration, image pipeline output, end-to-end UI workflows — coverage can
+take the form of a smoke test or an image golden regression entry under
+`tests_local/`. See [DEVELOPMENT.md](DEVELOPMENT.md) for both suites.
+
+If a change genuinely cannot be tested (e.g. a pure refactor that existing
+tests already cover, or a docs-only change), leave the box unchecked and say
+so in the PR description.
+
 ### `pytest -v tests_local` passes locally
 
 CI only runs the `tests/` suite. The `tests_local/` suite — which covers smoke
