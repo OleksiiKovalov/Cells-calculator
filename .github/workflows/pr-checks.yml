@@ -2,9 +2,6 @@ name: PR Checks
 
 on:
   pull_request:
-    branches:
-      - main
-      - dev/development2026Spring
 
 jobs:
   check-requirements:
