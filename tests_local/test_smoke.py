@@ -3,9 +3,19 @@
 This test ensures that models don't crash when running on various test images.
 """
 
-import pytest
 import logging
+import os
 from pathlib import Path
+
+import pytest
+
+
+PROJECT_ROOT = Path(__file__).parent.parent
+ULTRALYTICS_CONFIG_DIR = PROJECT_ROOT / ".cache" / "ultralytics"
+os.environ.setdefault("YOLO_CONFIG_DIR", str(ULTRALYTICS_CONFIG_DIR))
+ULTRALYTICS_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+SMOKE_IMAGE_MAX_SIDE = int(os.environ.get("SMOKE_IMAGE_MAX_SIDE", "512"))
+
 
 def load_model(model_path: str, model_type: str):
     if not Path(model_path).exists():
@@ -32,7 +42,12 @@ def load_model(model_path: str, model_type: str):
             pytest.importorskip("ultralytics")
             pytest.importorskip("sahi")
             from model.YOLOSegmenter import YoloSegmenter
-            return YoloSegmenter(model_path, object_size=object_size, model_data={})
+
+            class SmokeYoloSegmenter(YoloSegmenter):
+                def init_x10_model(self, path_to_model):
+                    self.model_x10 = None
+
+            return SmokeYoloSegmenter(model_path, object_size=object_size, model_data={})
         case "cellpose":
             pytest.importorskip("cellpose")
             from model.CellposeSegmenter import CellposeSegmenter
@@ -53,7 +68,21 @@ def load_model(model_path: str, model_type: str):
             raise ValueError(f"Unsupported model type: {model_type}. "
                             f"Supported types: yolo, cellpose, instanseg, stardist, cellcounter")
 
-def run_model_on_image(model_path: str, image_path: str, model_type: str = "yolo"):
+
+def reset_model_runtime_state(model):
+    for attr in (
+        "detections",
+        "original_image",
+        "inference_image",
+        "_last_original_image",
+        "_last_inference_image",
+        "prediction_image",
+    ):
+        if hasattr(model, attr):
+            setattr(model, attr, None)
+
+
+def run_model_on_image(model, image_path: str):
     if not Path(image_path).exists():
         return {
             'success': False,
@@ -63,7 +92,7 @@ def run_model_on_image(model_path: str, image_path: str, model_type: str = "yolo
             'error': f'Image file not found: {image_path}'
         }
 
-    model = load_model(model_path, model_type)
+    reset_model_runtime_state(model)
 
     if hasattr(model, 'predict'):
         results = model.predict(image_path)
@@ -102,13 +131,62 @@ TEST_IMAGES = [
 ]
 
 
+def model_id(model_case):
+    return model_case[0]
+
+
+def prepare_smoke_image(image_path: Path, output_dir: Path) -> Path:
+    if SMOKE_IMAGE_MAX_SIDE <= 0:
+        return image_path
+
+    from PIL import Image
+
+    with Image.open(image_path) as image:
+        image_format = image.format
+        if max(image.size) <= SMOKE_IMAGE_MAX_SIDE:
+            return image_path
+
+        smoke_image = image.copy()
+        smoke_image.thumbnail(
+            (SMOKE_IMAGE_MAX_SIDE, SMOKE_IMAGE_MAX_SIDE),
+            Image.Resampling.LANCZOS,
+        )
+        if image_format == "JPEG" and smoke_image.mode not in ("RGB", "L"):
+            smoke_image = smoke_image.convert("RGB")
+
+        output_path = output_dir / image_path.name
+        smoke_image.save(output_path, format=image_format)
+        return output_path
+
+
+@pytest.fixture(scope="module")
+def smoke_images(tmp_path_factory):
+    output_dir = tmp_path_factory.mktemp("smoke_images")
+    return {
+        image_path: prepare_smoke_image(PROJECT_ROOT / image_path, output_dir)
+        for image_path in TEST_IMAGES
+    }
+
+
+@pytest.fixture(scope="module", params=MODELS, ids=model_id)
+def loaded_model(request):
+    model_name, model_type, model_path = request.param
+    full_model_path = PROJECT_ROOT / model_path
+    if not full_model_path.exists():
+        pytest.skip(
+            f"{model_name} weights are missing at {full_model_path}. "
+            "Copy the model into trainedmodels/ to enable this smoke case."
+        )
+
+    return model_name, load_model(str(full_model_path), model_type)
+
+
 # ============================================================================
 # Tests
 # ============================================================================
 
-@pytest.mark.parametrize("model_name,model_type,model_path", MODELS)
 @pytest.mark.parametrize("test_image", TEST_IMAGES)
-def test_smoke(model_name, model_type, model_path, test_image):
+def test_smoke(loaded_model, smoke_images, test_image):
     """
     Smoke test: Run all models on all test images.
     
@@ -117,26 +195,19 @@ def test_smoke(model_name, model_type, model_path, test_image):
     run without raising exceptions.
     
     Args:
-        model_name (str): Friendly name of the model
-        model_type (str): Type of model (yolo, instanseg, cellpose, stardist)
-        model_path (str): Relative path to the model file
+        loaded_model: Fixture with the model name and loaded model instance.
+        smoke_images: Prepared image paths for fast smoke inference.
+        test_image (str): Relative path to the test image.
     """
-    project_root = Path(__file__).parent.parent
-    full_model_path = project_root / model_path
-    if not full_model_path.exists():
-        pytest.skip(
-            f"{model_name} weights are missing at {full_model_path}. "
-            "Copy the model into trainedmodels/ to enable this smoke case."
-        )
+    model_name, model = loaded_model
 
     # Test model with each test image
-    full_image_path = project_root / test_image  
+    full_image_path = smoke_images[test_image]
 
     # Run model on image - should not raise exceptions
     result = run_model_on_image(
-        model_path=str(full_model_path),
+        model=model,
         image_path=str(full_image_path),
-        model_type=model_type
     )
     
     # Verify that inference returned a result
