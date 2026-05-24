@@ -123,6 +123,11 @@ def test_smoke(model_name, model_type, model_path, test_image):
     """
     project_root = Path(__file__).parent.parent
     full_model_path = project_root / model_path
+    if not full_model_path.exists():
+        pytest.skip(
+            f"{model_name} weights are missing at {full_model_path}. "
+            "Copy the model into trainedmodels/ to enable this smoke case."
+        )
 
     # Test model with each test image
     full_image_path = project_root / test_image  
