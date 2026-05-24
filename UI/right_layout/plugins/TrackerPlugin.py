@@ -156,7 +156,7 @@ class TrackerPlugin(BasePlugin):
             return 0
         try:
             selected_path = self.models[model]['path']
-            selected_size = self.models[model]['object_size']
+            selected_size = self.models[model]['size']
             if getattr(self.model, 'path', None) != selected_path:
                 self.model = T(path=selected_path, size=selected_size)
 
