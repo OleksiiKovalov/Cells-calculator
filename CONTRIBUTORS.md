@@ -43,12 +43,10 @@
 * **Moskalenko O.** - *ML-engineer*
 * **Li P.** - *ML-engineer*
 * **Lysachenko S.** - *ML-engineer*
-* **Zharskyi N.** - *Software engineer*
 * **Borysenko M.** - *documentation editing assistance*
 * **Tyshchenko K.** - *documentation editing assistance*
 * **Boiko K.** - *documentation editing assistance*
 * **Fesenko M.** - *Data Labeling team lead*
-* **Fesenko M.** - *Data Labeling*
 * **Dolhodush A.** - *Data Labeling*
 * **Husachenko M.** - *Data Labeling*
 * **Vuziian Y.** - *Data Labeling*
