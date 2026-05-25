@@ -39,7 +39,7 @@ def run_case_subprocess(
     command = [
         sys.executable,
         "-m",
-        "tests.fuzzing.runtime_fuzz",
+        "tests_local.fuzzing.runtime_fuzz",
         "--run-case",
         str(case_path),
         "--max-rss-mb",
