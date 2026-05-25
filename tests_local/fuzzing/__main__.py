@@ -1,4 +1,4 @@
-from tests.fuzzing.runtime_fuzz import main
+from tests_local.fuzzing.runtime_fuzz import main
 
 
 if __name__ == "__main__":
