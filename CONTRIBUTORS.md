@@ -1,4 +1,4 @@
-# Contributors
+## Contributors
 
 **CellsCalculator V2.0** has been developed by the following students of NTU "KhPI":
 * **Ponomarov Y.** - *team-lead, ML engineer*;
@@ -42,3 +42,15 @@
 * **Pohasii M.** - *ML-engineer*
 * **Moskalenko O.** - *ML-engineer*
 * **Li P.** - *ML-engineer*
+* **Lysachenko S.** - *ML-engineer*
+* **Zharskyi N.** - *Software engineer*
+* **Borysenko M.** - *documentation editing assistance*
+* **Tyshchenko K.** - *documentation editing assistance*
+* **Boiko K.** - *documentation editing assistance*
+* **Fesenko M.** - *Data Labeling team lead*
+* **Fesenko M.** - *Data Labeling*
+* **Dolhodush A.** - *Data Labeling*
+* **Husachenko M.** - *Data Labeling*
+* **Vuziian Y.** - *Data Labeling*
+* **Borovko L.** - *Data Labeling*
+* **Kovalov O.** - *tech-lead*
