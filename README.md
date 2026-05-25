@@ -145,3 +145,16 @@ For the full list of project contributors, see [CONTRIBUTORS.md](CONTRIBUTORS.md
 - **Shifted approach**: Moved from **exemplar-based** to **instance segmentation**, enabling better handling of overlapping and clustered cells.
 - **Performance comparison**: Evaluated new models against our previous **YOLO-based pipelines**, showing improved segmentation quality and boundary accuracy.
 
+## CellsCalculatorV3.1: What's New?
+
+- **Improved usability** with a resizable main window, new status bar, live image zoom, and alpha control for better preview and progress feedback.
+- **More responsive processing** thanks to threaded inference, a dedicated wait dialog, and better cancellation handling.
+- **Smarter model loading** through dynamic registration, selective enable/disable config support, and preload/late-load behavior to avoid unnecessary startup overhead.
+- **Cleaner UI and workflow** with a dedicated original/inference/detections view switch, updated size controls, x10/x20 support, and on-the-fly filtering.
+- **Stability and cleanup** via standardized image I/O, refactored imports, constants for filenames, and removal of obsolete code.
+
+## CellsCalculatorV3.2: What's New?
+
+- **Refactoring**: PEP 8 compliance, docstring documentation, static type checking with `mypy`, removal of duplicated code and magic numbers, and SAHI integrated as a standard dependency.
+- **Functionality fix** with proper cell size calculations in µm, fixed LSM image loading and nuclei counting, and corrected size filtering with consistent colormaps.
+- **Automated testing** powered by GitHub Actions, including unit tests, smoke tests for all models, integration tests for prediction consistency, and runtime fuzzing harness for robustness validation.
