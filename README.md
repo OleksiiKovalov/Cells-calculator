@@ -18,7 +18,7 @@
 **CellsCalculator** is an innovative application developed by project team "B" for processing mouse fibroblast cells of L929 cell line as well as cells of any other lines which visually appear to be similar to L929 line. It enables processing contrast microscopic images in *lsm* format, as well as images in standard formats, such as *jpeg*, *png* etc.
 
 ## CellsCalculatorV2: What's New?
-The latest release v2.0 includes several major updates and innovations, which include:
+The release v2.0 includes several major updates and innovations, which include:
 * 2 different segmentation models were implemented for cell image processing, which enabled automatic extraction of information on cell morphology (averaged diameter, area, extrapolated volume);
 * additional filtering configuration has been added for in-place filtering of irrelevant detections based on the cell area;
 * processing of low-scale (x10 scale) images has been improved significantly using [SAHI](https://github.com/obss/sahi.git) approach;
