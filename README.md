@@ -12,14 +12,13 @@
 * [Model quality metrics](#model-quality-metrics)
 * [Run the code](#run-the-code)
 * [See also](#see-also)
-* [Contributors](#contributors)
 
 ## Brief description
 
 **CellsCalculator** is an innovative application developed by project team "B" for processing mouse fibroblast cells of L929 cell line as well as cells of any other lines which visually appear to be similar to L929 line. It enables processing contrast microscopic images in *lsm* format, as well as images in standard formats, such as *jpeg*, *png* etc.
 
 ## CellsCalculatorV2: What's New?
-The latest release v2.0 includes several major updates and innovations, which include:
+The release v2.0 includes several major updates and innovations, which include:
 * 2 different segmentation models were implemented for cell image processing, which enabled automatic extraction of information on cell morphology (averaged diameter, area, extrapolated volume);
 * additional filtering configuration has been added for in-place filtering of irrelevant detections based on the cell area;
 * processing of low-scale (x10 scale) images has been improved significantly using [SAHI](https://github.com/obss/sahi.git) approach;
@@ -138,65 +137,24 @@ If you are interested to study the project details more thoroughly, follow the l
 * [Used model configs & training artifacts](https://github.com/EugenTheMachine/ResultingModels.git);
 * [Data labelling using SAM](https://github.com/EugenTheMachine/SpheroidSAMLabelling.git).
 
+For the full list of project contributors, see [CONTRIBUTORS.md](CONTRIBUTORS.md).
+
 ## CellsCalculatorV3: What's New?
 
 - **New models added**: Trained and integrated **StarDist** (https://github.com/stardist/stardist), **InstantSeg** (https://github.com/instanseg/instanseg), and **Cellpose** (https://github.com/mouseland/cellpose) for more accurate and robust instance segmentation.
 - **Shifted approach**: Moved from **exemplar-based** to **instance segmentation**, enabling better handling of overlapping and clustered cells.
 - **Performance comparison**: Evaluated new models against our previous **YOLO-based pipelines**, showing improved segmentation quality and boundary accuracy.
 
-## Contributors
+## CellsCalculatorV3.1: What's New?
 
-**CellsCalculator V2.0** has been developed by the following students of NTU "KhPI":
-* **Ponomarov Y.** - *team-lead, ML engineer*;
-* **Kuznesova I.** - *ML engineer, data labelling*;
-* **Batiuchenko O.** - *software developer*;
-* **Noskova K.** - *ML engineer*;
-* **Glushchenko D.** - *lead of documentation editing assistance, lead of data labelling*;
-* **Baluka A.** - *documentation editing assistance, data labelling*;
-* **Ipatko K.** - *documentation editing assistance, data labelling*.
+- **Improved usability** with a resizable main window, new status bar, live image zoom, and alpha control for better preview and progress feedback.
+- **More responsive processing** thanks to threaded inference, a dedicated wait dialog, and better cancellation handling.
+- **Smarter model loading** through dynamic registration, selective enable/disable config support, and preload/late-load behavior to avoid unnecessary startup overhead.
+- **Cleaner UI and workflow** with a dedicated original/inference/detections view switch, updated size controls, x10/x20 support, and on-the-fly filtering.
+- **Stability and cleanup** via standardized image I/O, refactored imports, constants for filenames, and removal of obsolete code.
 
-**CellsCalculator V3.0** has been developed by the following students of NTU "KhPI":
-* **Cherkashyna I.** - *Team-lead, lead of documentary editing*
-* **Fesenko M.** - *ML-engineer*
-* **Lytvynenko S.** - *ML-engineer*
-* **Olijnyk V.** - *ML-engineer*
-* **Kovalov O.** - *tech-lead*
+## CellsCalculatorV3.2: What's New?
 
-**CellsCalculator V3.1** has been developed by the following students of NTU "KhPI":
-* **Cherkashyna I.** - *Team-lead, lead of documentary editing*
-* **Noskova K.** - *ML-engineer*
-* **Lytvynenko S.** - *ML-engineer*
-* **Kharkivskyi I.** - *ML-engineer*
-* **Zharskyi N.** - *Software engineer*
-* **Besedina Y.** - *documentation editing assistance, data labelling*
-* **Borysenko M.** - *documentation editing assistance, data labelling*
-* **Tkachenko V.** - *documentation editing assistance, data labelling*
-* **Kovalov O.** - *tech-lead*
-
-**CellsCalculator V3.2** has been developed by the following students of NTU "KhPI":
-* **Kharkivskyi I.** - *Software Development team lead, functionality fix*
-* **Koziuk D.** - *Software engineer, functionality fix*
-* **Kremliov R.** - *Software engineer, functionality fix*
-* **Savchenko V.** - *Software engineer, refactoring*
-* **Rudenko H.** - *Software engineer, refactoring*
-* **Ohanjanyan A.** - *Software engineer, automated testing*
-* **Hazin H.** - *Software engineer, automated testing*
-* **Smirnov S.** - *QA, manual testing*
-* **Lytvynenko S.** - *Data Science and Documentation team lead*
-* **Malakhov R.** - *ML-engineer*
-* **Lyndin Y.** - *ML-engineer*
-* **Pohasii M.** - *ML-engineer*
-* **Moskalenko O.** - *ML-engineer*
-* **Li P.** - *ML-engineer*
-* **Lysachenko S.** - *ML-engineer*
-* **Zharskyi N.** - *Software engineer*
-* **Borysenko M.** - *documentation editing assistance*
-* **Tyshchenko K.** - *documentation editing assistance*
-* **Boiko K.** - *documentation editing assistance*
-* **Fesenko M.** - *Data Labeling team lead*
-* **Fesenko M.** - *Data Labeling*
-* **Dolhodush A.** - *Data Labeling*
-* **Husachenko M.** - *Data Labeling*
-* **Vuziian Y.** - *Data Labeling*
-* **Borovko L.** - *Data Labeling*
-* **Kovalov O.** - *tech-lead*
+- **Refactoring**: PEP 8 compliance, docstring documentation, static type checking with `mypy`, removal of duplicated code and magic numbers, and SAHI integrated as a standard dependency.
+- **Functionality fix** with proper cell size calculations in µm, fixed LSM image loading and nuclei counting, and corrected size filtering with consistent colormaps.
+- **Automated testing** powered by GitHub Actions, including unit tests, smoke tests for all models, integration tests for prediction consistency, and runtime fuzzing harness for robustness validation.
