@@ -24,3 +24,5 @@ app.log
 .DS_Store
 application_settings*.json
 /.idea
+*.log
+/scripts/.cache
