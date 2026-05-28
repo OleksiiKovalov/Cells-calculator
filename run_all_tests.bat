@@ -1,15 +1,16 @@
 @echo off
 cd /d "%~dp0"
-call ./condaactivate.bat
+call scripts/condaactivate.bat
 if "%conda_root%"=="" goto no_conda_found
 
 echo.
 echo Using conda environment: %condaname%
+call conda activate "%condaname%"
 
 set FAILURE=0
 
 echo Running unit tests...
-call conda run -n "%condaname%" python -m pytest -v ../tests
+call python -m pytest -v tests
 set EXITCODE=%ERRORLEVEL%
 if %EXITCODE% NEQ 0 (
     echo.
@@ -20,22 +21,22 @@ if %EXITCODE% NEQ 0 (
     echo Unit tests passed.
 )
 
+echo.
+echo Running smoke tests...
+call python -m pytest -v tests_local/test_smoke.py
+set EXITCODE=%ERRORLEVEL%
+if %EXITCODE% NEQ 0 (
     echo.
-    echo Running smoke tests...
-    call conda run -n "%condaname%" python -m pytest -v ../tests_local/test_smoke.py
-    set EXITCODE=%ERRORLEVEL%
-    if %EXITCODE% NEQ 0 (
-        echo.
-        echo Smoke tests FAILED.
-        set FAILURE=1
-    ) else (
-        echo.
-        echo Smoke tests passed.
-    )
+   echo Smoke tests FAILED.
+    set FAILURE=1
+) else (
+    echo.
+    echo Smoke tests passed.
+)
 
 echo.
 echo Running golden regression tests...
-call conda run -n "%condaname%" python -m pytest -v ../tests_local/test_image_golden_regressions.py
+call python -m pytest -v tests_local/test_image_golden_regressions.py
 set EXITCODE=%ERRORLEVEL%
 if %EXITCODE% NEQ 0 (
     echo.
