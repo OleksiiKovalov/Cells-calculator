@@ -127,7 +127,6 @@ class StardistSegmenter(BaseModel):
        
         self.original_image = safegray2rgb(image)
         try:
-            #import stardist.models.model2d
             original_nms = model2d.non_maximum_suppression_sparse
             def safe_nms_sparse(dist, prob, points, *args, **kwargs):
                 # Clip distances to prevent C++ NMS crash on extreme values (e.g. >1e22)
