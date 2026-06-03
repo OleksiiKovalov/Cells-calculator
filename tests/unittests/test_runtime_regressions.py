@@ -99,6 +99,9 @@ def _fake_stardist_modules():
             super().__init__("stardist")
             self.models = types.SimpleNamespace()
             self.models.StarDist2D = _FakeStarDist2D
+            self.models.model2d = types.SimpleNamespace(
+                non_maximum_suppression_sparse=lambda *args, **kwargs: None
+            )
 
     fake_tf = FakeTf()
     fake_stardist = FakeStardist()
@@ -107,6 +110,7 @@ def _fake_stardist_modules():
         "tensorflow": fake_tf,
         "stardist": fake_stardist,
         "stardist.models": fake_stardist.models,
+        "stardist.models.model2d": fake_stardist.models.model2d,
     }
 
 

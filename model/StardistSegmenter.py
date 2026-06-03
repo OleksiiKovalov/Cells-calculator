@@ -30,7 +30,7 @@ from csbdeep.utils import normalize
 from skimage.io import imread
 from skimage.measure import regionprops
 from skimage.transform import resize
-from stardist.models import StarDist2D
+from stardist.models import model2d, StarDist2D
 
 # Local application imports
 from model.BaseModel import BaseModel
@@ -127,21 +127,20 @@ class StardistSegmenter(BaseModel):
        
         self.original_image = safegray2rgb(image)
         try:
-            import stardist.models.model2d
-            import numpy as np
-            original_nms = stardist.models.model2d.non_maximum_suppression_sparse
+            #import stardist.models.model2d
+            original_nms = model2d.non_maximum_suppression_sparse
             def safe_nms_sparse(dist, prob, points, *args, **kwargs):
                 # Clip distances to prevent C++ NMS crash on extreme values (e.g. >1e22)
                 dist = np.clip(dist, a_min=None, a_max=10000.0)
                 return original_nms(dist, prob, points, *args, **kwargs)
             
-            stardist.models.model2d.non_maximum_suppression_sparse = safe_nms_sparse
+            model2d.non_maximum_suppression_sparse = safe_nms_sparse
             
             labels, details = None, None
             try:
                 labels, details = self.model.predict_instances(img_inference)
             finally:
-                stardist.models.model2d.non_maximum_suppression_sparse = original_nms
+                model2d.non_maximum_suppression_sparse = original_nms
 
             self.detections = self.stardist_results_to_pandas(
                 labels,
