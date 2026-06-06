@@ -11,6 +11,7 @@ import os
 import string
 import traceback
 from datetime import datetime
+from typing import Any, Dict, Optional, Union
 
 # Third-party imports
 import numpy as np
@@ -28,13 +29,19 @@ from skimage.io import imread
 from UI.app_globals import get_global
 from UI.errorhandling import connect_to_log_events
 from UI.ImageNormalizeDialog import ImageNormalizeDialog
-from UI.menubar import menubar
+from UI.menubar import MenuBar
+from UI.prediction_rendering import COLOR_NUMBER as color_number
 from UI.right_layout.plugins.CellDetectorPlugin import CellDetectorPlugin as CellDetector_plugin
 from UI.right_layout.plugins.TrackerPlugin import TrackerPlugin as Tracker_plugin
 from UI.right_layout.right_layout import right_layout
 from UI.SettingsWindow import SettingsWindow
 from UI.table import calculate_table
-from model.utils import COLOR_NUMBER as color_number, clear_cache, safergb2gray
+from model.utils import (
+    clear_cache,
+    lsm_to_channels_last,
+    read_lsm_array,
+    safergb2gray,
+)
 
 
 class MainWindow(QMainWindow):
@@ -81,7 +88,7 @@ class MainWindow(QMainWindow):
         
         self._update_progress(60, "Initializing menu bar...")
         # Initialize the user interface
-        self.menu_bar = menubar(self, list(self.plugin_list.keys()), self.current_plugin_name)
+        self.menu_bar = MenuBar(self, list(self.plugin_list.keys()), self.current_plugin_name)
         self.setMenuBar(self.menu_bar)
         
         self._update_progress(75, "Setting up right panel...")
@@ -113,24 +120,24 @@ class MainWindow(QMainWindow):
         QApplication.processEvents()
 
     @pyqtSlot(str, object)
-    def handle_menubar_action(self, action_name, value):
-        """Обрабатываем сигнал от menubar"""
-        if action_name == "open_file":
+    def handle_menubar_action(self, action_name: str, value: object) -> None:
+        """
+        Handle actions from the menubar.
+        """
+        if action_name == "open_file" and isinstance(value, str):
             self.open_file(value)
-        if action_name == "open_folder":
+        elif action_name == "open_folder" and isinstance(value, str):
             self.open_folder(value)
         elif action_name == "open_settings":
             self.open_settings()
         elif action_name == "open_normalize":
             self.open_normalize()
-
-        elif action_name == "show_warning":
+        elif action_name == "show_warning" and isinstance(value, str):
             self.show_warning_dialog(value)
-        elif action_name == "change_plugin":
+        elif action_name == "change_plugin" and isinstance(value, str):
             if value in self.plugin_list:
                 self.main_scene.clear()
                 self.current_plugin_name = value
-                self.setWindowTitle(self.current_plugin_name)
                 self.setWindowTitle(value)
                 self.init_value()
                 self.right_layout.set_current_plugin(value, self.plugin_list)
@@ -138,6 +145,13 @@ class MainWindow(QMainWindow):
     
     @pyqtSlot(str, object)
     def handle_rightLayout_action(self, action_name, value):
+        """
+        Handle actions emitted from the right-side layout plugins.
+
+        Args:
+            action_name (str): The name of the action to handle.
+            value (object): Associated value for the action.
+        """
         if action_name == "show_warning":
             self.show_warning_dialog(value)
         elif action_name == "add_image":
@@ -146,15 +160,30 @@ class MainWindow(QMainWindow):
             self.filter_and_draw_predictions(get_global('predictions'), get_global('image_inference'))
         pass
     
-    def open_normalize(self):
+    def open_normalize(self) -> None:
+        """
+        Open the image normalization dialog for the current image.
+
+        Loads the currently selected image file, converts it to grayscale if needed,
+        and opens the normalization dialog for user adjustments.
+        """
+        if not self.lsm_path:
+            self.show_warning_dialog("No image selected for normalization.")
+            return
+
         image = imread(self.lsm_path)
         image = safergb2gray(image)
         dlg = ImageNormalizeDialog(image)
-        dlg.exec_()        
-        pass
+        dlg.exec_()
 
     def init_value(self):
-        # TODO: сделать так что бы параметры собиралиьс относительно выброного plugin
+        """
+        Initialize shared application values, objects, and plugin configuration.
+
+        Sets up default object size parameters, model collections, plugin definitions,
+        and initial application state variables used by the main window and plugins.
+        """
+        # TODO: make parameters collect relative to the selected plugin
         # Initialize DataFrame to None
         
         self._update_progress(42, "Setting up object parameters...")
@@ -167,7 +196,8 @@ class MainWindow(QMainWindow):
                    'color_map' : "viridis",
                    'color_map_list' : list(color_number.keys()),
                    'line_width' : 100.00,
-                   'scale' : 20
+                   'scale' : 20,
+                   'um_per_px' : 0.325
         }
         
         self.default_object_size = self.object_size.copy()
@@ -403,12 +433,13 @@ class MainWindow(QMainWindow):
         """
 
         # Create a list of image files within the selected folder
-        lsm_folder = folder_path
-        self.lsm_filesList = [os.path.join(folder_path, file) \
-        for file in os.listdir(folder_path)\
-            if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
+        self.lsm_folder = folder_path
+        self.lsm_filesList = [
+            os.path.join(folder_path, file)
+            for file in os.listdir(folder_path)
+            if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))
+        ]
 
-        # If image files are found
         if self.lsm_filesList:
             # Clear the main scene
             self.main_scene.clear()
@@ -427,7 +458,7 @@ class MainWindow(QMainWindow):
             # If no image files are found, reset variables and show a warning dialog
             self.show_warning_dialog("No Image files found in the selected folder")
 
-    def create_table(self):
+    def create_table(self) -> None:
         """
         Create a table with calculated results for multiple files.
 
@@ -438,6 +469,11 @@ class MainWindow(QMainWindow):
         - If an exception occurs during calculation, disables certain actions, resets file list and data frame, and shows a warning dialog.
         - Configures table properties, populates the table with data from the data frame, sets minimum size, and resizes rows and columns to fit content.
         - Adds the table to the main scene.
+
+
+        
+        ----This method is currently disabled until the table workflow is restored----
+
         """
         print("Expired")
         return
@@ -552,18 +588,7 @@ class MainWindow(QMainWindow):
                 
                 elif lsm_file.lower().endswith('.lsm'):
                     # Handle LSM files
-                    with tifffile.TiffFile(lsm_file) as tif:
-                        lsm_array = tif.pages[0].asarray()
-                    
-                    # Check if we have enough channels
-                    if lsm_array.shape[0] <= self.parametrs['Cell']:
-                        return self.create_no_image_qimage()
-                    
-                    # Create QImage from selected channel
-                    channel_data = lsm_array[self.parametrs['Cell']]
-                    return QImage(channel_data.data, channel_data.shape[1], 
-                                channel_data.shape[0], channel_data.strides[0], 
-                                QImage.Format_Grayscale8)
+                    return self._create_lsm_qimage(read_lsm_array(lsm_file))
                 
                 else:
                     # Handle regular image files (png, jpg, bmp, tif)
@@ -574,18 +599,10 @@ class MainWindow(QMainWindow):
                 if isinstance(lsm_file, np.ndarray):
                     if len(lsm_file.shape) >= 3:
                         # Multi-channel array (LSM data)
-                        if lsm_file.shape[0] <= self.parametrs['Cell']:
-                            return self.create_no_image_qimage()
-                        
-                        channel_data = lsm_file[self.parametrs['Cell']]
-                        return QImage(channel_data.data, channel_data.shape[1], 
-                                    channel_data.shape[0], channel_data.strides[0], 
-                                    QImage.Format_Grayscale8)
+                        return self._create_lsm_qimage(lsm_file)
                     else:
                         # Single channel 2D array
-                        return QImage(lsm_file.data, lsm_file.shape[1], 
-                                    lsm_file.shape[0], lsm_file.strides[0], 
-                                    QImage.Format_Grayscale8)
+                        return self._create_grayscale_qimage(lsm_file)
                 else:
                     # Unknown type - return placeholder
                     return self.create_no_image_qimage()
@@ -594,6 +611,52 @@ class MainWindow(QMainWindow):
             # If any error occurs during image creation, return placeholder
             print(f"Error creating image: {e}")
             return self.create_no_image_qimage()
+
+    def _create_lsm_qimage(self, lsm_array):
+        """
+        Convert an LSM array to a grayscale QImage using the selected cell channel.
+
+        Args:
+            lsm_array (numpy.ndarray): Raw LSM image data with channel-first layout.
+
+        Returns:
+            QImage: Grayscale image for display.
+        """
+        channels_last = lsm_to_channels_last(lsm_array)
+        cell_channel = self.parametrs['Cell']
+        if channels_last.shape[-1] <= cell_channel:
+            cell_channel = 0
+
+        return self._create_grayscale_qimage(channels_last[:, :, cell_channel])
+
+    def _create_grayscale_qimage(self, image_array):
+        """
+        Convert a 2D grayscale array into a QImage.
+
+        Args:
+            image_array (numpy.ndarray): A 2D array containing grayscale pixel values.
+
+        Returns:
+            QImage: The converted grayscale image, or a placeholder image if the input is invalid.
+        """
+        image_array = np.asarray(image_array)
+        if image_array.ndim != 2:
+            return self.create_no_image_qimage()
+
+        if image_array.dtype != np.uint8:
+            max_value = np.max(image_array) if image_array.size else 0
+            if max_value > 0:
+                image_array = image_array.astype(np.float32) / max_value * 255
+            image_array = image_array.astype(np.uint8)
+
+        image_array = np.ascontiguousarray(image_array)
+        return QImage(
+            image_array.data,
+            image_array.shape[1],
+            image_array.shape[0],
+            image_array.strides[0],
+            QImage.Format_Grayscale8,
+        ).copy()
     
     def _add_image_to_scene(self, image):
         """
@@ -779,7 +842,12 @@ class MainWindow(QMainWindow):
                 self._center_image_in_scene(scaled_pixmap, view_width, view_height)
 
     def _update_zoom_status(self):
-        # Update cursor based on zoom level - show hand cursor when image is larger than view
+        """
+        Update visual state and status bar text for the current zoom level.
+
+        Updates the mouse cursor depending on whether zooming and panning is active,
+        then writes the current zoom percentage to the status bar.
+        """
         self._update_cursor_for_zoom()
         # Update status bar with zoom level
         zoom_percentage = int(self.zoom_factor * 100)
@@ -798,82 +866,7 @@ class MainWindow(QMainWindow):
         self.main_view.resetTransform()
         self.main_view.scale(self.zoom_factor, self.zoom_factor)
         self._update_zoom_status()
-    
-    def _on_wheel_event(self, event):
-        """
-        Handle mouse wheel events for zooming with Ctrl key.
-        
-        Args:
-            event (QWheelEvent): The wheel event
-        """
-        # Check if Ctrl key is pressed
-        if event.modifiers() & Qt.ControlModifier:
-            # Get the wheel delta (positive for zoom in, negative for zoom out)
-            delta = event.angleDelta().y()
-            
-            if delta > 0:
-                self.zoom_in()
-            else:
-                self.zoom_out()
-                
-            # Accept the event to prevent scrolling
-            event.accept()
-        else:
-            # Call the default wheel event handler for normal scrolling
-            QGraphicsView.wheelEvent(self.main_view, event)
-    
-    def zoom_in(self):
-        """
-        Zoom in the image view.
-        """
-        if self.zoom_factor < self.max_zoom:
-            self.zoom_factor *= self.zoom_step
-            self._apply_zoom()
-    
-    def zoom_out(self):
-        """
-        Zoom out the image view.
-        """
-        if self.zoom_factor > self.min_zoom:
-            self.zoom_factor /= self.zoom_step
-            self._apply_zoom()
-    
-    def zoom_to_fit(self):
-        """
-        Reset zoom to fit the image in the view.
-        """
-        self.zoom_factor = 1.0
-        self.main_view.resetTransform()
-        
-        # If we have an image, rescale it to fit
-        if hasattr(self, 'original_image_pixmap') and self.original_image_pixmap:
-            view_rect = self.main_view.viewport().rect()
-            view_width = view_rect.width()
-            view_height = view_rect.height()
-            
-            scaled_pixmap = self._scale_pixmap_to_fit(
-                self.original_image_pixmap, view_width, view_height)
-            
-            if hasattr(self, 'current_pixmap_item') and self.current_pixmap_item:
-                self.current_pixmap_item.setPixmap(scaled_pixmap)
-                self._center_image_in_scene(scaled_pixmap, view_width, view_height)
-    
-    def _apply_zoom(self):
-        """
-        Apply the current zoom factor to the view.
-        """
-        # Reset transform and apply zoom
-        self.main_view.resetTransform()
-        self.main_view.scale(self.zoom_factor, self.zoom_factor)
-        
-        # Update status bar with zoom level
-        zoom_percentage = int(self.zoom_factor * 100)
-        if hasattr(self, 'status_processing'):
-            self.update_status(
-                message=f"Zoom: {zoom_percentage}%",
-                processing_status=f"Zoom: {zoom_percentage}%"
-            )
-    
+
     def _on_mouse_press(self, event):
         """
         Handle mouse press events for panning.
@@ -944,7 +937,7 @@ class MainWindow(QMainWindow):
             else:
                 # Normal zoom level - show default cursor
                 self.main_view.setCursor(Qt.ArrowCursor)
-        
+    
     def change_image(self):
         """
         Change displayed image. 
@@ -974,7 +967,7 @@ class MainWindow(QMainWindow):
             # If an error occurs, show a warning dialog
             self.show_warning_dialog("Error during opening image.")
 
-    def open_file(self, lsm_path):
+    def open_file(self, lsm_path: str) -> None:
         """
         Open an image file (*.png *.jpg *.bmp *.lsm *.TIF) and display it.
 
@@ -1013,18 +1006,18 @@ class MainWindow(QMainWindow):
                 self.add_image(self.lsm_path)
                 self.setWindowTitle(
                     f"Cells Calculator - {os.path.basename(lsm_path)} ({self.currentImageWidth} x {self.currentImageHeight})")
-                
-                # Update status bar with success
-                self.update_status("File loaded successfully", 
-                                 file_info=f"{os.path.basename(lsm_path)} ({self.currentImageWidth}x{self.currentImageHeight})",
-                                 processing_status="Ready")
-                                 
+                self.update_status(
+                    "File loaded successfully",
+                    file_info=f"{os.path.basename(lsm_path)} ({self.currentImageWidth}x{self.currentImageHeight})",
+                    processing_status="Ready"
+                )
+                self.image_mru[lsm_path] = datetime.min
             except Exception as e:
                 traceback.print_exc()
                 # If an error occurs, show a warning dialog,
                 # reset variables, and clear the main scene
                 self.show_warning_dialog("Error during opening file.")
-                self.setWindowTitle(f"Cells Calculator")
+                self.setWindowTitle("Cells Calculator")
                 self.mainWindow_signal.emit("open_lsm", None)
                 self.lsm_path = None
                 self.lsm_filesList = None
@@ -1033,12 +1026,10 @@ class MainWindow(QMainWindow):
                 
                 # Update status bar with error
                 self.update_status("Error loading file", file_info="No file", processing_status="Error")
-
-                return 0
-        self.image_mru[lsm_path] = datetime.min
+                return
 
 
-    def open_lsm(self, lsm_path):
+    def open_lsm(self, lsm_path: str) -> None:
         """
         Open an image file (*.LSM) and display it.
 
@@ -1074,6 +1065,7 @@ class MainWindow(QMainWindow):
             self.add_image(lsm_file)
             self.setWindowTitle(
                 f"Cells Calculator - {os.path.basename(lsm_path)}")
+            self.image_mru[lsm_path] = datetime.min
         except Exception as e:
             traceback.print_exc()
             # If an error occurs, show a warning dialog,
@@ -1085,7 +1077,7 @@ class MainWindow(QMainWindow):
             self.lsm_path = None
             self.lsm_filesList = None
             self.lsm_folder = None
-            return 0
+            return
 
     def open_settings(self):
         """
@@ -1104,14 +1096,12 @@ class MainWindow(QMainWindow):
         try:
            # Check if there are LSM files in the list
             if self.lsm_filesList:
-               # If LSM files are present, set the LSM path and callback function for table creation
-               lsm_path = self.lsm_filesList
-                #TODO переделать callback так что бы он зависил от плагина
-               call_back = self.plugin_list[self.current_plugin_name]["folder_callback"]
+                lsm_path = self.lsm_filesList
+                call_back = self.plugin_list[self.current_plugin_name]["folder_callback"]
             else:
-               # If no LSM files in the list, set the callback function for image change
-               call_back = self.plugin_list[self.current_plugin_name]["file_callback"]
-               lsm_path = self.lsm_path
+                # If no LSM files in the list, set the callback function for image change
+                call_back = self.plugin_list[self.current_plugin_name]["file_callback"]
+                lsm_path = self.lsm_path
 
             # If there's a valid LSM path
             if lsm_path:
@@ -1178,6 +1168,12 @@ class MainWindow(QMainWindow):
         return image
     
     def on_log_line_added(self, log_line):
+        """
+        Handle log line added event.
+        
+        Args:
+            log_line: The log line to display.
+        """
         # Shrink the log line to fit status bar
         shortened_line = self.shrink_text(log_line, max_length=100)
         self.update_status(shortened_line)
@@ -1227,12 +1223,27 @@ class MainWindow(QMainWindow):
         # Combine with separator
         return start_part + separator + end_part
 
-    def remove_non_printable(self,text):
-        """Remove non-printable characters using string.printable"""
+    def remove_non_printable(self, text):
+        """
+        Remove non-printable characters from text.
+
+        Args:
+            text (str): Input text to sanitize.
+
+        Returns:
+            str: Text containing only printable characters.
+        """
         printable = set(string.printable)
         return ''.join(char for char in text if char in printable)
 
-    def filter_and_draw_predictions(self, image, predictions):
+    def filter_and_draw_predictions(self, image: Any, predictions: Any) -> None:
+        """
+        Filter and draw predictions on the image.
+        
+        Args:
+            image: The image data.
+            predictions: The predictions to draw.
+        """
         mask_image = None
         self.add_image(mask_image)
         pass

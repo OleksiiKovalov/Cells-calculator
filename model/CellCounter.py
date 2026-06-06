@@ -3,28 +3,53 @@ In this module the CellCounter class is defined which is used
 to calculate cells on a given contrast microimage.
 """
 
-# Standard library imports
-import os
-
 # Third-party imports
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
+from typing import Protocol, Any
 
-# Local application imports
-from UI.app_globals import set_global
+
+class DnnProtocol(Protocol):
+    def setInput(self, blob) -> None: ...
+    def forward(self) -> Any: ...
+
 from model.BaseModel import BaseModel
-from model.utils import safe_image_read, safe_image_write
-from model.utils import draw_bounding_box, filter_detections, safeimagesave
-from UI.app_globals import IMAGE_FILE_NAME_INGFERENCE
+# Local application imports
+from model.utils import safe_image_read
 
 
-CLASSES = ['Cell']
+CLASSES = ["Cell"]
 colors = np.random.uniform(0, 255, size=(len(CLASSES), 3))
+
+
+def _scale_and_clip_box(box, scale, image_width, image_height):
+    """Convert a model-space xywh box to a clipped image-space xywh box."""
+    box_array = np.asarray(box, dtype=np.float32).reshape(-1)
+    if box_array.size != 4 or not np.isfinite(box_array).all():
+        return None
+
+    x, y, width, height = box_array * float(scale)
+    if width <= 0 or height <= 0:
+        return None
+
+    x1 = np.clip(x, 0.0, float(image_width))
+    y1 = np.clip(y, 0.0, float(image_height))
+    x2 = np.clip(x + width, 0.0, float(image_width))
+    y2 = np.clip(y + height, 0.0, float(image_height))
+    clipped_width = x2 - x1
+    clipped_height = y2 - y1
+    if clipped_width <= 0 or clipped_height <= 0:
+        return None
+
+    return np.array([x1, y1, clipped_width, clipped_height], dtype=np.float32)
+
 
 class CellCounter(BaseModel):
     """
     The class for object which performs cell counting.
+
     This is a part of the general model for obtaining target percentage.
     The objects of this class are not to be used explicitly - they function
     inside of the general Model class defined further.
@@ -34,54 +59,97 @@ class CellCounter(BaseModel):
 
     Output value is the number of cells detected.
     """
+    model: DnnProtocol
     # def __init__(self, path, object_size):
     #     super().__init__(path, object_size)
 
     def init_x20_model(self, path_to_model: str):
+        """
+        Initialize ONNX model for x20 magnification inference.
+        
+        Loads an ONNX model from the specified path for cell detection
+        at 20x magnification.
+        
+        Args:
+            path_to_model (str): Path to the ONNX model file.
+            
+        Raises:
+            FileNotFoundError: If the model file does not exist.
+        """
         self.model = cv2.dnn.readNetFromONNX(path_to_model)
 
     def init_x10_model(self, path_to_model):
+        """
+        Initialize model for x10 magnification.
+        
+        Currently not implemented.
+        """
         self.model_x10 = None
 
-    def count_x10(self, input_image, filename):
-        return self.count_x20(input_image, filename)
-
-    def count_x20(self, input_image, filename):
-        # # NOTE: this function is deprecated and no longer used, because we have implemented ultralytics-based inference pipeline for simplicity
+    def count_x10(self, input_image):
         """
-        Main function to load ONNX model, perform inference, draw bounding boxes,
-        and display the output image.
-
+        Count cells at x10 magnification.
+        
+        Delegates to count_x20 method.
+        
         Args:
-            onnx_model (str): Path to the ONNX model.
-            input_image (str): Path to the input image.
+            input_image (str): Path to input image
 
         Returns:
-            list: List of dictionaries containing detection information such as class_id,
-            class_name, confidence, etc.
+            pd.DataFrame: Detection results
+        """
+        return self.count_x20(input_image)
+
+
+    def count_x20(self, input_image):
+        """
+        Perform inference on x20 magnification image using ONNX model.
+        
+        ---WARNING---: This function is deprecated and no longer used. The application now uses
+        an ultralytics-based inference pipeline for improved performance and simplicity.
+        
+        Loads image, preprocesses for model input, runs ONNX inference, applies NMS,
+        and saves CSV data for downstream UI/reporting use.
+        
+        Args:
+            input_image (str): Path to input microscopy image
+
+        Returns:
+            pd.DataFrame: Detection results with columns:
+                - class_id, class_name, confidence
+                - box: [x, y, width, height]
+                - scale: normalization factor
+        
+        Note:
+            - Images are padded to square before inference (512x512)
+            - NMS thresholds: score=0.25, iou=0.6
+            - Confidence threshold: 0.2
         """
         # Read the input image
+        inference_image = getattr(self, "_last_inference_image", None)
         if self.detections is None:
-            original_image: np.ndarray = safe_image_read(input_image, color_mode='color')
+            original_image: np.ndarray = safe_image_read(
+                input_image, color_mode="color"
+            )
             if original_image is None:
                 raise ValueError(f"Could not read image: {input_image}")
             self.original_image = original_image.copy()
-            [height, width, _] = original_image.shape
+            height, width, _ = original_image.shape
 
             # Prepare a square image for inference
             length = max((height, width))
             image = np.zeros((length, length, 3), np.uint8)
             image[0:height, 0:width] = original_image
+            inference_image = image
 
-            # Calculate scale factor
+            # Calculate scale factor from model input pixels back to image pixels.
             scale = length / 512
 
             # Preprocess the image and prepare blob for model
-            blob = cv2.dnn.blobFromImage(image, scalefactor=1 / 255, size=(512, 512), swapRB=True)
+            blob = cv2.dnn.blobFromImage(
+                image, scalefactor=1 / 255, size=(512, 512), swapRB=True
+            )
             self.model.setInput(blob)
-
-            set_global('image_inference', image)
-            safeimagesave(image, IMAGE_FILE_NAME_INGFERENCE)
 
             # Perform inference
             outputs = self.model.forward()
@@ -97,7 +165,8 @@ class CellCounter(BaseModel):
             scores = []
             class_ids = []
 
-            # Iterate through output to collect bounding boxes, confidence scores, and class IDs
+            # Iterate through output to collect bounding boxes, confidence scores,
+            # and class IDs
             for i in range(rows):
                 classes_scores = outputs[0][i][4:]
                 (minScore, maxScore, minClassLoc, (x, maxClassIndex)) = cv2.minMaxLoc(classes_scores)
@@ -113,67 +182,84 @@ class CellCounter(BaseModel):
                     class_ids.append(maxClassIndex)
 
             # Apply NMS (Non-maximum suppression)
-            result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)  # score, nms thresholds
-            boxes_to_filter = np.array(boxes)[result_boxes,:]
+            result_boxes: NDArray[np.int64] = np.array(cv2.dnn.NMSBoxes(boxes, scores, 0.25, 0.6)).flatten() # score, nms thresholds
 
-            detections = []
+            detections_list = []
 
             # Iterate through NMS results to draw bounding boxes and labels
-            for i, _ in enumerate(result_boxes):
-                index = result_boxes[i]
-                box = boxes[index]
+            for index in result_boxes:
+                box = _scale_and_clip_box(
+                    boxes[index],
+                    scale,
+                    image_width=width,
+                    image_height=height,
+                )
+                if box is None:
+                    continue
                 detection = {
                     "class_id": class_ids[index],
                     "class_name": CLASSES[class_ids[index]],
                     "confidence": scores[index],
-                    "box": np.array(box),
-                    "scale": scale,
+                    "box": box,
+                    "scale": 1.0,
                 }
-                detections.append(detection)
-            # perform square-based filtering of bboxes
-            detections = pd.DataFrame(detections)
-            self.detections = detections
+                detections_list.append(detection)
+
+            # Perform square-based filtering of bboxes. Keep the expected
+            # columns even when no objects pass the detector/NMS thresholds.
+            detections_df = pd.DataFrame(
+                detections_list,
+                columns=["class_id", "class_name", "confidence", "box", "scale"],
+            )
+            detections_df.attrs["image_size"] = (width, height)
+            self.detections = detections_df
             csv_data = self.detections.copy()
-            csv_data['width'] = csv_data['box'].apply(lambda b: b[2] / length)
-            csv_data['height'] = csv_data['box'].apply(lambda b: b[3] / length)
-            csv_data['bbox_area'] = csv_data['width'] * csv_data['height'] / length**2
-            csv_data[['confidence', 'width', 'height',
-                      'bbox_area']].to_csv(self.out_dir / "cell_data.csv", sep=';', index=False)
+            csv_data["width"] = csv_data["box"].apply(
+                lambda b: b[2] / width if b is not None and width else None
+            )
+            csv_data["height"] = csv_data["box"].apply(
+                lambda b: b[3] / height if b is not None and height else None
+            )
+            csv_data["bbox_area"] = (
+                csv_data["box"].apply(
+                    lambda b: (b[2] * b[3]) / (width * height)
+                    if b is not None and width and height
+                    else None
+                )
+            )
+            csv_data[
+                ["confidence", "width", "height", "bbox_area"]
+            ].to_csv(
+                self.out_dir / "cell_data.csv", sep=";", index=False
+            )
             self.scale = scale
-            # change object_size for detection
-            self.object_size['signal']("set_size", detections['box'].copy())
+            # Change object_size for detection
+            self.object_size["signal"]("set_size", detections_df.copy())
 
         detections = self.detections
-        self.object_size['signal']("set_size", detections['box'].copy())
-        original_image = self.original_image.copy()
-        scale = self.scale
-        # TODO: in this codeline, calculate max and min squares of obtained bboxes and automatically
-        # set them as lower and upper bounds for the filtering sliders if the sliders currently
-        # have default values (0 and 10) set up. Otherwise do not re-set up them.
-        # TODO: in this codeline, add initialization of min_size and max_size params where their
-        # values are read from the boundary sliders. Scale them to be in 0.0-1.0 range, as required
-        # by the filter_detections() function.
+        self.object_size["signal"]("set_size", detections.copy())
+        # TODO: in this codeline, calculate max and min squares of obtained bboxes
+        # and automatically set them as lower and upper bounds for the filtering
+        # sliders if the sliders currently have default values (0 and 10) set up.
+        # Otherwise do not re-set up them.
+        # TODO: in this codeline, add initialization of min_size and max_size params
+        # where their values are read from the boundary sliders. Scale them to be
+        # in 0.0-1.0 range, as required by the filter_detections() function.
         # TODO: pass the min/max_size params to filter_detections() call below.
-        # TODO: when opening a new image or folder of images, reset boundary sliders to their default values (min=0%, max=10%).
-        #filtered_detections = filter_detections(detections, min_size = self.object_size['min_size'], max_size= self.object_size['max_size'])
+        # TODO: when opening a new image or folder of images, reset boundary
+        # sliders to their default values (min=0%, max=10%).
+        # filtered_detections = filter_detections(
+        #     detections,
+        #     min_size=self.object_size["min_size"],
+        #     max_size=self.object_size["max_size"],
+        # )
         filtered_detections = detections
-        for i in range(filtered_detections.shape[0]):
-            draw_bounding_box(
-                original_image,
-                filtered_detections.iloc[i,0],
-                filtered_detections.iloc[i,2],
-                round(filtered_detections.iloc[i,3][0] * scale),
-                round(filtered_detections.iloc[i,3][1] * scale),
-                round((filtered_detections.iloc[i,-2][0] + filtered_detections.iloc[i,-2][2]) * filtered_detections.iloc[i,-1]),
-                round((filtered_detections.iloc[i,-2][1] + filtered_detections.iloc[i,-2][3]) * filtered_detections.iloc[i,-1]),
-            )
-            
-        self.prediction_image = original_image
         self.detectionCount = filtered_detections.shape[0]
-        try:
-            os.remove(filename)
-        except:
-            pass
-        safe_image_write(original_image, filename)
+        self.prediction_image = None
 
-        return filtered_detections
+        return self._prediction_result(
+            filtered_detections,
+            original_image=self.original_image,
+            inference_image=inference_image,
+        )
+

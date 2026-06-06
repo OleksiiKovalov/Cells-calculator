@@ -1,27 +1,43 @@
+"""
+Cell Detector plugin module for segmentation and detection UI.
+
+This module implements the CellDetectorPlugin and related UI helpers used for
+selecting models, configuring object filters, and running detection on images.
+"""
+
 # Standard library imports
 import os
+import math
 import time
 import traceback
 
 # Third-party imports
 import matplotlib.pyplot as plt
+import numpy as np
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QCheckBox, QPushButton, QTextEdit,
     QComboBox, QLabel, QRadioButton, QButtonGroup, 
-    QHBoxLayout, QWidget, QVBoxLayout, QFileDialog, QApplication
+    QDoubleSpinBox, QHBoxLayout, QWidget, QVBoxLayout, QFileDialog, QApplication
 )
 
 # Local application imports
 from UI.WaitWindow import run_with_wait_window
-from UI.app_globals import get_global, set_global
+from UI.app_globals import get_global, set_global, get_registered_model
 from UI.errorhandling import app_logger
 from UI.ModelsCheckList import ModelsCheckListDialog
+from UI.prediction_rendering import (
+    plot_predictions,
+    plot_predictions_with_alignment,
+    publish_inference_image,
+    render_detector_predictions,
+)
 from UI.rangeslider import RangeSlider
 from UI.right_layout.plugins.BasePlugin import BasePlugin
 from model.Model import Model
-from model.utils import create_image_grid, draw_bounding_box, filter_detections, plot_predictions, safe_image_write
+from model.PredictionResult import get_prediction_images, unwrap_prediction_cells
+from model.utils import create_image_grid, filter_segmentation_detections, safe_image_write
 from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE
 
 
@@ -42,6 +58,39 @@ class RangeSliderWrapper(QWidget):
         self.round_parametr_slider = object_size['round_parametr_slider']
         self.round_parametr_value_input = object_size['round_parametr_value_input']
         self.initUI()
+
+    def _to_slider_floor(self, value):
+        return int(math.floor(float(value) * self.round_parametr_slider))
+
+    def _to_slider_ceil(self, value):
+        return int(math.ceil(float(value) * self.round_parametr_slider))
+
+    def _get_image_size(self):
+        for key in ('image_display_base', 'image_inference'):
+            image = get_global(key)
+            if image is not None and hasattr(image, 'shape') and len(image.shape) >= 2:
+                return image.shape[0], image.shape[1]
+        return None
+
+    def _format_size_label(self, label, value):
+        value = float(value)
+        text = f"{label}: {value * self.round_parametr_value_input:.2f}"
+
+        image_size = self._get_image_size()
+        um_per_px = self.object_size.get("um_per_px")
+        if image_size is not None and um_per_px is not None:
+            image_area_px = image_size[0] * image_size[1]
+            area_um2 = value * image_area_px * (float(um_per_px) ** 2)
+            text += f" ({area_um2:.2f} um^2)"
+
+        return text
+
+    def refresh_labels(self):
+        """
+        Refresh displayed range values after size or calibration changes.
+        """
+        self.min_label.setText(self._format_size_label("Min", self.object_size['min_size']))
+        self.max_label.setText(self._format_size_label("Max", self.object_size['max_size']))
             
     def initUI(self):
         layout = QVBoxLayout()
@@ -51,10 +100,10 @@ class RangeSliderWrapper(QWidget):
         
         # Create the range slider
         self.range_slider = RangeSlider(
-            minimum=int(self.object_size['min_size'] * self.round_parametr_slider),
-            maximum=int(self.object_size['max_size'] * self.round_parametr_slider),
-            low=int(self.object_size['min_size'] * self.round_parametr_slider),
-            high=int(self.object_size['max_size'] * self.round_parametr_slider)
+            minimum=self._to_slider_floor(self.object_size['min_size']),
+            maximum=self._to_slider_ceil(self.object_size['max_size']),
+            low=self._to_slider_floor(self.object_size['min_size']),
+            high=self._to_slider_ceil(self.object_size['max_size'])
         )
         
         # Connect signals
@@ -88,16 +137,18 @@ class RangeSliderWrapper(QWidget):
         slider_controls_layout.addWidget(controls_widget, 0)  # Fixed size for controls
         
         # Create value display labels
-        value_layout = QHBoxLayout()
-        self.min_label = QLabel(f"Min: {self.object_size['min_size'] * self.round_parametr_value_input:.2f}")
-        self.max_label = QLabel(f"Max: {self.object_size['max_size'] * self.round_parametr_value_input:.2f}")
+        value_layout = QVBoxLayout()
+        self.min_label = QLabel()
+        self.max_label = QLabel()
         
         font = QFont("Arial", 12)
         self.min_label.setFont(font)
         self.max_label.setFont(font)
+        self.min_label.setWordWrap(True)
+        self.max_label.setWordWrap(True)
+        self.refresh_labels()
         
         value_layout.addWidget(self.min_label)
-        value_layout.addStretch()
         value_layout.addWidget(self.max_label)
         
         layout.addLayout(slider_controls_layout)
@@ -106,19 +157,30 @@ class RangeSliderWrapper(QWidget):
         self.setLayout(layout)
     
     def on_range_changed(self, low, high):
+        """
+        Handle range slider value changes.
+        """
         if self.lockCount > 0:
             return  
-        """Handle range slider value changes"""
-        min_value = low / self.round_parametr_slider
-        max_value = high / self.round_parametr_slider
+        slider_min = self.range_slider.minimum()
+        slider_max = self.range_slider.maximum()
+        min_value = (
+            float(self.default_object_size['min_size'])
+            if low == slider_min
+            else low / self.round_parametr_slider
+        )
+        max_value = (
+            float(self.default_object_size['max_size'])
+            if high == slider_max
+            else high / self.round_parametr_slider
+        )
         
         # Update object_size
         self.object_size['min_size'] = min_value
         self.object_size['max_size'] = max_value
         
         # Update display labels
-        self.min_label.setText(f"Min: {min_value * self.round_parametr_value_input:.2f}")
-        self.max_label.setText(f"Max: {max_value * self.round_parametr_value_input:.2f}")
+        self.refresh_labels()
         
         # Emit signal based on Auto Apply setting
         if self.auto_apply_checkbox.isChecked():
@@ -128,26 +190,29 @@ class RangeSliderWrapper(QWidget):
             self.apply_button.setEnabled(True)
     
     def set_default(self):
+        """
+        Set slider to default values.
+        """
         try:
             self.lockCount += 1
-            """Set slider to default values"""
-            min_val = self.default_object_size['min_size']
-            max_val = self.default_object_size['max_size']
+            min_val = float(self.default_object_size['min_size'])
+            max_val = float(self.default_object_size['max_size'])
         
             self.object_size['min_size'] = min_val
             self.object_size['max_size'] = max_val
         
             self.range_slider.setValues(
-                int(min_val * self.round_parametr_slider),
-                int(max_val * self.round_parametr_slider)
+                self._to_slider_floor(min_val),
+                self._to_slider_ceil(max_val)
             )
-            self.min_label.setText(f"Min: {min_val * self.round_parametr_value_input:.2f}")
-            self.max_label.setText(f"Max: {max_val * self.round_parametr_value_input:.2f}")
+            self.refresh_labels()
         finally:
             self.lockCount -= 1 
     
     def on_auto_apply_changed(self, state):
-        """Handle Auto Apply checkbox state change"""
+        """
+        Handle Auto Apply checkbox state change.
+        """
         if state == Qt.Checked:
             # Auto apply is enabled
             self.apply_button.setEnabled(False)
@@ -160,29 +225,47 @@ class RangeSliderWrapper(QWidget):
             self.apply_button.setEnabled(True)
     
     def on_apply_clicked(self):
-        """Handle Apply button click"""
+        """
+        Handle Apply button click.
+        """
         min_value = self.object_size['min_size']
         max_value = self.object_size['max_size']
         self.applyRequested.emit(min_value, max_value)
         self.apply_button.setEnabled(False)  # Disable until next change 
     
     def change_default(self, min_size, max_size):
+        """
+        Change the range and default values.
+        """
         try:
             self.lockCount += 1
-            """Change the range and default values"""
             if min_size is None:
-                min_size = 100
+                min_size = 0.0
             if max_size is None:
-                max_size = 0
+                max_size = 1.0
+
+            min_size = float(min_size)
+            max_size = float(max_size)
+            if min_size > max_size:
+                min_size, max_size = max_size, min_size
+
+            # Keep the detected extrema inclusive after slider rounding/filtering.
+            slider_step = 1.0 / float(self.round_parametr_slider)
+            min_size = min_size - max(abs(min_size) * 0.01, slider_step)
+            max_size = max_size + max(abs(max_size) * 0.01, slider_step)
+
+            # Keep normalized metrics within sane bounds.
+            min_size = max(0.0, min(min_size, 1.0))
+            max_size = max(0.0, min(max_size, 1.0))
             
             # Update default values with some buffer
-            self.default_object_size['min_size'] = min_size - min_size / 100
-            self.default_object_size['max_size'] = max_size + max_size / 100
+            self.default_object_size['min_size'] = min_size
+            self.default_object_size['max_size'] = max_size 
         
             # Update slider range
             self.range_slider.setRange(
-                int(self.default_object_size['min_size'] * self.round_parametr_slider),
-                int(self.default_object_size['max_size'] * self.round_parametr_slider)
+                self._to_slider_floor(self.default_object_size['min_size']),
+                self._to_slider_ceil(self.default_object_size['max_size'])
             )
         
             # Set to default values
@@ -192,10 +275,27 @@ class RangeSliderWrapper(QWidget):
 
 
 class CellDetectorPlugin(BasePlugin):
+    """
+    Plugin for cell detection processing.
+    """
+
+    DEFAULT_ALPHA_TEXT = "75%"
+    DEFAULT_ALPHA_VALUE = 0.75
+    DISPLAY_MODE_ORIGINAL = 0
+    DISPLAY_MODE_DETECTIONS = 1
+    DISPLAY_MODE_INFERENCE = 2
+    PERMYRIAD_FACTOR = 10000
+    DEFAULT_RANGE_MIN = 0.0
+    DEFAULT_RANGE_MAX = 1.0
+    SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.bmp', '.lsm', '.tif')
+
     def get_name(self):
         return "Cell Processor"
+    
     def __init__(self, *arg):
-
+        """
+        Initialize the cell detector plugin.
+        """
         super().__init__(*arg)
         self.checked_indices = None
         self.plugin_signal.emit("Open_lsm", True)
@@ -203,13 +303,18 @@ class CellDetectorPlugin(BasePlugin):
         self.plugin_signal.emit("Settings", False)
         self.plugin_signal.emit("Save_as", False)
         currentModel = self.combo_box.currentText()
-        self.model = Model(path=arg[-1][currentModel]['path'],
+        self.model = Model(logger=app_logger(),
+                           get_registered_model=get_registered_model,
+                           path=arg[-1][currentModel]['path'],
                            object_size=arg[-1][currentModel]['object_size'],
                            model_type = arg[-1][currentModel]['model_type']
                            )
         self.lsm_path = None
 
     def init_value(self, parent, parametrs, object_size, default_object_size, models):
+        """
+        Initialize plugin values.
+        """
         self.show_boundry = 0
         self.draw_bounding = 0
         self.models = models
@@ -220,6 +325,9 @@ class CellDetectorPlugin(BasePlugin):
         self.lsm_filesList = None
 
     def handle_action(self, action_name, value):
+        """
+        Handle an action.
+        """
         if action_name == "reset_detection":
             self.reset_detection()
         elif action_name == "set_size":
@@ -244,7 +352,7 @@ class CellDetectorPlugin(BasePlugin):
             # self.max_range_slider.set_default()
             # self.min_range_slider.set_default()
             # workaround for some weird bug when app crashes after opening new image after prev recognition
-            self.range_slider.change_default(100, 0)
+            self.range_slider.change_default(0.0, 1.0)
 
             self.lsm_path = value
             self.lsm_filesList = None
@@ -270,6 +378,9 @@ class CellDetectorPlugin(BasePlugin):
                 self.button.setEnabled(False)
 
     def update_colormap(self, colormap):
+        """
+        Update the colormap.
+        """
         self.object_size["color_map"] = colormap
         
         # Trigger redraw with new colormap using current range slider values
@@ -278,7 +389,9 @@ class CellDetectorPlugin(BasePlugin):
         self.on_range_slider_changed(current_min, current_max)
     
     def update_alpha(self, alpha_text):
-        """Handle alpha combo box changes"""
+        """
+        Handle alpha combo box changes.
+        """
         # Convert percentage text to float value (e.g., "75%" -> 0.75)
         alpha_value = float(alpha_text.rstrip('%')) / 100.0
         self.object_size["alpha"] = alpha_value
@@ -287,20 +400,61 @@ class CellDetectorPlugin(BasePlugin):
         current_min = self.object_size['min_size']
         current_max = self.object_size['max_size']
         self.on_range_slider_changed(current_min, current_max)
+
+    def update_um_per_px(self, value):
+        """
+        Update micrometers-per-pixel calibration.
+        """
+        self.object_size["um_per_px"] = float(value)
+
+        if hasattr(self, 'range_slider'):
+            self.range_slider.refresh_labels()
+
+        if getattr(self, 'result', None) is not None:
+            self.print_result(self.result)
+
+    def _shape_to_filter_size(self, image):
+        if image is None or not hasattr(image, "shape") or len(image.shape) < 2:
+            return None
+        return int(image.shape[1]), int(image.shape[0])
+
+    def _get_detection_filter_size(self, detection=None, fallback=(512, 512)):
+        """
+        Return image size as (width, height) for detector bbox area filtering.
+        """
+        if hasattr(detection, "attrs"):
+            image_size = detection.attrs.get("image_size")
+            if image_size is not None and len(image_size) == 2:
+                return int(image_size[0]), int(image_size[1])
+
+        current_model = self.__dict__.get("model")
+        cell_counter = getattr(current_model, "cell_counter", None)
+        image_size = self._shape_to_filter_size(
+            getattr(cell_counter, "original_image", None)
+        )
+        if image_size is not None:
+            return image_size
+
+        for key in ("image_display_base", "image_inference"):
+            image_size = self._shape_to_filter_size(get_global(key))
+            if image_size is not None:
+                return image_size
+
+        return fallback
     # def update_lineWidth(self):
-    #     # Получаем значение из QLineEdit
+    #     # Get value from QLineEdit
     #     input_text = self.LineWidth_edit.text()
 
-    #     # Проверяем, является ли введённое значение числом
+    #     # Check if the entered value is a number
     #     try:
-    #         # Преобразуем в число с плавающей точкой
+    #         # Convert to float
     #         line_width = float(input_text)
 
     #         self.object_size["line_width"] = round(line_width, 2)
     #         self.LineWidth_edit.setText(f"{float(input_text):.2f}")
 
     #     except ValueError:
-    #         # Если введено некорректное значение, устанавливаем стандартное значение
+    #         # If invalid value, set default
     #         size = self.object_size["line_width"]
     #         self.LineWidth_edit.setText(f"{size:.2f}") 
 
@@ -311,33 +465,71 @@ class CellDetectorPlugin(BasePlugin):
             pass
 
     def set_size(self, detection, img_size : tuple = (512,512)):
-        min_size, max_size = self.default_object_size["min_size"], self.default_object_size["max_size"]
-        model = self.combo_box.currentText()
-        if all(len(cell) >= 4 for cell in detection):
-            img_sq = img_size[0] * img_size[1]
-            # Вычисляем произведения для каждого 
-            values = [cell[2] * cell[3] for cell in detection] 
-            if values:
-                # Находим максимальное и минимальное произведение
-                min_size_from_detection = min(values) / img_sq
-                max_size_from_detection = max(values) / img_sq
-                if self.lsm_filesList or model != "All_models":
-                    if min_size_from_detection >= min_size:
-                        min_size = None
-                    else:
-                        min_size = min_size_from_detection
-                    if max_size_from_detection <= max_size:
-                        max_size = None
-                    else:
-                        max_size = max_size_from_detection
+        """
+        Set the size based on detection.
+        
+        Args:
+            detection: Detection data.
+            img_size: Image size.
+        """
+        if detection is None or len(detection) == 0:
+            self.range_slider.change_default(0.0, 1.0)
+            return
+
+        try:
+            # Full dataframe from segmentation models: use morphology area directly
+            if hasattr(detection, "columns") and "area" in detection.columns:
+                values = detection["area"].dropna().tolist()
+                if values:
+                    self.range_slider.change_default(min(values), max(values))
                 else:
-                    min_size = min_size_from_detection
-                    max_size = max_size_from_detection
+                    self.range_slider.change_default(0.0, 1.0)
+                return
+
+            # Series/list of boxes
+            values = []
+            image_size = self._get_detection_filter_size(detection, img_size)
+            img_sq = image_size[0] * image_size[1]
+
+            if hasattr(detection, "columns") and "box" in detection.columns:
+                box_rows = (
+                    (row["box"], row["scale"] if "scale" in row else 1.0)
+                    for _, row in detection.iterrows()
+                )
             else:
-                min_size = None
-                max_size = None
-        if min_size is not None and max_size is not None:
-            self.range_slider.change_default(min_size=min_size, max_size=max_size)
+                box_rows = ((cell, 1.0) for cell in detection)
+
+            for cell, scale in box_rows:
+                try:
+                    box = np.asarray(cell, dtype=np.float64).reshape(-1)
+                except (TypeError, ValueError):
+                    continue
+                if box.size < 4 or not np.isfinite(box[:4]).all():
+                    continue
+
+                width = max(0.0, float(box[2]))
+                height = max(0.0, float(box[3]))
+                try:
+                    scale = float(scale)
+                except (TypeError, ValueError):
+                    scale = 1.0
+                if not np.isfinite(scale):
+                    scale = 1.0
+
+                # If widths/heights are normalized, area is already normalized.
+                if 0.0 <= width <= 1.0 and 0.0 <= height <= 1.0 and scale == 1.0:
+                    values.append(width * height)
+                elif img_sq > 0:
+                    values.append((width * scale) * (height * scale) / img_sq)
+
+            if values:
+                self.range_slider.change_default(min(values), max(values))
+            else:
+                self.range_slider.change_default(0.0, 1.0)
+
+        except Exception as e:
+            app_logger().exception(e)
+            self.range_slider.change_default(0.0, 1.0)
 
     def calculate_button(self):
         """
@@ -370,14 +562,13 @@ class CellDetectorPlugin(BasePlugin):
         model = self.combo_box.currentText()
 
         # Check if a method and file are selected
-        if model == "" or self.lsm_path is None:
-            # If not, show a warning dialog and return
+        if not model or self.lsm_path is None:
             self.plugin_signal.emit("show_warning", "Warning\n\nChoose model and file.")
             return 0
 
         # If a specific method is selected
         button_enabled = self.button.isEnabled()
-        self.button.setText("Calculating.....")
+        self.button.setText("Calculating...")
         self.button.setEnabled(False)
         self.button.repaint()
         
@@ -388,6 +579,16 @@ class CellDetectorPlugin(BasePlugin):
                 # Remove progress_callback from kwargs if present since call_inference doesn't need it
                 kwargs.pop('progress_callback', None)
                 return self.call_inference(*args, **kwargs)
+
+            self.result = None
+
+            # Connect signals before the worker starts so fast runs cannot be missed.
+            def on_completion(result):
+                self.result = result
+
+            def on_error(error_msg):
+                self.result = None
+                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
             
             wait_window = run_with_wait_window(
                 inference_wrapper, 
@@ -395,21 +596,10 @@ class CellDetectorPlugin(BasePlugin):
                 title="Image Processing", 
                 info_text="Processing image...", 
                 parent=self.parent(),
-                threaded=True
+                threaded=True,
+                on_completed=on_completion,
+                on_failed=on_error
             )
-            
-            # Connect signals to handle completion
-            def on_completion(result):
-                self.result = result
-                
-            def on_error(error_msg):
-                self.result = None
-                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
-
-            if hasattr(wait_window, 'process_completed'):
-                wait_window.process_completed.connect(on_completion)
-            if hasattr(wait_window, 'process_failed'):
-                wait_window.process_failed.connect(on_error)
 
             # Wait for completion (this will block until thread finishes)
             if hasattr(wait_window, 'isVisible'):
@@ -417,7 +607,7 @@ class CellDetectorPlugin(BasePlugin):
                     QApplication.processEvents()
                     time.sleep(0.01)
                 
-            result = getattr(self, 'result', None)
+            result = getattr(wait_window, 'result', None)
         finally:
             self.button.setText("Calculate")
             self.button.setEnabled(button_enabled)
@@ -427,7 +617,14 @@ class CellDetectorPlugin(BasePlugin):
         if not result:
             return 0
 
-        set_global('detections',self.model.cell_counter.detections if self.model and self.model.cell_counter else None)
+        set_global(
+            'detections',
+            self.model.cell_counter.detections
+            if self.model and self.model.cell_counter
+            else unwrap_prediction_cells(result.get('Cells'))
+            if isinstance(result, dict)
+            else None,
+        )
         
         # Create QGraphicsTextItems to display the results
         self.results_text.clear()
@@ -440,9 +637,19 @@ class CellDetectorPlugin(BasePlugin):
         self.draw_bounding_box()
 
     def call_inference(self, model):
+        """
+        Call inference for the given model.
+        
+        Args:
+            model: Model name.
+            
+        Returns:
+            Result of inference.
+        """
         try:
                     # Attempt to calculate the result using the selected method
-            if self.model and (self.model == self.model.model_name):
+            if self.model and getattr(self.model, 'model_name', None) == model:
+                self.model.cell_counter.original_image_path = self.lsm_path
                 result = self.model.calculate(
                             img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                                 nuclei_channel=self.parametrs['Nuclei'])
@@ -450,12 +657,14 @@ class CellDetectorPlugin(BasePlugin):
                 if self.model:
                     del self.model
                     self.model = None
-                self.model = Model(path=self.models[model]['path'],
-                                        object_size=self.models[model]['object_size'],
-                                        model_type=self.models[model]['model_type'],
-                                        model_data=self.models[model],
-                                        model_name=model
-                                        )
+                self.model = Model(logger=app_logger(),
+                                   get_registered_model=get_registered_model,
+                                   path=self.models[model]['path'],
+                                   object_size=self.models[model]['object_size'],
+                                   model_type=self.models[model]['model_type'],
+                                   model_data=self.models[model],
+                                   model_name=model
+                                   )
                 self.model.cell_counter.original_image_path = self.lsm_path
                 result = self.model.calculate(
                             img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
@@ -472,11 +681,13 @@ class CellDetectorPlugin(BasePlugin):
                     del self.model
                     self.model = None
                     a_path = self.models[model]['path']
-                    self.model = Model(path=a_path,
-                                            object_size=self.models[model]['object_size'],
-                                            model_type=self.models[model]['model_type'],
-                                            model_data=self.models[model],
-                                            model_name=model)
+                    self.model = Model(logger=app_logger(),
+                                       get_registered_model=get_registered_model,
+                                       path=a_path,
+                                       object_size=self.models[model]['object_size'],
+                                       model_type=self.models[model]['model_type'],
+                                       model_data=self.models[model],
+                                       model_name=model)
                     self.model.cell_counter.original_image_path = self.lsm_path
                     result = self.model.calculate(img_path=self.lsm_path)
             except  Exception as e:
@@ -490,19 +701,154 @@ class CellDetectorPlugin(BasePlugin):
                     self.model = None
                         # clear the model so it can be restarted 
                 self.draw_bounding = 0
+        if result is not None and self.model is not None:
+            publish_inference_image(self.model, result)
+            self.render_model_result(self.model, result)
         return result
 
+    def render_model_result(
+        self,
+        model,
+        result,
+        filename=IMAGE_FILE_NAME_DETECTION,
+        update_global_detections=True,
+    ):
+        """
+        Render raw detection data returned by a model call.
+
+        Model classes produce the raw DataFrame and image state; this UI caller
+        turns those values into the displayed detection image.
+        """
+        if model is None or not getattr(model, "cell_counter", None):
+            return None
+
+        cell_counter = model.cell_counter
+        raw_detections = (
+            result.get("Cells")
+            if isinstance(result, dict) and "Cells" in result
+            else getattr(cell_counter, "detections", None)
+        )
+        detections = unwrap_prediction_cells(raw_detections)
+        if detections is None:
+            return None
+        if not hasattr(detections, "columns"):
+            return None
+        source_detections = unwrap_prediction_cells(
+            getattr(cell_counter, "detections", None)
+        )
+        if source_detections is None or not hasattr(source_detections, "columns"):
+            source_detections = detections
+
+        result_original_image, result_inference_image = get_prediction_images(
+            result
+        )
+        original_image = result_original_image
+        if original_image is None:
+            original_image = getattr(cell_counter, "original_image", None)
+        if original_image is None:
+            original_image = get_global("image_display_base")
+        if original_image is None:
+            original_image = get_global("image_inference")
+        if original_image is None:
+            return None
+
+        if hasattr(original_image, "copy"):
+            original_image = original_image.copy()
+
+        if hasattr(detections, "columns") and "mask" in detections.columns:
+            inference_image = result_inference_image
+            if inference_image is None:
+                inference_image = getattr(cell_counter, "inference_image", None)
+            if inference_image is None:
+                inference_image = get_global("image_inference")
+
+            counter_object_size = getattr(cell_counter, "object_size", {}) or {}
+            colormap = self.object_size.get(
+                "color_map",
+                counter_object_size.get("color_map", "tab20"),
+            )
+            alpha = self.object_size.get(
+                "alpha",
+                counter_object_size.get("alpha", 0.75),
+            )
+            color_ids = (
+                detections["id_label"].tolist()
+                if "id_label" in detections
+                else None
+            )
+            model_class_name = type(cell_counter).__name__.lower()
+            mask_coordinate_space = (
+                "inference"
+                if "instanseg" in model_class_name
+                else "original"
+            )
+            if inference_image is not None:
+                rendered_image = plot_predictions_with_alignment(
+                    original_image,
+                    inference_image,
+                    detections["mask"].tolist(),
+                    filename=filename,
+                    colormap=colormap,
+                    alpha=alpha,
+                    color_ids=color_ids,
+                    mask_coordinate_space=mask_coordinate_space,
+                )
+            else:
+                set_global("image_display_base", original_image.copy())
+                rendered_image = plot_predictions(
+                    original_image,
+                    detections["mask"].tolist(),
+                    filename=filename,
+                    colormap=colormap,
+                    alpha=alpha,
+                    color_ids=color_ids,
+                )
+        else:
+            set_global("image_display_base", original_image.copy())
+            rendered_image = render_detector_predictions(
+                original_image,
+                detections,
+                filename=filename,
+            )
+
+        cell_counter.prediction_image = rendered_image
+        if update_global_detections:
+            set_global("detections", source_detections)
+        if hasattr(rendered_image, "copy"):
+            set_global("image_detections", rendered_image.copy())
+        return rendered_image
+
     def calculate_single_model(self, modeltype,modelpath,object_size, image_path,model_data = None, model_name = "<not set>"):
-        model = None
-        model = Model(path=modelpath,object_size=object_size,model_type=modeltype,model_data=model_data,model_name=model)
+        """
+        Calculate for a single model.
+        
+        Args:
+            modeltype: Model type.
+            modelpath: Model path.
+            object_size: Object size.
+            image_path: Image path.
+            model_data: Model data.
+            model_name: Model name.
+            
+        Returns:
+            Tuple of images and data.
+        """
+        model = Model(logger=app_logger(),
+                      get_registered_model=get_registered_model,
+                      path=modelpath,
+                      object_size=object_size,
+                      model_type=modeltype,
+                      model_data=model_data,
+                      model_name=model_name)
         model.cell_counter.original_image_path = self.lsm_path
+        result = None
         try:
-            model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
+            result = model.calculate(img_path=image_path, cell_channel=self.parametrs['Cell'],nuclei_channel=self.parametrs['Nuclei'])
         except  Exception as e:
             traceback.print_exc()
             app_logger().error(e)
             try:
-                model.calculate(img_path=image_path)
+                result = model.calculate(img_path=image_path)
             except  Exception as e:
                 traceback.print_exc()
                 app_logger().error(e)
@@ -512,11 +858,19 @@ class CellDetectorPlugin(BasePlugin):
                     del model
                     model = None
         if model:
-            return model.cell_counter.original_image, model.cell_counter.prediction_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
+            publish_inference_image(model, result)
+            processed_image = self.render_model_result(model, result)
+            return model.cell_counter.original_image, processed_image,model.cell_counter.inference_duration,model.cell_counter.detectionCount
         else:
             return None, None, None, None
 
     def batchProcess_ProcessModelList(self,model_list):
+        """
+        Process a list of models in batch.
+        
+        Args:
+            model_list: List of model names.
+        """
         i = 1
         j = 1
         for model_name in model_list:
@@ -540,6 +894,9 @@ class CellDetectorPlugin(BasePlugin):
         return
 
     def batchProcessButton_click(self):
+        """
+        Handle batch process button click.
+        """
         self.batch_processedImages = []
         self.batch_labels = []
         try:
@@ -549,7 +906,7 @@ class CellDetectorPlugin(BasePlugin):
             dlg = ModelsCheckListDialog(items, self.checked_indices, parent=self.parent())
             #set to resonable height to fit most of models
             dlg.resize(300,383)
-            if dlg.Execute():
+            if dlg.execute():
                 checked = dlg.get_checked_items()
             else:
                 return
@@ -564,27 +921,24 @@ class CellDetectorPlugin(BasePlugin):
                 kwargs.pop('progress_callback', None)
                 self.batchProcess_ProcessModelList(model_list)
                 return
-            
+
+            # Connect signals before the worker starts so fast runs cannot be missed.
+            def on_completion(result):
+                pass
+
+            def on_error(error_msg):
+                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
+
             wait_window = run_with_wait_window(
                 inference_wrapper, 
                 title="Image Processing", 
                 info_text="Processing image...", 
                 parent=self.parent(),
-                threaded=True
+                threaded=True,
+                on_completed=on_completion,
+                on_failed=on_error
             )
             self.batch_wait_window = wait_window
-
-            # Connect signals to handle completion
-            def on_completion(result):
-                pass
-                
-            def on_error(error_msg):
-                self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
-
-            if hasattr(wait_window, 'process_completed'):
-                wait_window.process_completed.connect(on_completion)
-            if hasattr(wait_window, 'process_failed'):
-                wait_window.process_failed.connect(on_error)
 
             # Wait for completion (this will block until thread finishes)
             if hasattr(wait_window, 'isVisible'):
@@ -605,6 +959,18 @@ class CellDetectorPlugin(BasePlugin):
 
 
     def batchProcess_MultiImage(self, model_type, modepath, object_size, file_path, model_data , model_name, files):
+        """
+        Process multiple images in batch.
+        
+        Args:
+            model_type: Model type.
+            modepath: Model path.
+            object_size: Object size.
+            file_path: File path.
+            model_data: Model data.
+            model_name: Model name.
+            files: List of files.
+        """
         i = 1
         for file_path in files:
             image_name = os.path.basename(file_path)
@@ -619,6 +985,9 @@ class CellDetectorPlugin(BasePlugin):
         pass
 
     def batchProcessMultiImageButton_click(self):
+        """
+        Handle batch process multi image button click.
+        """
         try:
             savedEnabled = self.batchProcessButtonMultiImage.isEnabled()
             saved_lsm_path = self.lsm_path
@@ -658,14 +1027,11 @@ class CellDetectorPlugin(BasePlugin):
                     title="Image Processing", 
                     info_text="Processing image...", 
                     parent=self.parent(),
-                    threaded=True
+                    threaded=True,
+                    on_completed=on_completion,
+                    on_failed=on_error
                 )
                 self.batch_wait_window = wait_window
-
-                if hasattr(wait_window, 'process_completed'):
-                    wait_window.process_completed.connect(on_completion)
-                if hasattr(wait_window, 'process_failed'):
-                    wait_window.process_failed.connect(on_error)
 
                 # Wait for completion (this will block until thread finishes)
                 if hasattr(wait_window, 'isVisible'):
@@ -690,71 +1056,155 @@ class CellDetectorPlugin(BasePlugin):
             self.batchProcessButtonMultiImage.setText(f"Current model on multiple images")
         
     def print_result(self, result):
+        """
+        Print the result based on model type.
+        
+        Args:
+            result: Result data.
+        """
         model = self.combo_box.currentText()
         if model == "Detector":
             self.print_result_detector(result)
         else:
             self.print_result_segmenter(result)
 
+    def _format_value(self, label, value_permyriad, value_um=None, unit_um="µm"):
+        """
+        Format value for display.
+        
+        Args:
+            label: Label for the value.
+            value_permyriad: Value in permyriad.
+            value_um: Value in micrometers.
+            unit_um: Unit for micrometers.
+            
+        Returns:
+            Formatted string.
+        """
+        if value_permyriad in ("-", None):
+            return f"{label}: -"
+
+        value_permyriad = f"{float(value_permyriad):.2f}"
+
+        if value_um is None:
+            return f"{label}: {value_permyriad}‱"
+
+        value_um = f"{float(value_um):.2f}"
+        return f"{label}: {value_permyriad}‱ ({value_um} {unit_um})"
+
     def print_result_detector(self, result):
+        """
+        Print result for detector model.
+        
+        Args:
+            result: Result data.
+        """
         results = []
-        # Добавить количество клеток
+        # Add number of cells
         results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
         # try:
         #     results.append(f'Cells: {result["Cells"]["box"].shape[0]}')
         # except:
         #     results.append(f'Cells: {result["Cells"]}')
+
+        average_arithmetic_diameter_permyriad = "-"
+        average_geometric_diameters_permyriad = "-"
+        average_area_permyriad = "-"
+
+        average_arithmetic_diameter_um = None
+        average_geometrics_diameter_um = None
+        average_area_um2 = None
+
         try:
             boxes = result["Cells"]["box"]
 
-            # Извлечение длины и ширины (второй и третий элемент в массивах)
+            # Extract length and width in pixels (second and third elements in arrays)
             lengths = boxes.apply(lambda x: x[2])
             widths = boxes.apply(lambda x: x[3])
 
-            img_area = self.model.cell_counter.original_image.shape[0] * self.model.cell_counter.original_image.shape[0]
+            image_h = self.model.cell_counter.original_image.shape[0]
+            image_w = self.model.cell_counter.original_image.shape[1]
+            img_area = image_h * image_w
 
-            # Вычисление диагоналей (диаметры)
-            arithmetic_diameters = (lengths + widths) / 2
-            geometric_diameters = (lengths * widths)**(1/2)
+            # Calculate diagonals (diameters)
+            arithmetic_diameters_px = (lengths + widths) / 2
+            geometric_diameters_px = (lengths * widths)**(1/2)
 
-            # Вычисление площадей
-            areas = lengths * widths
+            # Calculate areas
+            areas_px2 = lengths * widths
+            average_area_px2 = areas_px2.mean()
 
-            average_arithmetic_diameter = arithmetic_diameters.mean() / img_area * 10000
-            average_geometric_diameters = geometric_diameters.mean() / img_area * 10000
-            average_area = areas.mean() / img_area * 10000
-        except:
-            average_arithmetic_diameter = "-"
-            average_geometric_diameters = "-"
-            average_area = "-"
+            img_linear = (image_h + image_w) / 2.0
+            average_arithmetic_diameter_permyriad = round(arithmetic_diameters_px.mean() / img_linear * 10000, 2)
+            average_geometric_diameters_permyriad = round(geometric_diameters_px.mean() / img_linear * 10000, 2)
+            average_area_permyriad = round(average_area_px2 / img_area * 10000, 2)
 
-        results.append(f"Mean S: {average_area}‱")
-        results.append(f"Mean Arithmetic D: {round(average_arithmetic_diameter, 2)}‱")
-        results.append(f"Mean Geometric D: {round(average_geometric_diameters, 2)}‱")
+            um_per_px = self.object_size.get("um_per_px")
+            if um_per_px is not None:
+                average_arithmetic_diameter_um = round(arithmetic_diameters_px.mean() * um_per_px, 2)
+                average_geometrics_diameter_um = round(geometric_diameters_px.mean() * um_per_px, 2)
+                average_area_um2 = round(average_area_px2 * (um_per_px ** 2), 2)
+
+        except Exception:
+            pass
+
+        results.append(
+            self._format_value(
+                "Mean S",
+                average_area_permyriad,
+                average_area_um2,
+                "µm²"
+            )
+        )
+
+        results.append(
+            self._format_value(
+                "Mean Arithmetic D",
+                average_arithmetic_diameter_permyriad,
+                average_arithmetic_diameter_um,
+                "µm"
+            )
+        )
+
+        results.append(
+            self._format_value(
+                "Mean Geometric D",
+                average_geometric_diameters_permyriad,
+                average_geometrics_diameter_um,
+                "µm"
+            )
+        )
+
         results.append("")
 
-        # Добавить количество ядер
+        # Add number of nuclei
         if result["Nuclei"] == -100:
             results.append('Nuclei: -')
         else:
             results.append(f'Nuclei: {result["Nuclei"]}')
 
-        # Добавить процент живых
+        # Add percentage alive
         if result["%"] == -100:
             results.append('Alive: -')
         else:
             results.append(f'Alive: {result["%"]}%')
 
-        # Шрифт для всех элементов - not needed for text edit
+        # Font for all elements - not needed for text edit
         
-        # Добавляем текстовые элементы в text edit
+        # Add text elements to text edit
         result_text = "\n".join(results)
         self.results_text.setPlainText(result_text)
 
     def print_result_segmenter(self, result):
+        """
+        Print result for segmenter model.
+        
+        Args:
+            result: Result data.
+        """
         spheroid_df = result["Cells"]
 
-        # Вычисление средних значений и количества строк
+        # Calculate average values and number of rows
         try:
             avg_diameter = spheroid_df["diameter"].mean()
             avg_area = spheroid_df["area"].mean()
@@ -763,13 +1213,36 @@ class CellDetectorPlugin(BasePlugin):
             inference_duration = -1
             if self.model:
                 inference_duration = self.model.inference_duration
-            # Создание строк для вывода
+
+            avg_diameter_permyriad = round(avg_diameter * 10000, 3)
+            avg_area_permyriad = round(avg_area * 10000, 3)
+            avg_volume_permyriad = round(avg_volume * 10000, 3)
+
+            avg_diameter_um = None
+            avg_area_um2 = None
+            avg_volume_um3 = None
+
+            um_per_px = self.object_size.get("um_per_px")
+            if um_per_px is not None:
+                image_h = self.model.cell_counter.original_image.shape[0]
+                image_w = self.model.cell_counter.original_image.shape[1]
+
+                avg_diameter_px = avg_diameter * image_w
+                avg_area_px2 = avg_area * image_h * image_w
+                linear_scale_px = (image_h + image_w) / 2
+                avg_volume_px3 = avg_volume * (linear_scale_px ** 3)
+
+                avg_diameter_um = round(avg_diameter_px * um_per_px, 2)
+                avg_area_um2 = round(avg_area_px2 * (um_per_px ** 2), 2)
+                avg_volume_um3 = round(avg_volume_px3 * (um_per_px ** 3), 2)
+
+            # Create strings for output
             results = [
                 f"Objects detected: {num_cells}",
                 f"Duration        : {inference_duration:.2f} seconds",
-                f"Mean D: {round(avg_diameter*10000, 3)}‱",
-                f"Mean S: {round(avg_area*10000, 3)}‱",
-                f"Mean V: {round(avg_volume*10000, 3)}‱",
+                self._format_value("Mean D", avg_diameter_permyriad, avg_diameter_um, "µm"),
+                self._format_value("Mean S", avg_area_permyriad, avg_area_um2, "µm²"),
+                self._format_value("Mean V", avg_volume_permyriad, avg_volume_um3, "µm³"),
             ]
         except:
             results = [
@@ -782,14 +1255,14 @@ class CellDetectorPlugin(BasePlugin):
         # try:
         # except AttributeError:
         #     num_cells = spheroid_df
-        #     # Создание строк для вывода
+        #     # Create strings for output
         #     results = [
         #         f"Cells detected: {num_cells}"
         #     ]
 
-        # Настройки для шрифта и отображения - not needed for text edit
+        # Settings for font and display - not needed for text edit
         
-        # Добавление строк в text edit
+        # Add strings to text edit
         result_text = "\n".join(results)
         self.results_text.setPlainText(result_text)
 
@@ -815,14 +1288,11 @@ class CellDetectorPlugin(BasePlugin):
 
         try:
             # Handle different display modes based on show_boundry flag
-            if self.show_boundry == 0:  # Original
-                # Show the original image
+            if self.show_boundry == self.DISPLAY_MODE_ORIGINAL:
                 self.plugin_signal.emit("add_image", self.lsm_path)
-            elif self.show_boundry == 2:  # Inference
-                # Show the inference image (if available)
-                    self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_INGFERENCE)
-            elif self.show_boundry == 1:  # Detections
-                # Show the image with bounding box detections
+            elif self.show_boundry == self.DISPLAY_MODE_INFERENCE:
+                self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_INGFERENCE)
+            elif self.show_boundry == self.DISPLAY_MODE_DETECTIONS:
                 self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_DETECTION)
             else:
                 # Default to original image
@@ -843,12 +1313,12 @@ class CellDetectorPlugin(BasePlugin):
         # Get the ID of the selected button (0=Original, 1=Detections, 2=Inference)
         selected_id = self.display_group.id(button)
         
-        if selected_id == 0:  # Original
-            self.show_boundry = 0
-        elif selected_id == 1:  # Detections
-            self.show_boundry = 1
-        elif selected_id == 2:  # 
-            self.show_boundry = 2
+        if selected_id == self.DISPLAY_MODE_ORIGINAL:
+            self.show_boundry = self.DISPLAY_MODE_ORIGINAL
+        elif selected_id == self.DISPLAY_MODE_DETECTIONS:
+            self.show_boundry = self.DISPLAY_MODE_DETECTIONS
+        elif selected_id == self.DISPLAY_MODE_INFERENCE:
+            self.show_boundry = self.DISPLAY_MODE_INFERENCE
             
         # Redraw with the new display mode
         self.draw_bounding_box()
@@ -865,40 +1335,62 @@ class CellDetectorPlugin(BasePlugin):
         if detections is None:
             return
         
-        filtered_detections = filter_detections(detections, min_size=min_value, max_size=max_value)        
-        
-        # Check if filtered_detections has 'mask' key and is valid
-        if filtered_detections is not None and 'mask' in filtered_detections and filtered_detections['mask'] is not None:
-            plot_predictions(
-                get_global('image_inference'), 
-                filtered_detections['mask'].tolist(), 
-                filename=IMAGE_FILE_NAME_DETECTION, 
-                colormap=self.object_size["color_map"], 
-                alpha=self.object_size.get("alpha", 0.75)
+        if hasattr(detections, "columns") and all(c in detections.columns for c in ["area", "mask"]):
+            filtered_detections = filter_segmentation_detections(
+                detections,
+                min_size=min_value,
+                max_size=max_value,
+                size_metric=self.object_size.get("size_metric", "area")
             )
         else:
-            image = get_global('image_inference').copy()
-            for i in range(filtered_detections.shape[0]):
-                draw_bounding_box(
-                    image,
-                    filtered_detections.iloc[i,0],
-                    filtered_detections.iloc[i,2],
-                    round(filtered_detections.iloc[i,3][0] * filtered_detections.iloc[i,4]),
-                    round(filtered_detections.iloc[i,3][1] * filtered_detections.iloc[i,4]),
-                    round((filtered_detections.iloc[i,-2][0] + filtered_detections.iloc[i,-2][2]) * filtered_detections.iloc[i,-1]),
-                    round((filtered_detections.iloc[i,-2][1] + filtered_detections.iloc[i,-2][3]) * filtered_detections.iloc[i,-1]),
+            from model.utils import filter_detections
+            filtered_detections = filter_detections(
+                detections,
+                min_size=min_value,
+                max_size=max_value,
+                img_size=self._get_detection_filter_size(detections)
+            )
+
+        current_model = getattr(self, "model", None)
+        if current_model is not None:
+            self.render_model_result(
+                current_model,
+                {"Cells": filtered_detections},
+                update_global_detections=False,
+            )
+        else:
+            # Fallback for tests or partially initialized plugin instances.
+            image = get_global('image_display_base')
+            if image is None:
+                image = get_global('image_inference')
+            if image is None:
+                return
+            if filtered_detections is not None and 'mask' in filtered_detections:
+                plot_predictions(
+                    image.copy(),
+                    filtered_detections['mask'].tolist(),
+                    filename=IMAGE_FILE_NAME_DETECTION,
+                    colormap=self.object_size["color_map"],
+                    alpha=self.object_size.get("alpha", 0.75),
+                    color_ids=filtered_detections['id_label'].tolist() if 'id_label' in filtered_detections else None
                 )
-                
-            try:
-                os.remove(IMAGE_FILE_NAME_DETECTION)
-            except:
-                pass
-            safe_image_write(image, IMAGE_FILE_NAME_DETECTION)
+            else:
+                render_detector_predictions(
+                    image.copy(),
+                    filtered_detections,
+                    filename=IMAGE_FILE_NAME_DETECTION,
+                )
 
         self.draw_bounding_box()
         return
 
     def on_state_changed_scale(self, state):
+        """
+        Handle scale checkbox state change.
+        
+        Args:
+            state: Checkbox state.
+        """
         if state and self.x10checkbox.isEnabled():
             self.object_size["scale"] = 10
         else:
@@ -906,8 +1398,11 @@ class CellDetectorPlugin(BasePlugin):
         self.reset_detection()
 
     def currentModelChanged(self):
-        self.default_object_size['min_size'] = 100
-        self.default_object_size['max_size'] = 0
+        """
+        Handle model selection change.
+        """
+        self.default_object_size['min_size'] = 0.0
+        self.default_object_size['max_size'] = 1.0
         
         # Reset range slider to default values
         if hasattr(self, 'range_slider'):
@@ -919,6 +1414,9 @@ class CellDetectorPlugin(BasePlugin):
             self.x10checkbox.setEnabled("x10" in model_data)
 
     def init_rightLayout(self):
+        """
+        Initialize the right layout UI components.
+        """
         plugin_label = QLabel(self.get_name())
         plugin_label.setFont(QFont("Arial", 32))
         # Create a combo box to choose models
@@ -1065,39 +1563,67 @@ class CellDetectorPlugin(BasePlugin):
 
         self.colormap_combo = QComboBox()
         self.colormap_combo.setFont(QFont("Arial", 16))
+        self.colormap_combo.setMinimumWidth(120)
 
         self.colormaps =  self.object_size["color_map_list"]
         self.colormap_combo.addItems(self.colormaps)
-        self.colormap_combo.setCurrentText(self.object_size['color_map'])  # Установить "Viridis" по умолчанию
+        self.colormap_combo.setCurrentText(self.object_size['color_map'])  # Set "Viridis" as default
         self.colormap_combo.currentTextChanged.connect(self.update_colormap)
         
         # Create alpha combo box
         alpha_label = QLabel("Alpha:")
-        alpha_label.setFont(QFont("Arial", 24))
+        alpha_label.setFont(QFont("Arial", 16))
         
         self.alpha_combo = QComboBox()
         self.alpha_combo.setFont(QFont("Arial", 16))
+        self.alpha_combo.setMinimumWidth(80)
         
         # Add alpha values
         alpha_values = ["100%", "75%", "50%", "25%"]
         self.alpha_combo.addItems(alpha_values)
-        self.alpha_combo.setCurrentText("75%")  # Default to 75%
+        self.alpha_combo.setCurrentText(self.DEFAULT_ALPHA_TEXT)  # Default to 75%
         self.alpha_combo.currentTextChanged.connect(self.update_alpha)
         
         # Initialize alpha in object_size
-        self.object_size["alpha"] = 0.75  # Default 75%
+        self.object_size["alpha"] = self.DEFAULT_ALPHA_VALUE  # Default 75%
+
+        um_per_px_label = QLabel("um per px:")
+        um_per_px_label.setFont(QFont("Arial", 16))
+
+        self.um_per_px_spin = QDoubleSpinBox()
+        self.um_per_px_spin.setFont(QFont("Arial", 16))
+        self.um_per_px_spin.setDecimals(6)
+        self.um_per_px_spin.setRange(0.000001, 1000.0)
+        self.um_per_px_spin.setSingleStep(0.001)
+        self.um_per_px_spin.setMinimumWidth(120)
+        self.um_per_px_spin.setValue(float(self.object_size.get("um_per_px", 0.325)))
+        self.um_per_px_spin.valueChanged.connect(self.update_um_per_px)
         
         # Create horizontal layout for colormap and alpha
         colormap_layout = QHBoxLayout()
+        colormap_layout.setContentsMargins(0, 0, 0, 0)
         colormap_layout.addWidget(colormap_label)
         colormap_layout.addWidget(self.colormap_combo)
-        colormap_layout.addSpacing(20)
-        #colormap_layout.addWidget(alpha_label)
+        colormap_layout.addSpacing(12)
+        colormap_layout.addWidget(alpha_label)
         colormap_layout.addWidget(self.alpha_combo)
+        colormap_layout.addStretch()
+
+        calibration_layout = QHBoxLayout()
+        calibration_layout.setContentsMargins(0, 0, 0, 0)
+        calibration_layout.addWidget(um_per_px_label)
+        calibration_layout.addWidget(self.um_per_px_spin)
+        calibration_layout.addStretch()
+
+        settings_layout = QVBoxLayout()
+        settings_layout.setContentsMargins(0, 0, 0, 0)
+        settings_layout.setSpacing(8)
+        settings_layout.addLayout(colormap_layout)
+        settings_layout.addLayout(calibration_layout)
         
         # Create widget to contain the horizontal layout
         colormap_widget = QWidget()
-        colormap_widget.setLayout(colormap_layout)
+        colormap_widget.setLayout(settings_layout)
 
         # Add widgets to the right layout with spacing
         ###self.right_layout.addWidget(label)

@@ -1,3 +1,16 @@
+"""
+Logging and error handling utilities for the application.
+
+Provides custom logging handlers, error message formatting, and
+event-driven log emission. Includes LogEventEmitter for PyQt5
+integration and EventFileHandler for file-based logging.
+
+Key components:
+- LogEventEmitter: PyQt5 signals for log events
+- EventFileHandler: File handler that emits log signals
+- app_logger: Central logging utility function
+"""
+
 # Standard library imports
 import glob
 import logging
@@ -84,6 +97,12 @@ def cleanup_old_logs():
 
 # Configure your logger (do this once, typically at the start of your app)
 def setup_logging():
+    """
+    Set up logging with console and file handlers.
+    
+    Returns:
+        logging.Logger: The configured root logger.
+    """
     # Create logs directory if it doesn't exist
     logs_dir = "logs"
     if not os.path.exists(logs_dir):
@@ -148,6 +167,12 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     msgbox.exec_()
     
 def app_logger():
+    """
+    Get the application logger instance.
+    
+    Returns:
+        logging.Logger: The application logger.
+    """
     return app_logger_int
 
 class LoggerWriter:
@@ -167,16 +192,20 @@ class LoggerWriter:
         
         # Also write to original stdout/stderr for console visibility
         if self.level == logging.INFO:
-            sys.__stdout__.write(message)
+            if sys.__stdout__ is not None:
+                sys.__stdout__.write(message)
         else:
-            sys.__stderr__.write(message)
+            if sys.__stderr__ is not None:
+                sys.__stderr__.write(message)
 
     def flush(self):
         # Flush the original streams
         if self.level == logging.INFO:
-            sys.__stdout__.flush()
+            if sys.__stdout__ is not None:
+                sys.__stdout__.flush()
         else:
-            sys.__stderr__.flush()
+            if sys.__stderr__ is not None:
+                sys.__stderr__.flush()
 
 def setup_console_logging():
     """

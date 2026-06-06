@@ -4,35 +4,80 @@
 import math
 import os
 import shutil
-import sys
+from typing import Any, cast, Iterable, Optional
 
 # Third-party imports
 import cv2
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
-import torch
 import tiffile
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-
-# Scientific computing imports
-from collections import OrderedDict
+import torch
 from csbdeep.utils import normalize
+from PyQt5.QtWidgets import QMessageBox
 from skimage.color import gray2rgb, rgb2gray
 from skimage.io import imsave
 from skimage.transform import resize
 from ultralytics.engine.results import Results
 
-# Third-party imports
-from PyQt5.QtWidgets import QMessageBox
-
-from UI.app_globals import IMAGE_FILE_NAME_DETECTION, IMAGE_FILE_NAME_GRID, IMAGE_FILE_NAME_INGFERENCE, IMAGE_FILE_NAME_TMP, CASH_DIRECTORY
+# Local application imports
+from model.constants import IMAGE_FILE_NAME_TMP, CACHE_DIRECTORY
+from model.PredictionResult import unwrap_prediction_cells
 
 
 
 VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'bmp', 'lsm']
-CLASSES = ['Cell']
-COLORS = [(3,177,252)]
+
+
+def read_lsm_array(img_path):
+    """Reads the primary LSM/TIFF series as an array."""
+    with tiffile.TiffFile(img_path) as tif:
+        try:
+            return tif.series[0].asarray()
+        except (IndexError, ValueError):
+            return tif.pages[0].asarray()
+
+
+def lsm_to_channels_last(image):
+    """Normalizes LSM arrays to (height, width, channels)."""
+    image = np.asarray(image)
+    if image.ndim == 0:
+        return image.reshape(1, 1, 1)
+    if image.ndim == 1:
+        return image.reshape(1, 1, image.shape[0])
+    if image.ndim == 2:
+        return image[:, :, np.newaxis]
+
+    if image.ndim > 3:
+        image = np.squeeze(image)
+        if image.ndim == 0:
+            return image.reshape(1, 1, 1)
+        if image.ndim == 1:
+            return image.reshape(1, 1, image.shape[0])
+        if image.ndim == 2:
+            return image[:, :, np.newaxis]
+        image = image.reshape((-1, image.shape[-2], image.shape[-1]))
+
+    if image.ndim != 3:
+        raise ValueError(f"Unsupported LSM image shape: {image.shape}")
+
+    if (
+        image.shape[0] <= 8
+        and (
+            image.shape[1] > 8
+            or image.shape[2] > 8
+            or (image.shape[0] > 1 and image.shape[2] <= 1)
+        )
+    ):
+        return np.transpose(image, (1, 2, 0))
+
+    if image.shape[-1] <= 8 and image.shape[0] > 8 and image.shape[1] > 8:
+        return image
+
+    if image.shape[-1] in (3, 4):
+        return image
+
+    return np.transpose(image, (1, 2, 0))
 
 
 def safe_image_read(img_path, color_mode='color', channel=None):
@@ -55,17 +100,15 @@ def safe_image_read(img_path, color_mode='color', channel=None):
         extension = img_path.split('.')[-1].lower()
         
         if extension == 'lsm':
-            # Handle LSM files with tifffile
-            import tifffile
-            with tifffile.TiffFile(img_path) as tif:
-                image = tif.pages[0].asarray()
-                if channel is not None and len(image.shape) > 2:
-                    if channel < image.shape[0]:
-                        return image[channel]
-                    else:
-                        print(f"Channel {channel} not available in LSM file")
-                        return None
-                return image
+            # Handle LSM files with tiffile
+            image = read_lsm_array(img_path)
+            if channel is not None:
+                image = lsm_to_channels_last(image)
+                if 0 <= channel < image.shape[-1]:
+                    return image[:, :, channel]
+                print(f"Channel {channel} not available in LSM file")
+                return None
+            return image
         else:
             # Handle standard image formats
             if color_mode == 'unchanged':
@@ -107,6 +150,9 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
         if image is None:
             print("Cannot save None image")
             return False
+
+        filename = os.fspath(filename)
+        image = np.asarray(image)
             
         # Ensure output directory exists
         output_dir = os.path.dirname(filename)
@@ -128,60 +174,58 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
         else:
             image_to_save = image
         
+        write_success = False
+
         # Save based on file extension
         if extension in ['jpg', 'jpeg']:
             # JPEG with quality control
-            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_JPEG_QUALITY, quality])
+            write_success = cv2.imwrite(
+                filename,
+                image_to_save,
+                [cv2.IMWRITE_JPEG_QUALITY, quality],
+            )
         elif extension == 'png':
             # PNG with compression
-            cv2.imwrite(filename, image_to_save, [cv2.IMWRITE_PNG_COMPRESSION, 1])
+            write_success = cv2.imwrite(
+                filename,
+                image_to_save,
+                [cv2.IMWRITE_PNG_COMPRESSION, 1],
+            )
+        elif extension == 'bmp':
+            write_success = cv2.imwrite(filename, image_to_save)
         elif extension in ['tif', 'tiff']:
             # Use skimage for better TIFF support
             if len(image_to_save.shape) == 3 and image_to_save.shape[2] == 3:
                 # Convert BGR to RGB for skimage
                 image_to_save = cv2.cvtColor(image_to_save, cv2.COLOR_BGR2RGB)
             imsave(filename, image_to_save)
+            write_success = os.path.exists(filename)
         else:
-            # Default to OpenCV for other formats
-            cv2.imwrite(filename, image_to_save)
+            print(f"Unsupported image extension: {extension}")
+            return False
         
-        return True
+        return bool(write_success and os.path.exists(filename))
         
     except Exception as e:
         print(f"Error saving image {filename}: {str(e)}")
         return False
 
-COLOR_NUMBER = {
-        "gist_rainbow": 20,
-        "tab20": 20,
-        "tab20b": 20,
-        "tab20c": 20,
-        "tab10": 10,
-        "Set1": 9,
-        "Set2": 8,
-        "Set3": 12,
-        "Paired": 12,
-        "viridis": 10,
-        "plasma": 10
-    }
-
 def read_lsm_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads lsm image and returns as array."""
-    with tiffile.TiffFile(img_path) as tif:
-        image = tif.pages[0].asarray()
-    if np.transpose(image, (1, 2, 0)).shape[-1] == 1:
-        return cv2.cvtColor(np.transpose(image, (1, 2, 0)), cv2.COLOR_GRAY2RGB)
-    elif np.transpose(image, (1, 2, 0)).shape[-1] == 2:
-        img = np.transpose(image, (1, 2, 0))
-        stacked_array = np.dstack((img, np.zeros((512,512)).astype('uint8')))
+    img = lsm_to_channels_last(read_lsm_array(img_path))
+    if img.shape[-1] == 1:
+        return cv2.cvtColor(img[:, :, 0], cv2.COLOR_GRAY2RGB)
+    if img.shape[-1] == 2:
+        stacked_array = np.dstack((img, np.zeros(img.shape[:2], dtype=img.dtype)))
         return stacked_array
-    elif np.transpose(image, (1, 2, 0)).shape[-1] == 3:
-        return np.transpose(image, (1, 2, 0))
-    else:
-        img = np.transpose(image, (1, 2, 0))
-        stacked_array = np.dstack((img[cell_channel], img[nuclei_channel],
-                                   np.zeros((512,512)).astype('uint8')))
-        return stacked_array
+    if img.shape[-1] == 3:
+        return img
+
+    empty_channel = np.zeros(img.shape[:2], dtype=img.dtype)
+    cell = img[:, :, cell_channel] if 0 <= cell_channel < img.shape[-1] else img[:, :, 0]
+    nuclei = img[:, :, nuclei_channel] if 0 <= nuclei_channel < img.shape[-1] else empty_channel
+    stacked_array = np.dstack((cell, nuclei, empty_channel))
+    return stacked_array
 
 def read_standard_img(img_path):
     """Reads image in grayscale jpg/png/tif/bmp which contains cells only."""
@@ -198,10 +242,7 @@ def read_standard_img(img_path):
 
 def is_image_valid(img_path: str):
     """Checks if provided image is in correct format."""
-    extension = img_path.split('.')[-1]
-    if extension.lower() in VALID_IMAGE_EXTENSIONS:
-        return True
-    return False
+    return img_path.split('.')[-1].lower() in VALID_IMAGE_EXTENSIONS
 
 def read_img(img_path, cell_channel=0, nuclei_channel=1):
     """Reads any possible image of cells (and/or nuclei)."""
@@ -210,8 +251,68 @@ def read_img(img_path, cell_channel=0, nuclei_channel=1):
     elif is_image_valid(img_path):
         return read_standard_img(img_path)
 
+
+def extract_nuclei_channel(img_path, nuclei_channel=1):
+    """Extracts the channel used for dead-cell counting from any supported image."""
+    if img_path.endswith('lsm'):
+        img = lsm_to_channels_last(read_lsm_array(img_path))
+        if 0 <= nuclei_channel < img.shape[-1]:
+            return img[:, :, nuclei_channel]
+        return None
+
+    img = safe_image_read(img_path, color_mode='unchanged')
+    if img is None:
+        return None
+
+    if img.ndim == 2:
+        return img
+
+    if img.ndim == 3:
+        if img.shape[2] == 1:
+            return img[:, :, 0]
+        if 0 <= nuclei_channel < img.shape[2]:
+            return img[:, :, nuclei_channel]
+        return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    return None
+
+def count_detected_objects(detections) -> int:
+    """Returns the number of detected objects for detector- and segmenter-style outputs."""
+    detections = unwrap_prediction_cells(detections)
+    if detections is None:
+        return 0
+    if hasattr(detections, "shape"):
+        return int(detections.shape[0])
+    return int(detections)
+
+
+def calculate_alive_percentage(cell_count: int, nuclei_count: int):
+    """Calculates alive percentage, returning -100 when it cannot be computed."""
+    if cell_count <= 0 or nuclei_count == -100:
+        return -100
+    return round((1 - nuclei_count / cell_count) * 100, 3)
+
+def _select_channel(image, channel, *, empty_on_missing=False):
+    """Return a valid channel, falling back to channel 0 or an empty image."""
+    try:
+        channel = int(channel)
+    except (TypeError, ValueError):
+        channel = -1
+
+    if image.ndim == 2:
+        if empty_on_missing and channel not in (0, None):
+            return np.zeros(image.shape, dtype=image.dtype)
+        return image
+
+    if 0 <= channel < image.shape[-1]:
+        return image[:, :, channel]
+    if empty_on_missing:
+        return np.zeros(image.shape[:2], dtype=image.dtype)
+    return image[:, :, 0]
+
+
 def calculate_lsm(cell_counter, nuclei_counter,
-                  img_path, cell_channel=0, nuclei_channel=1):
+                  img_path, cell_channel=0, nuclei_channel=1, nuclei_count=None):
     """
     Calculates the resulting target values.
     Input params are:
@@ -220,13 +321,16 @@ def calculate_lsm(cell_counter, nuclei_counter,
     - nuclei_channel: channel with stained nuclei. Default to 1.
 
     Returns the result as a dictionary with the following fields:
-    - Nuclei: count for stained nuclei detected (given lsm image only);
+    - Nuclei: count for stained nuclei detected;
     - Cells: count for all the cells detected;
-    - %: the target percentage for alive cells (given lsm image only).
+    - %: the target percentage for alive cells.
     """
-    img = read_lsm_img(img_path)
+    img = lsm_to_channels_last(read_lsm_array(img_path))
 
-    cell_img = cv2.cvtColor(img[:,:,cell_channel], cv2.COLOR_GRAY2BGR)
+    cell_img = cv2.cvtColor(
+        _select_channel(img, cell_channel),
+        cv2.COLOR_GRAY2BGR
+    )
     tmp_path = IMAGE_FILE_NAME_TMP
     safe_image_write(cell_img, tmp_path)
     cell_count = cell_counter.count_cells(tmp_path)
@@ -234,67 +338,102 @@ def calculate_lsm(cell_counter, nuclei_counter,
         os.remove(tmp_path)
     except FileNotFoundError:
         pass
-    nuclei_count = nuclei_counter.countNuclei(img[:,:,nuclei_channel])
-    percentage = (1 - nuclei_count/cell_count.shape[0]) * 100
-    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': round(percentage,3)}
+    if nuclei_count is None:
+        nuclei_img = _select_channel(img, nuclei_channel, empty_on_missing=True)
+        nuclei_count = nuclei_counter.countNuclei(nuclei_img)
+    percentage = calculate_alive_percentage(
+        count_detected_objects(cell_count),
+        nuclei_count
+    )
+    return {'Nuclei': nuclei_count, 'Cells': cell_count, '%': percentage}
 
-
-
-def draw_bounding_box(img, class_id, confidence, x, y, x_plus_w, y_plus_h, draw_mode=0):
+def filter_detections(
+    detections: pd.DataFrame,
+    min_size: float = 0.0,
+    max_size: float = 1.0,
+    img_size: Optional[tuple] = None,
+) -> pd.DataFrame:
     """
-    Draws bounding boxes on the input image based on the provided arguments.
-
-    Args:
-        img (numpy.ndarray): The input image to draw the bounding box on.
-        # img_path (str): The path to input image to draw the bounding box on.
-        # class_id (int): Class ID of the detected object.
-        # confidence (float): Confidence score of the detected object.
-        x (int): X-coordinate of the top-left corner of the bounding box.
-        y (int): Y-coordinate of the top-left corner of the bounding box.
-        x_plus_w (int): X-coordinate of the bottom-right corner of the bounding box.
-        y_plus_h (int): Y-coordinate of the bottom-right corner of the bounding box.
-    """
-    color = COLORS[0]
-    if img.shape[0] < 800:
-        thickness = 1
-    else:
-        thickness = 2
-    if draw_mode == 0:
-        cv2.rectangle(img, (x, y), (x_plus_w, y_plus_h), color, thickness)
-    else:
-        img = cv2.circle(img, (x, y), 2, color, -1)
-
-def filter_detections(detections: pd.DataFrame, min_size: float = 0.0, max_size: float = 1.0, img_size: tuple = (512,512)) -> pd.DataFrame:
-    # NOTE: this function is deprecatedand no longer used, since we have implemented new inference pipeline
-    """
-    Filters bounding boxes based on their area.
+    [DEPRECATED] Filters bounding boxes based on their area.
+    No longer used - new inference pipeline implemented.
+    
     Bboxes of size < min_size or > max_size are removed.
     Area is measured in % of image size (between 0.0 and 1.0).
-    This filtering function is implemented in October, 2024, to reduce the amount of garbage detected as cells.
 
-    Input args:
-    - detections: pd.DataFrame of detections, including bboxes in [x1, y1, w, h] format, where x1, y1 - lower-left corner coordinates;
-    - min_size: float representing the minimal possible size of bbox;
-    - max_size: float representing the maximal possible size of bbox;
-    - img_size: tuple of size 2 representing width and height of image.
+    Args:
+    - detections: pd.DataFrame of detections with bboxes in [x1, y1, w, h] format
+    - min_size: minimal possible size of bbox
+    - max_size: maximal possible size of bbox
+    - img_size: tuple (width, height) of image
 
-    Returns np.array of filtered bboxes.
+    Returns pd.DataFrame of filtered detections.
     """
-    # assert(min_size <= max_size)
     if detections.empty:
         return detections
+
+    if img_size is None:
+        img_size = detections.attrs.get("image_size", (512, 512))
+
+    min_size = 0.0 if min_size is None else float(min_size)
+    max_size = 1.0 if max_size is None else float(max_size)
+    if min_size > max_size:
+        min_size, max_size = max_size, min_size
+
     img_sq = img_size[0] * img_size[1]
-    # print(type(detections['box']))
-    # print(detections.head())
-    # print(detections['box'].head())
-    filtered_detections = detections[detections['box'].apply(lambda b: min_size <= b[2] * b[3] / img_sq <= max_size)]
-    # filtered_detections = filtered_detections[filtered_detections['box'].apply(lambda b: (min_size <= b[2] * b[3] / img_sq <= max_size).item())]
+    if img_sq <= 0:
+        return detections.iloc[0:0].copy()
+
+    def _area_ratio(row):
+        try:
+            box = np.asarray(row["box"], dtype=np.float64).reshape(-1)
+            scale = float(row["scale"]) if "scale" in row else 1.0
+        except (TypeError, ValueError, KeyError):
+            return np.nan
+        if box.size < 4 or not np.isfinite(box[:4]).all() or not np.isfinite(scale):
+            return np.nan
+        width = max(0.0, float(box[2]) * scale)
+        height = max(0.0, float(box[3]) * scale)
+        return width * height / img_sq
+
+    areas = detections.apply(_area_ratio, axis=1)
+    keep = areas.notna() & (areas >= min_size) & (areas <= max_size)
+    filtered_detections = cast(pd.DataFrame, detections.loc[keep].copy())
+    filtered_detections.attrs.update(detections.attrs)
     return filtered_detections
+
+def filter_segmentation_detections(
+    detections: pd.DataFrame,
+    min_size: float = 0.0,
+    max_size: float = 1.0,
+    size_metric: str = "area"
+) -> pd.DataFrame:
+    """
+    Filters segmentation detections using morphology-based metrics.
+    
+    Supported metrics:
+    - area: relative object area / image area
+    - diameter: relative object diameter / sqrt(image area)
+    - volume: relative object volume / image volume surrogate
+    """
+    if detections.empty:
+        return detections
+
+    metric = size_metric if size_metric in detections.columns else "area"
+
+    min_size = 0.0 if min_size is None else float(min_size)
+    max_size = 1.0 if max_size is None else float(max_size)
+
+    if min_size > max_size:
+        min_size, max_size = max_size, min_size
+
+    values = pd.to_numeric(detections[metric], errors="coerce")
+    keep = values.notna() & (values >= min_size) & (values <= max_size)
+    return cast(pd.DataFrame, detections.loc[keep].copy())
 
 def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
-    if store_bin_mask is False:
-        data = {
+    if not store_bin_mask:
+        data: dict[str, list[Any]] = {
             "id_label": [],
             "box": [],
             "mask": [],
@@ -315,21 +454,28 @@ def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataF
             "bin_mask": []
         }
     for i, _ in enumerate(outputs.masks.xyn):
-        if len(outputs.masks.xyn[i]) == 0:
-            pass
-        else:
-            data['id_label'].append(i)
-            box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
-            box[2:] -= box[:2]
-            data['box'].append(box)
-            data['mask'].append(outputs.masks.xyn[i])
-            data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
-            bin_mask, morphology = plot_mask(outputs.masks.xyn[i], image_size=outputs.orig_shape)
-            data['diameter'].append(morphology['diameter'])
-            data['area'].append(morphology['area'])
-            data['volume'].append(morphology['volume'])
-            if store_bin_mask is True:
-                data['bin_mask'].append(bin_mask)
+        try:
+            mask = np.asarray(outputs.masks.xyn[i], dtype=np.float32).reshape(-1, 2)
+        except (TypeError, ValueError):
+            continue
+        if mask.shape[0] < 3 or not np.isfinite(mask).all():
+            continue
+
+        bin_mask, morphology = plot_mask(mask, image_size=outputs.orig_shape)
+        if not bin_mask.any():
+            continue
+
+        data['id_label'].append(i)
+        box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
+        box[2:] -= box[:2]
+        data['box'].append(box)
+        data['mask'].append(mask)
+        data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
+        data['diameter'].append(morphology['diameter'])
+        data['area'].append(morphology['area'])
+        data['volume'].append(morphology['volume'])
+        if store_bin_mask is True:
+            data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
 def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
@@ -344,7 +490,7 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
     Returns:
     - pd.DataFrame of the standard form with the predictions in it.
     """
-    data = {
+    data: dict[str, list[Any]] = {
         "id_label": [],
         "box": [],
         "mask": [],
@@ -366,12 +512,27 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
                 data['diameter'].append(morphology['diameter'])
                 data['area'].append(morphology['area'])
                 data['volume'].append(morphology['volume'])
-    except:
-        print("Something wrong happenned...")
+    except Exception as e:
+        print(f"SAHI conversion failed: {e}")
     return pd.DataFrame(data)
 
 def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
-    """Converts pandas DataFrame instance to ultralytics Results for easier plotting."""
+    """
+    Convert detection DataFrame to ultralytics Results object for visualization.
+    
+    Transforms pandas DataFrame with detection columns into ultralytics Results
+    format for easy plotting and further processing.
+    
+    Args:
+        df (pd.DataFrame): Detection dataframe with columns:
+            ['confidence', 'id_label', 'box', 'bin_mask']
+        original_image (np.ndarray): Original RGB/BGR image array
+        path (str): File path for the results object
+        frame_num (int): Frame number for tracking context. Defaults to 0.
+    
+    Returns:
+        Results | None: ultralytics Results object or None if empty
+    """
     names = {}
     for n in range(100):
         names[n] = str(n)
@@ -394,7 +555,7 @@ def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
                       masks=masks, probs=probs, keypoints=None, obb=None, speed=None)
     return results
 
-def compute_iou(masks_1: list, masks_2: list) -> np.array:
+def compute_iou(masks_1: list, masks_2: list) -> tuple[NDArray, list]:
     """
     Computes IoU matrix for 2 given sets of polygon masks.
     The function is used for spheroid tracjing.
@@ -415,13 +576,14 @@ def compute_iou(masks_1: list, masks_2: list) -> np.array:
             mask_2_morphologies.append(morphology)
             intersection = np.sum(mask1 * mask2)
             union = np.sum(np.clip(mask1 + mask2, 0, 1))
-            iou_matrix[i,j] = intersection / union
+            iou_matrix[i, j] = intersection / union
     return iou_matrix, mask_2_morphologies
 
-def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
+def plot_mask(in_mask: NDArray | None, image_size=(1000, 1000)) -> tuple[NDArray[np.bool_], dict[str, float]]:
     """
-    Plots given mask on a 1000x1000 canvas for its further processing.
-    This util is used as a helper for compute_iou() function above.
+    Rasterizes a polygon mask safely and calculates morphology.
+    Handles normalized and denormalized coordinates.
+    Guards against degenerate contours and out-of-bounds points.
 
     Input params:
     - in_mask: np.array - np.array of contour points in ultralytics.engine.Results.Masks.xyn format;
@@ -433,87 +595,47 @@ def plot_mask(in_mask: np.array, image_size=(1000,1000)) -> np.array:
     - bin_mask: np.array - binary array where 0-values represent background and 1-values represent
     the foreground (the polygon for the given mask).
     """
-    if in_mask.max() > 1.0:
-        in_mask = in_mask /  np.array([image_size[1], image_size[0]])
-    coords = in_mask.reshape(-1, 2) * np.array([image_size[1], image_size[0]])
-    coords = coords.astype(np.int32)
-    bin_mask = np.zeros(image_size, dtype=np.uint8)
-    cv2.fillPoly(bin_mask, [coords], 1)
+    bin_mask: NDArray[np.uint8] = np.zeros(image_size, dtype=np.uint8)
+    if in_mask is None:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    try:
+        coords = np.asarray(in_mask, dtype=np.float32)
+    except (TypeError, ValueError):
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    if coords.size < 6:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    if coords.ndim == 1 and coords.size % 2 == 1:
+        coords = coords[:-1]
+
+    try:
+        coords = coords.reshape(-1, 2)
+    except ValueError:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+
+    coords = coords[np.isfinite(coords).all(axis=1)]
+
+    if coords.shape[0] < 3:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
+    if coords.max() <= 1.0 and coords.min() >= 0.0:
+        coords = coords * np.array([image_size[1], image_size[0]], dtype=np.float32)
+
+    coords[:, 0] = np.clip(coords[:, 0], 0, image_size[1] - 1)
+    coords[:, 1] = np.clip(coords[:, 1], 0, image_size[0] - 1)
+
+    coords = np.round(coords).astype(np.int32)
+
+    if np.unique(coords, axis=0).shape[0] < 3:
+        return bin_mask.astype(bool), calculate_morphology(bin_mask)
+    
+    cv2.fillPoly(bin_mask, [coords], (1,))
     morphology = calculate_morphology(bin_mask)
     return bin_mask.astype(bool), morphology
 
-def colormap_to_hex(cmap_name):
-    """
-    Convert a matplotlib colormap into a list of discrete HEX colors.
-    
-    Parameters:
-        cmap_name (str): Name of the colormap (e.g., 'viridis', 'plasma', etc.).        
-    Returns:
-        List[str]: List of HEX color strings.
-    """
-    color_number = {
-        "gist_rainbow": 20,
-        "tab20": 20,
-        "tab20b": 20,
-        "tab20c": 20,
-        "tab10": 10,
-        "Set1": 9,
-        "Set2": 8,
-        "Set3": 12,
-        "Paired": 12,
-        "viridis": 10,
-        "plasma": 10
-    }
-    assert cmap_name in color_number, f"incorrect colormap specified: {cmap_name}"
-    num_colors = color_number[cmap_name]
-    # Get the colormap object
-    cmap = plt.get_cmap(cmap_name)
-    color_values = [cmap(i / (num_colors - 1)) for i in range(num_colors)]
-    hex_colors = [mcolors.to_hex(c) for c in color_values]
-    return hex_colors
-
-def hex_to_bgr(hex_colors):
-    """
-    Convert a HEX color string to a BGR tuple for OpenCV.
-
-    Parameters:
-        hex_color (str): HEX color string (e.g., '#FF5733').
-    Returns:
-        Tuple[int, int, int]: BGR color tuple.
-    """
-    # Convert HEX to RGB
-    if isinstance(hex_colors, str):  # Single color
-        hex_colors = [hex_colors]
-    bgr_colors = []
-    for hex_color in hex_colors:
-        rgb = [int(c * 255) for c in mcolors.hex2color(hex_color)]
-        bgr_colors.append(tuple(reversed(rgb)))
-    return bgr_colors
-
-def denormalize_coordinates(coords, image_shape):
-    """Converts normalized coords to given image coordinates."""
-    return coords * np.array([image_shape[1], image_shape[0]])
-
-def plot_predictions(image, pred_masks, filename: str = IMAGE_FILE_NAME_DETECTION,
-                     alpha=.75, colormap="tab20"):
-    """Draws predicted masks on the image."""
-    hex_colors = hex_to_bgr(colormap_to_hex(colormap))
-    if not pred_masks:
-        print("No masks found.")
-        return
-    overlay = image.copy()
-    for i, mask in enumerate(pred_masks):
-        coords = np.array(mask)
-        color = hex_colors[i % len(hex_colors)]
-        if coords.max() <= 1.0:  # Проверка, денормализованы ли координаты (xIn или xIm)
-            coords = denormalize_coordinates(coords, image.shape)
-        coords = coords.astype(int)
-        cv2.fillPoly(overlay, [coords], color)
-    cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
-    safe_image_write(image, filename)
-    return image
-
-def calculate_morphology(bin_mask: np.array) -> dict:
+def calculate_morphology(bin_mask: NDArray[np.uint8]) -> dict:
     """
     Calculates the morphology for the given segmented object.
     The morphology includes: diameter, area, volume.
@@ -524,19 +646,30 @@ def calculate_morphology(bin_mask: np.array) -> dict:
     - volume - relative to the image volume (image area multiplied by square root of image area).
     """
     img_area = bin_mask.shape[0] * bin_mask.shape[1]
-    area = np.sum(bin_mask)
+    if img_area == 0:
+        return {'diameter': 0.0, 'area': 0.0, 'volume': 0.0}
+
+    area = float(np.sum(bin_mask))
     diameter = 2 * np.sqrt(area / np.pi)
     radius = diameter / 2
     volume = (4/3) * np.pi * radius**3
-    return {'diameter': diameter / np.sqrt(img_area), 'area': area / img_area, 'volume': volume / (img_area * np.sqrt(img_area))}
+    return {
+        'diameter': float(diameter / np.sqrt(img_area)),
+        'area': float(area / img_area),
+        'volume': float(volume / (img_area * np.sqrt(img_area))),
+    }
 
-def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, font=cv2.FONT_HERSHEY_SIMPLEX, total_images = None) -> np.ndarray:
-    # if any(img is None for img in images):
-    #     raise ValueError("One or more images could not be loaded.")
-    
+def create_image_grid(
+    images, 
+    labels, 
+    label_font_scale=0.5, 
+    label_thickness=1, 
+    font=cv2.FONT_HERSHEY_SIMPLEX, 
+    total_images=None
+) -> np.ndarray:
+    """Create a grid of images with labels."""
     # Resize all images to the same dimensions
-    #height, width = [img is not None for img in images][0].shape[:2]
-    height, width =  (next((img for img in images if img is not None), None)).shape[:2]
+    height, width = next(img for img in images if img is not None).shape[:2]
     images = [cv2.resize(img, (width, height)) for img in images]
     
     # Annotate each image with filename
@@ -571,14 +704,27 @@ def create_image_grid(images, labels, label_font_scale=0.5, label_thickness=1, f
     grid_image = np.vstack(grid_rows)
     return grid_image            
 
-def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
-    """Resize image keeping aspect ratio and pad to target size."""
+def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
+    """
+    Resize image maintaining aspect ratio and pad to target dimensions.
+    
+    Scales image to fit within target dimensions while preserving aspect ratio,
+    then zero-pads to exactly match target size (centered).
+    
+    Args:
+        image (np.ndarray): Input image (2D or 3D array)
+        target_width (int): Target image width in pixels
+        target_height (int): Target image height in pixels
+        anti_aliasing (bool): Apply Gaussian filter before downsampling. Defaults to True.
+    
+    Returns:
+        np.ndarray: Resized and padded image with shape (target_height, target_width, ...)
+    """
     h, w = image.shape[:2]
     scale = min(target_width / w, target_height / h)
     new_w, new_h = int(w * scale), int(h * scale)
 
     resized = resize(image, (new_h, new_w), anti_aliasing=anti_aliasing, preserve_range=True)
-    #resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
     resized = resized.astype(image.dtype)
     
     top = (target_height - new_h) // 2
@@ -586,9 +732,7 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
     left = (target_width - new_w) // 2
     right = target_width - new_w - left
 
-#    padded = cv2.copyMakeBorder(resized, top, bottom, left, right, borderType=cv2.BORDER_CONSTANT, value=[0, 0, 0])
-
-    # Assuming image shape: (height, width, channels) or (height, width)
+    # Calculate padding for numpy
     pad_width = (
         (top, bottom),     # pad rows (height)
         (left, right),     # pad columns (width)
@@ -598,16 +742,41 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing = True):
         padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
     # For color or multi-channel
     elif resized.ndim == 3:
-        pad_width = pad_width + ((0, 0),)  # no padding on channels
-        padded = np.pad(resized, pad_width, mode='constant', constant_values=0)
-        
+        pad_width_3d = pad_width + ((0, 0),)  # no padding on channels
+        padded = np.pad(resized, pad_width_3d, mode='constant', constant_values=0)
+
     return padded
 
 
-def process_loaded_image(image, settings:OrderedDict):
-    set = settings
-    for step in settings:
-        key, value = next(iter(step.items()))    
+def process_loaded_image(image, settings: list[dict[str, str]] | dict[str, str]):
+    """
+    Apply sequence of preprocessing operations to image.
+    
+    Executes ordered preprocessing steps specified in settings OrderedDict.
+    Supports operations: resize, resizeandpad, gray2rgb, rgb2gray, normalize, clip.
+    
+    Args:
+        image (np.ndarray): Input image array
+        settings (OrderedDict): Ordered dict of preprocessing steps.
+            Each step is {'operation': 'parameters'}. Supported:
+            - {'resize': 'WIDTH:HEIGHT'}
+            - {'resizeandpad': 'WIDTH:HEIGHT'}
+            - {'gray2rgb': ''}
+            - {'rgb2gray': ''}
+            - {'normalize': 'PMIN,PMAX'} (percentiles)
+            - {'clip': 'MIN,MAX'} (value ranges)
+    
+    Returns:
+        np.ndarray: Processed image
+        
+    Raises:
+        RuntimeError: If unknown operation specified
+    """
+    if isinstance(settings, dict):
+        iterable: Iterable[tuple[str, str]] = settings.items()
+    else:
+        iterable = (next(iter(step.items())) for step in settings)
+    for key, value in iterable:    
         match key:
             case "resize":
                 target_width, target_height = map(int, value.strip().split(":"))
@@ -615,7 +784,13 @@ def process_loaded_image(image, settings:OrderedDict):
                 scale = min(target_width / orig_width, target_height / orig_height)
                 resized_width = int(orig_width * scale)
                 resized_height = int(orig_height * scale)
-                image = resize(image, output_shape=(resized_height,resized_width), order=0, preserve_range=True, anti_aliasing=False).astype(image.dtype)
+                image = resize(
+                    image, 
+                    output_shape=(resized_height,resized_width), 
+                    order=0, 
+                    preserve_range=True, 
+                    anti_aliasing=False
+                    ).astype(image.dtype)
 
             case "resizeandpad":
                 target_width, target_height = map(int, value.strip().split(":"))
@@ -635,19 +810,66 @@ def process_loaded_image(image, settings:OrderedDict):
     return image
 
 def safegray2rgb(image):
+    """
+    Convert image-like arrays to a 3-channel RGB-compatible array.
+    
+    Args:
+        image (np.ndarray): Input image array
+        
+    Returns:
+        np.ndarray: 3-channel RGB-compatible image
+    """
+    image = np.asarray(image)
     if image.ndim == 2:
         return gray2rgb(image)
-    else:
-        return image
+    if image.ndim == 3:
+        channels = image.shape[2]
+        if channels == 1:
+            return gray2rgb(image[:, :, 0])
+        if channels == 2:
+            return gray2rgb(image[:, :, 0])
+        if channels == 3:
+            return image
+        if channels > 3:
+            return image[:, :, :3]
+    return image
+
 
 def safergb2gray(image):
+    """
+    Convert RGB to grayscale if needed, otherwise return unchanged.
+    
+    Args:
+        image (np.ndarray): Input image array
+        
+    Returns:
+        np.ndarray: Grayscale image if input was RGB, otherwise unchanged
+    """
     if image.ndim == 3:
         image = rgb2gray(image)
         return (image * 255).astype("uint8")
-    else:
-        return image
+    return image
+
 
 def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.5):
+    """
+    Calculate F1, precision, recall, TP, FP, FN metrics from matches.
+    
+    Args:
+        matches (list): List of (ground_idx, candidate_idx, iou) tuples
+        num_ground (int): Total number of ground truth objects
+        num_candidate (int): Total number of candidate detections
+        iou_threshold (float): IoU threshold for considering match valid. Defaults to 0.5.
+    
+    Returns:
+        dict: Metrics dictionary with keys:
+            - 'TP': True positives
+            - 'FP': False positives  
+            - 'FN': False negatives
+            - 'Precision': Precision score
+            - 'Recall': Recall score
+            - 'F1': F1 score
+    """
     tp = sum(1 for (_, _, iou) in matches if iou >= iou_threshold)
     fp = num_candidate - tp
     fn = num_ground - tp
@@ -664,96 +886,27 @@ def compute_f1_from_matches(matches, num_ground, num_candidate, iou_threshold=0.
         'Recall': recall,
         'F1': f1
     }
-    
-def safeimagesave(image, filename):
-    """Legacy wrapper for backward compatibility - use safe_image_write instead."""
-    return safe_image_write(image, filename, preserve_dtype=False)
       
 def clear_cache():
-    cache_dir = CASH_DIRECTORY
+    """
+    Remove and recreate application cache directory.
+    """
+    cache_dir = CACHE_DIRECTORY
     if os.path.exists(cache_dir):
         shutil.rmtree(cache_dir,ignore_errors=True)
     os.makedirs(cache_dir, exist_ok=True)
 
-
-# ============================================================================
-# BEEP UTILITY FUNCTIONS
-# ============================================================================
-
-def beep_simple():
-    """Simple system beep (cross-platform)"""
-    try:
-        print('\a')  # ASCII bell character - works on most systems
-    except:
-        pass
-
-def beep_windows(sound_type="default"):
-    """Windows-specific beep sounds"""
-    try:
-        if sys.platform == "win32":
-            import winsound  # For Windows beep sounds
-            if sound_type == "error":
-                winsound.MessageBeep(winsound.MB_ICONHAND)
-            elif sound_type == "warning":
-                winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
-            elif sound_type == "info":
-                winsound.MessageBeep(winsound.MB_ICONASTERISK)
-            elif sound_type == "question":
-                winsound.MessageBeep(winsound.MB_ICONQUESTION)
-            elif sound_type == "frequency":
-                # Custom frequency beep (frequency, duration_ms)
-                winsound.Beep(1000, 500)  # 1000Hz for 500ms
-            else:
-                winsound.MessageBeep()  # Default system beep
-        else:
-            beep_simple()  # Fallback for non-Windows
-    except ImportError:
-        print("winsound not available - using simple beep")
-        beep_simple()
-    except Exception as e:
-        print(f"Beep failed: {e}")
-        beep_simple()
-
-def beep_success():
-    """Success beep - pleasant sound"""
-    beep_windows("info")
-
-def beep_error():
-    """Error beep - attention-getting sound"""
-    beep_windows("error")
-
-def beep_warning():
-    """Warning beep - cautionary sound"""
-    beep_windows("warning")
-
-def beep_custom(frequency=800, duration=300):
-    """Custom frequency beep (Windows only)"""
-    try:
-        if sys.platform == "win32":
-            import winsound
-            winsound.Beep(frequency, duration)
-        else:
-            beep_simple()
-    except:
-        beep_simple()
-
-def beep_sequence(frequencies, duration=200, gap=100):
-    """Play a sequence of beeps with specified frequencies"""
-    try:
-        if sys.platform == "win32":
-            import time
-            import winsound
-            for freq in frequencies:
-                winsound.Beep(freq, duration)
-                if gap > 0:
-                    time.sleep(gap / 1000.0)  # Convert ms to seconds
-        else:
-            beep_simple()
-    except:
-        beep_simple()
-
 def show_error_message(title, message):
-    """Show error message box to user"""
+    """
+    Display error dialog to user with title and message.
+    
+    Args:
+        title (str): Dialog window title
+        message (str): Error message text
+        
+    Returns:
+        None
+    """
     msg_box = QMessageBox()
     msg_box.setIcon(QMessageBox.Critical)
     msg_box.setWindowTitle(title)

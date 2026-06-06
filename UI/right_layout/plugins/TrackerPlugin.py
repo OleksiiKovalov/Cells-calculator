@@ -1,3 +1,10 @@
+"""
+Tracker plugin module for sequential image tracking.
+
+This module provides TrackerPlugin, the plugin responsible for tracking
+cellular spheroids across a folder of sequential images.
+"""
+
 # Standard library imports
 import os
 import traceback
@@ -19,6 +26,10 @@ class TrackerPlugin(BasePlugin):
     Class for Tracker plugin of the application.
     This plugin is used for tracking cellular spheroids on given sequential image frames.
     """
+
+    DEFAULT_TIME_PERIOD_SECONDS = 15
+    SUPPORTED_IMAGE_EXTENSIONS = ('.png', '.jpg', '.bmp', '.lsm', '.tif')
+
     def get_name(self):
         return "Tracker"
 
@@ -49,9 +60,11 @@ class TrackerPlugin(BasePlugin):
             self.reset_detection()
             self.right_scene.clear()
             if value:
-                self.lsm_filesList = [os.path.join(value, file) \
-        for file in os.listdir(value)\
-            if file.lower().endswith(('.png', '.jpg', '.bmp', '.lsm', '.tif'))]
+                self.lsm_filesList = [
+                    os.path.join(value, file)
+                    for file in os.listdir(value)
+                    if file.lower().endswith(self.SUPPORTED_IMAGE_EXTENSIONS)
+                ]
                 self.folder_path = value
                 # self.max_range_slider.set_default()
                 # self.min_range_slider.set_default()
@@ -61,6 +74,9 @@ class TrackerPlugin(BasePlugin):
                 self.button.setEnabled(False)
 
     def init_rightLayout(self):
+        """
+        Initialize the right layout UI components.
+        """
         plugin_label = QLabel(self.get_name())
         plugin_label.setFont(QFont("Arial", 32))
         # Create a combo box to choose models
@@ -111,15 +127,27 @@ class TrackerPlugin(BasePlugin):
         self.right_layout.addSpacing(20)
 
     def update_colormap(self, colormap):
+        """
+        Update colormap.
+        
+        Args:
+            colormap: New colormap.
+        """
         self.object_size["color_map"] = colormap
 
     def reset_detection(self):
+        """
+        Reset detection results.
+        """
         print("reset_detection")
         return
         for key, model in self.models.items():
             model.cell_counter.detections = None
 
     def calculate_button(self):
+        """
+        Calculate tracking using the selected model.
+        """
         model = self.combo_box.currentText()
         # Check if a method and file are selected
         if model == "" or self.folder_path is None:
@@ -127,25 +155,31 @@ class TrackerPlugin(BasePlugin):
             self.plugin_signal.emit("show_warning", "Warning\n\nChoose model and folder.")
             return 0
         try:
-            if self.model.path == self.models[model]['path']:
-                self.model.track(img_seq_folder=self.folder_path, time_period = 15)
-                text_to_show ="""Success!"""
-                self.show_result(text_to_show)
-            else:
-                self.model = T(path=self.models[model]['path'],
-                                     size=self.models[model]['object_size'])
-                self.model.track(img_seq_folder=self.folder_path, time_period = 15)
-                text_to_show ="""Success!"""
-                self.show_result(text_to_show)
+            selected_path = self.models[model]['path']
+            selected_size = self.models[model]['size']
+            if getattr(self.model, 'path', None) != selected_path:
+                self.model = T(path=selected_path, size=selected_size)
+
+            self.model.track(
+                img_seq_folder=self.folder_path,
+                time_period=self.DEFAULT_TIME_PERIOD_SECONDS
+            )
+            self.show_result("Success!")
         except Exception as e:
             traceback.print_exc()
             # self.plugin_signal.emit("show_warning", traceback.format_exc())
             self.plugin_signal.emit("show_warning", str(e))
 
     def show_result(self, text):
+        """
+        Show result message.
+        
+        Args:
+            text: Message text.
+        """
         msgBox = QMessageBox()
 
-        # Set the icon of the message box to a warning icon
+        # Set the icon of the message box to an information icon
         msgBox.setIcon(QMessageBox.Information)
 
         # Set the text of the message box
