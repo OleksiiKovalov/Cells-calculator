@@ -91,7 +91,6 @@ ome-types==0.6.1
 ome-zarr==0.11.1
 ome-zarr-models==0.1.5
 opencv-python==4.10.0.84
-opencv-python-headless==4.11.0.86
 opt_einsum==3.4.0
 optree==0.15.0
 packaging==25.0
@@ -147,7 +146,6 @@ tensorflow-metal; sys_platform == 'darwin' and platform_machine == 'arm64'
 termcolor==3.1.0
 threadpoolctl==3.6.0
 tifffile==2025.1.10
-tiffile==2018.10.18
 tiffslide==2.5.0
 toolz==1.0.0
 torch==2.7.0

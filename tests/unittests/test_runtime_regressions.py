@@ -10,7 +10,7 @@ from typing import Any
 import cv2
 import numpy as np
 import pandas as pd
-import tiffile
+import tifffile
 
 from model.NucleiCounter import NucleiCounter
 import model.utils as model_utils
@@ -256,7 +256,7 @@ def test_calculate_lsm_accepts_high_valid_channel_index(tmp_path, monkeypatch):
     image = np.zeros((4, 96, 320), dtype=np.uint8)
     image[2, :, :] = 60
     image[3, :, :] = 200
-    tiffile.imwrite(
+    tifffile.imwrite(
         str(image_path),
         image,
         metadata={"axes": "CYX"},

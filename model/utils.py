@@ -11,7 +11,7 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
-import tiffile
+import tifffile
 import torch
 from csbdeep.utils import normalize
 from PyQt5.QtWidgets import QMessageBox
@@ -31,7 +31,7 @@ VALID_IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'tif', 'tiff', 'bmp', 'lsm']
 
 def read_lsm_array(img_path):
     """Reads the primary LSM/TIFF series as an array."""
-    with tiffile.TiffFile(img_path) as tif:
+    with tifffile.TiffFile(img_path) as tif:
         try:
             return tif.series[0].asarray()
         except (IndexError, ValueError):
@@ -100,7 +100,7 @@ def safe_image_read(img_path, color_mode='color', channel=None):
         extension = img_path.split('.')[-1].lower()
         
         if extension == 'lsm':
-            # Handle LSM files with tiffile
+            # Handle LSM files with tifffile
             image = read_lsm_array(img_path)
             if channel is not None:
                 image = lsm_to_channels_last(image)
@@ -549,7 +549,7 @@ def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
     boxes = torch.Tensor(box_array)
     try:
         masks = torch.Tensor(mask_array)
-    except:
+    except Exception:
         masks = torch.Tensor(mask_array.astype(np.uint8))
     results = Results(orig_img=original_image, path=path, names=names, boxes=boxes,
                       masks=masks, probs=probs, keypoints=None, obb=None, speed=None)

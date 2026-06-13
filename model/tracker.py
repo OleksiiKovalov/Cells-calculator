@@ -86,7 +86,7 @@ class Tracker:
 
         try:
             shutil.rmtree(self.output_dir)
-        except:
+        except Exception:
             pass
 
         os.makedirs(self.output_dir, exist_ok=True)

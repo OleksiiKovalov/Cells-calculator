@@ -220,7 +220,7 @@ class SettingsSaver:
                 temp_file = self.settings_file.parent / f"{self.settings_file.name}.tmp"
                 if temp_file.exists():
                     temp_file.unlink()
-            except:
+            except Exception:
                 pass
             return False
 

@@ -180,7 +180,7 @@ class FileTableModel(QAbstractTableModel):
         """Get display text for a cell"""
         try:
             return column_config['data_func'](file_info)
-        except:
+        except Exception:
             return ""
     
     def _get_text_alignment(self, column_config: Dict[str, Any], index: QModelIndex) -> int:
@@ -199,7 +199,7 @@ class FileTableModel(QAbstractTableModel):
                 color = self.color_rule(file_info)
                 if color:
                     return QBrush(color)
-            except:
+            except Exception:
                 pass
         return None
     
@@ -210,7 +210,7 @@ class FileTableModel(QAbstractTableModel):
                 color = self.background_color_rule(file_info)
                 if color:
                     return QBrush(color)
-            except:
+            except Exception:
                 pass
         elif getattr(self, 'alternating_colors', False):
             if index.row() % 2 == 1:

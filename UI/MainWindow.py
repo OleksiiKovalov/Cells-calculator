@@ -532,7 +532,7 @@ class MainWindow(QMainWindow):
             # Adds the table to the main scene
             self.main_scene.addWidget(table)
             
-        except:
+        except Exception:
             traceback.print_exc()
             # If an exception occurs during the process, disables certain actions,
             # resets file list and data frame, and shows a warning dialog
@@ -1117,7 +1117,7 @@ class MainWindow(QMainWindow):
 
                 # Center the dialog window on the screen
                 dialog.center()
-        except:
+        except Exception:
             traceback.print_exc()
             # If an error occurs, show a warning dialog
             self.show_warning_dialog("Error during opening channels settings")

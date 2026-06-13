@@ -3,7 +3,7 @@
 import cv2
 import numpy as np
 import pandas as pd
-import tiffile
+import tifffile
 
 import model.Model as model_module
 from model import BaseModel as base_model_module
@@ -354,7 +354,7 @@ def test_calculate_lsm_skips_nuclei_count_for_segmenter_model(tmp_path, monkeypa
 def test_read_lsm_img_handles_single_channel_2d_series(tmp_path):
     image_path = tmp_path / "single_channel.lsm"
     image = np.zeros((16, 24), dtype=np.uint8)
-    tiffile.imwrite(str(image_path), image)
+    tifffile.imwrite(str(image_path), image)
 
     result = read_lsm_img(str(image_path))
 
@@ -366,7 +366,7 @@ def test_read_lsm_img_uses_series_shape_for_multichannel_lsm(tmp_path):
     image_path = tmp_path / "two_channel.lsm"
     image = np.zeros((2, 20, 30), dtype=np.uint8)
     image[1, :, :] = 255
-    tiffile.imwrite(str(image_path), image, metadata={"axes": "CYX"})
+    tifffile.imwrite(str(image_path), image, metadata={"axes": "CYX"})
 
     result = read_lsm_img(str(image_path), nuclei_channel=1)
     nuclei = extract_nuclei_channel(str(image_path), nuclei_channel=1)

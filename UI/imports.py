@@ -68,7 +68,6 @@ splash_manager.update_splash(curpc, "Loading Image Processing...")
 curpc += 1
 
 import tifffile
-import tiffile  # Alternative tiff library used in some modules
 from skimage.io import imread, imsave
 from skimage.color import rgb2gray, gray2rgb
 from skimage.measure import regionprops
@@ -109,18 +108,18 @@ if r is not None and r['preload'] is True:
     from sahi.auto_model import AutoDetectionModel
 
 # Additional deep learning frameworks (optional)
-try:
-    import onnxruntime
-except ImportError:
-    onnxruntime: Optional[ModuleType] = None
+# try:
+#     import onnxruntime
+# except ImportError:
+#     onnxruntime: Optional[ModuleType] = None
 
 # Optional evaluation tools
-try:
-    from pycocotools.coco import COCO
-    from pycocotools.cocoeval import COCOeval
-except ImportError:
-    COCO: Optional[type] = None
-    COCOeval: Optional[type] = None
+# try:
+#     from pycocotools.coco import COCO
+#     from pycocotools.cocoeval import COCOeval
+# except ImportError:
+#     COCO: Optional[type] = None
+#     COCOeval: Optional[type] = None
 
 # Optional advanced packages
 try:
@@ -131,20 +130,20 @@ except ImportError:
     except ImportError:
         importlib_metadata: Optional[ModuleType] = None
 
-try:
-    import IPython
-except ImportError:
-    IPython: Optional[ModuleType] = None
+# try:
+#     import IPython
+# except ImportError:
+#     IPython: Optional[ModuleType] = None
 
-try:
-    import fiftyone as fo
-except ImportError:
-    fo: Optional[ModuleType] = None
+# try:
+#     import fiftyone as fo
+# except ImportError:
+#     fo: Optional[ModuleType] = None
 
-try:
-    import imantics
-except ImportError:
-    imantics: Optional[ModuleType] = None
+# try:
+#     import imantics
+# except ImportError:
+#     imantics: Optional[ModuleType] = None
 
 try:
     import skimage.io

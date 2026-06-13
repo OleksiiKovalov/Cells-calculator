@@ -74,7 +74,7 @@ def calculate_table(
                 # Attempt to apply the method to the image file
                 result = getattr(model, 'calculate', lambda **kwargs: None)(img_path=file_path, cell_channel=parameters['Cell'],\
                     nuclei_channel=parameters['Nuclei'])
-            except:
+            except Exception:
                 result = None
 
             if result:

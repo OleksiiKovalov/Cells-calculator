@@ -8,7 +8,6 @@ selecting models, configuring object filters, and running detection on images.
 # Standard library imports
 import os
 import math
-import time
 import traceback
 
 # Third-party imports
@@ -19,7 +18,7 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QCheckBox, QPushButton, QTextEdit,
     QComboBox, QLabel, QRadioButton, QButtonGroup, 
-    QDoubleSpinBox, QHBoxLayout, QWidget, QVBoxLayout, QFileDialog, QApplication
+    QDoubleSpinBox, QHBoxLayout, QWidget, QVBoxLayout, QFileDialog
 )
 
 # Local application imports
@@ -461,7 +460,7 @@ class CellDetectorPlugin(BasePlugin):
     def reset_detection(self):
         try:
             self.model.cell_counter.detections = None
-        except:
+        except Exception:
             pass
 
     def set_size(self, detection, img_size : tuple = (512,512)):
@@ -591,22 +590,17 @@ class CellDetectorPlugin(BasePlugin):
                 self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
             
             wait_window = run_with_wait_window(
-                inference_wrapper, 
+                inference_wrapper,
                 model,
-                title="Image Processing", 
-                info_text="Processing image...", 
+                title="Image Processing",
+                info_text="Processing image...",
                 parent=self.parent(),
                 threaded=True,
                 on_completed=on_completion,
-                on_failed=on_error
+                on_failed=on_error,
+                wait_for_completion=True,
             )
 
-            # Wait for completion (this will block until thread finishes)
-            if hasattr(wait_window, 'isVisible'):
-                while wait_window.isVisible():
-                    QApplication.processEvents()
-                    time.sleep(0.01)
-                
             result = getattr(wait_window, 'result', None)
         finally:
             self.button.setText("Calculate")
@@ -864,18 +858,21 @@ class CellDetectorPlugin(BasePlugin):
         else:
             return None, None, None, None
 
-    def batchProcess_ProcessModelList(self,model_list):
+    def batchProcess_ProcessModelList(self, model_list, progress_callback=None):
         """
         Process a list of models in batch.
-        
+
         Args:
             model_list: List of model names.
+            progress_callback: Optional callable used to report progress text.
+                Runs on the worker thread; the WaitWindow delivers it to the UI
+                thread via a queued signal, so it is safe to call from here.
         """
         i = 1
         j = 1
         for model_name in model_list:
-            if self.batch_wait_window is not None:
-                self.batch_wait_window.set_info_text(f"Processing {model_name} ({j}/{len(model_list)})")
+            if progress_callback is not None:
+                progress_callback(f"Processing {model_name} ({j}/{len(model_list)})")
             j = j + 1
             model_data = self.models[model_name]
             modepath = model_data['path']
@@ -917,9 +914,8 @@ class CellDetectorPlugin(BasePlugin):
             # Run inference in a thread using WaitWindow
             # Create a wrapper to handle progress_callback that call_inference doesn't expect
             def inference_wrapper(*args, **kwargs):
-                # Remove progress_callback from kwargs if present since call_inference doesn't need it
-                kwargs.pop('progress_callback', None)
-                self.batchProcess_ProcessModelList(model_list)
+                progress_callback = kwargs.pop('progress_callback', None)
+                self.batchProcess_ProcessModelList(model_list, progress_callback=progress_callback)
                 return
 
             # Connect signals before the worker starts so fast runs cannot be missed.
@@ -930,21 +926,15 @@ class CellDetectorPlugin(BasePlugin):
                 self.plugin_signal.emit("show_warning", f"Error during calculation: {error_msg}")
 
             wait_window = run_with_wait_window(
-                inference_wrapper, 
-                title="Image Processing", 
-                info_text="Processing image...", 
+                inference_wrapper,
+                title="Image Processing",
+                info_text="Processing image...",
                 parent=self.parent(),
                 threaded=True,
                 on_completed=on_completion,
-                on_failed=on_error
+                on_failed=on_error,
+                wait_for_completion=True,
             )
-            self.batch_wait_window = wait_window
-
-            # Wait for completion (this will block until thread finishes)
-            if hasattr(wait_window, 'isVisible'):
-                while wait_window.isVisible():
-                    QApplication.processEvents()
-                    time.sleep(0.01)
 
             imageGrid = create_image_grid(self.batch_processedImages,self.batch_labels)
             self.batch_processedImages, self.batch_labels = None, None
@@ -958,10 +948,10 @@ class CellDetectorPlugin(BasePlugin):
             pass
 
 
-    def batchProcess_MultiImage(self, model_type, modepath, object_size, file_path, model_data , model_name, files):
+    def batchProcess_MultiImage(self, model_type, modepath, object_size, file_path, model_data , model_name, files, progress_callback=None):
         """
         Process multiple images in batch.
-        
+
         Args:
             model_type: Model type.
             modepath: Model path.
@@ -970,6 +960,9 @@ class CellDetectorPlugin(BasePlugin):
             model_data: Model data.
             model_name: Model name.
             files: List of files.
+            progress_callback: Optional callable used to report progress text.
+                Runs on the worker thread; the WaitWindow delivers it to the UI
+                thread via a queued signal, so it is safe to call from here.
         """
         i = 1
         for file_path in files:
@@ -977,7 +970,8 @@ class CellDetectorPlugin(BasePlugin):
             self.lsm_path = file_path
             #self.batchProcessButtonMultiImage.setText(f"Processing {image_name} ({i}/{len(files)})")
             #self.batchProcessButtonMultiImage.repaint()
-            self.batch_wait_window.set_info_text(f"Processing {image_name} ({i}/{len(files)})")
+            if progress_callback is not None:
+                progress_callback(f"Processing {image_name} ({i}/{len(files)})")
             _, processedImage,duration,counted = self.calculate_single_model(model_type, modepath, self.object_size, file_path,model_data = model_data , model_name = model_name)
             self.batch_processedImages.append( processedImage)
             self.batch_labels.append(f"{i} {image_name}:{counted} cells in {duration:.2f} seconds")
@@ -1008,10 +1002,10 @@ class CellDetectorPlugin(BasePlugin):
             model_data = self.models[model]
 
             def inference_wrapper(*args, **kwargs):
-                # Remove progress_callback from kwargs if present since call_inference doesn't need it
-                kwargs.pop('progress_callback', None)
+                progress_callback = kwargs.pop('progress_callback', None)
                 self.batchProcess_MultiImage(model_type= model_type,modepath= modepath,object_size= self.object_size,file_path= self.lsm_path,
-                                            model_data= model_data,model_name = model,files= files)
+                                            model_data= model_data,model_name = model,files= files,
+                                            progress_callback=progress_callback)
                 return
 
             # Connect signals to handle completion
@@ -1023,22 +1017,16 @@ class CellDetectorPlugin(BasePlugin):
 
             if files:
                 wait_window = run_with_wait_window(
-                    inference_wrapper, 
-                    title="Image Processing", 
-                    info_text="Processing image...", 
+                    inference_wrapper,
+                    title="Image Processing",
+                    info_text="Processing image...",
                     parent=self.parent(),
                     threaded=True,
                     on_completed=on_completion,
-                    on_failed=on_error
+                    on_failed=on_error,
+                    wait_for_completion=True,
                 )
-                self.batch_wait_window = wait_window
 
-                # Wait for completion (this will block until thread finishes)
-                if hasattr(wait_window, 'isVisible'):
-                    while wait_window.isVisible():
-                        QApplication.processEvents()
-                        time.sleep(0.01)
-                       
                 imageGrid = create_image_grid(self.batch_processedImages,self.batch_labels)
                 safe_image_write(imageGrid, IMAGE_FILE_NAME_GRID)
                 self.plugin_signal.emit("add_image", IMAGE_FILE_NAME_GRID )
@@ -1244,7 +1232,7 @@ class CellDetectorPlugin(BasePlugin):
                 self._format_value("Mean S", avg_area_permyriad, avg_area_um2, "µm²"),
                 self._format_value("Mean V", avg_volume_permyriad, avg_volume_um3, "µm³"),
             ]
-        except:
+        except Exception:
             results = [
                 f"Objects detected: - ",
                 f"Duration        : - ",

@@ -151,10 +151,11 @@ class BaseModel:
                             Columns: class_id, class_name, confidence, box, scale
         
         Raises:
-            AssertionError: If scale is not 10 or 20.
+            ValueError: If scale is not 10 or 20.
         """
         scale = self.object_size["scale"]
-        assert scale in [10, 20], f"Scale must be either 10 or 20, instead received scale {scale}"
+        if scale not in (10, 20):
+            raise ValueError(f"Scale must be either 10 or 20, instead received scale {scale}")
         self.detectionCount = -1
         start_time = time.time()
         result = None

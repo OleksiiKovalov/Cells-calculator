@@ -53,7 +53,7 @@ class BasePlugin(QObject):
         self.init_value(*arg)
         try:
             self.init_rightLayout()
-        except:
+        except Exception:
             self.plugin_signal.emit("error",None)
 
     def handle_action(self, action_name, value):

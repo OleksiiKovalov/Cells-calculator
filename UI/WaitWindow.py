@@ -22,7 +22,7 @@ import time
 from typing import Callable, Optional, cast
 
 # Third-party imports
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QThread, QEventLoop
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
     QPushButton, QFrame, QApplication, QSizePolicy
@@ -470,10 +470,11 @@ def show_wait_window(title="Processing", info_text="Processing, please wait...",
     return wait_window
 
 
-def run_with_wait_window(target_function, *args, title="Processing", 
-                        info_text="Processing, please wait...", 
+def run_with_wait_window(target_function, *args, title="Processing",
+                        info_text="Processing, please wait...",
                         cancellable=True, parent=None, threaded=True,
-                        on_completed=None, on_failed=None, **kwargs):
+                        on_completed=None, on_failed=None,
+                        wait_for_completion=False, **kwargs):
     """
     Run a function with a wait window, handling UI responsiveness automatically.
     
@@ -506,6 +507,17 @@ def run_with_wait_window(target_function, *args, title="Processing",
         wait_window.process_failed.connect(on_failed)
     
     if threaded:
+        if wait_for_completion:
+            # Block the caller until the worker finishes, but drive the wait
+            # with a real nested event loop instead of a sleep/poll spin.
+            # The quit handler is wired to ``finished`` (emitted on completion,
+            # failure, and cancel) BEFORE the worker starts, so a fast worker
+            # cannot finish and close the dialog before we begin waiting.
+            loop = QEventLoop()
+            wait_window.finished.connect(loop.quit)
+            wait_window.run_threaded_process(target_function, *args, **kwargs)
+            loop.exec_()
+            return wait_window
         # Run in separate thread
         wait_window.run_threaded_process(target_function, *args, **kwargs)
         return wait_window
