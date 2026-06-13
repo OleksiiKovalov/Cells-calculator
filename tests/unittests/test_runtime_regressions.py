@@ -221,6 +221,38 @@ def test_prediction_alignment_uses_inference_image_for_inference_space(tmp_path)
     assert output_path.exists()
 
 
+def test_masks_render_over_original_when_inference_is_resized(tmp_path):
+    """Masks normalized to a resized inference image must be drawn on the original."""
+    from UI.prediction_rendering import plot_predictions_with_alignment
+    from UI.app_globals import get_global, set_global
+
+    output_path = tmp_path / "detections.png"
+    original = np.full((480, 640, 3), 25, dtype=np.uint8)   # original image size
+    inference = np.full((384, 512, 3), 80, dtype=np.uint8)  # resized for inference
+    masks = [
+        np.array(
+            [[0.1, 0.1], [0.5, 0.1], [0.5, 0.5], [0.1, 0.5]],
+            dtype=np.float32,
+        )
+    ]
+    set_global("image_display_base", None)
+
+    rendered = plot_predictions_with_alignment(
+        original,
+        inference,
+        masks,
+        filename=str(output_path),
+        mask_coordinate_space="auto",
+    )
+
+    # Output and display base must match the ORIGINAL image, not the inference image.
+    assert rendered.shape == original.shape
+    assert get_global("image_display_base").shape == original.shape
+    # The mask must actually be painted onto the original-sized canvas.
+    assert (rendered != 25).any()
+    assert output_path.exists()
+
+
 def test_countnuclei_blank_channel_is_empty():
     assert NucleiCounter().countNuclei(np.zeros((32, 32), dtype=np.uint8)) == 0
 
@@ -451,6 +483,51 @@ def test_stardist_skips_instance_when_no_usable_contour_exists(
         "volume",
     ]
     assert result.empty
+
+
+def test_stardist_results_store_normalized_box_and_mask(
+    request,
+    monkeypatch,
+    tmp_path,
+):
+    stardist_module = _import_with_fakes(
+        request,
+        monkeypatch,
+        "model.StardistSegmenter",
+        _fake_stardist_modules(),
+    )
+    monkeypatch.setattr(
+        stardist_module,
+        "IMAGE_FILE_NAME_INSTANCES",
+        str(tmp_path / "instances.png"),
+    )
+    segmenter = stardist_module.StardistSegmenter.__new__(
+        stardist_module.StardistSegmenter
+    )
+    instances = np.zeros((8, 10), dtype=np.int32)
+    instances[2:6, 3:8] = 1  # solid block -> a usable contour
+
+    result = segmenter.stardist_results_to_pandas(
+        instances,
+        scores=np.array([0.9]),
+        original_shape=instances.shape,
+        inference_shape=instances.shape,
+    )
+
+    assert len(result) == 1
+
+    # Masks must be normalized (N, 2) polygons in [0, 1], like every other
+    # segmenter (see test_instanseg_results_store_masks_in_normalized_inference_space).
+    mask = np.asarray(result["mask"].iloc[0])
+    assert mask.ndim == 2 and mask.shape[1] == 2
+    assert mask.min() >= 0.0
+    assert mask.max() <= 1.0
+
+    # Boxes must be normalized [x, y, w, h] in [0, 1].
+    box = np.asarray(result["box"].iloc[0], dtype=float)
+    assert box.shape == (4,)
+    assert box.min() >= 0.0
+    assert box.max() <= 1.0
 
 
 def test_yolo_x10_uses_sahi_nms_postprocess(request, monkeypatch, tmp_path):

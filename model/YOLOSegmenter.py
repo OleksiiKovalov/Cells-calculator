@@ -140,10 +140,10 @@ class YoloSegmenter(BaseModel):
                 original_image=self.original_image,
                 inference_image=inference_image,
             )
+        # ``results_to_pandas`` already produces normalized [x, y, w, h] boxes
+        # (from ultralytics xyxyn). Keep them normalized so every segmenter shares
+        # the same [0, 1] coordinate convention for box and mask.
         self.detections = results_to_pandas(outputs, store_bin_mask)
-        self.detections['box'] = self.detections['box'].apply(
-            lambda b: b * np.array([self.w, self.h, self.w, self.h])
-        )
 
         if tracking is False:
             # Keep slider calibration aligned with morphology-based filtering.

@@ -268,10 +268,27 @@ class StardistSegmenter(BaseModel):
         props = regionprops(instances)
         safe_image_write(instances, IMAGE_FILE_NAME_INSTANCES, preserve_dtype=False)
 
+        # Coordinate spaces: prop.bbox is in inference (instances) space, while the
+        # mask contour is taken from a binary mask resized back to the original
+        # image. Both are normalized to [0, 1] so they align on the original image
+        # and match the convention used by the other segmenters.
+        inference_h, inference_w = (
+            inference_shape if inference_shape is not None else instances.shape[:2]
+        )
+        original_h, original_w = (
+            original_shape if original_shape is not None else instances.shape[:2]
+        )
+
         for i, prop in enumerate(props):
             # Extract bounding box (min_row, min_col, max_row, max_col)
             minr, minc, maxr, maxc = prop.bbox
-            box = [minc, minr, maxc, maxr]  # Convert to [x_min, y_min, x_max, y_max]
+            # Normalized [x_min, y_min, width, height]
+            box = [
+                minc / inference_w,
+                minr / inference_h,
+                (maxc - minc) / inference_w,
+                (maxr - minr) / inference_h,
+            ]
 
             # Create binary mask for the object
             binary_mask = (instances == prop.label).astype(np.uint8)
@@ -302,6 +319,12 @@ class StardistSegmenter(BaseModel):
             if pts is None:
                 continue
 
+            # Normalize the contour to [0, 1] in the original-image space and store
+            # it as an (N, 2) array, matching the other segmenters' mask format.
+            norm_mask = pts.reshape(-1, 2).astype(np.float32) / np.array(
+                [original_w, original_h], dtype=np.float32
+            )
+
             # Confidence (if provided)
             confidence = scores[i] if scores is not None and i < len(scores) else None
 
@@ -320,10 +343,10 @@ class StardistSegmenter(BaseModel):
             # Append to data
             data["id_label"].append(id_label)
             data["box"].append(box)
-            data["mask"].append(pts)
+            data["mask"].append(norm_mask)
             data["confidence"].append(confidence)
-            
-            bin_mask, morphology = plot_mask(np.array(pts), image_size=instances.shape)
+
+            bin_mask, morphology = plot_mask(norm_mask, image_size=(original_h, original_w))
             data['diameter'].append(morphology['diameter'])
             data['area'].append(morphology['area'])
             data['volume'].append(morphology['volume'])

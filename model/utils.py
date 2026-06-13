@@ -503,7 +503,10 @@ def sahi_to_pandas(outputs: list, h: int, w: int) -> pd.DataFrame:
         for i, obj in enumerate(outputs):
             if len(obj['bbox']) == 4 and len(obj['segmentation']) == 1 and len(obj['segmentation'][0]) >= 8:
                 data['id_label'].append(i)
-                data['box'].append(np.array(obj['bbox']))
+                # COCO bbox is pixel [x, y, width, height]; normalize to [0, 1]
+                # so it matches the normalized mask and the other segmenters.
+                bbox = np.asarray(obj['bbox'], dtype=np.float32)
+                data['box'].append(bbox / np.array([w, h, w, h], dtype=np.float32))
                 xs, ys = np.array(obj['segmentation'][0][::2]) / w, np.array(obj['segmentation'][0][1::2]) / h
                 mask_array = np.vstack((xs, ys)).T
                 data['mask'].append(mask_array)
@@ -525,11 +528,12 @@ def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
     
     Args:
         df (pd.DataFrame): Detection dataframe with columns:
-            ['confidence', 'id_label', 'box', 'bin_mask']
+            ['confidence', 'id_label', 'box', 'bin_mask']. ``box`` is the
+            normalized [x, y, w, h] used throughout the detection pipeline.
         original_image (np.ndarray): Original RGB/BGR image array
         path (str): File path for the results object
         frame_num (int): Frame number for tracking context. Defaults to 0.
-    
+
     Returns:
         Results | None: ultralytics Results object or None if empty
     """
@@ -540,8 +544,14 @@ def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
     if len(conf_array) == 0:
         return None
     class_array = np.array(df['id_label'].tolist())
-    df['box'] = df['box'].apply(lambda b: [b[0], b[1], b[2] + b[0], b[3] + b[1]])
-    box_array = np.array(df['box'].tolist())
+    # Stored boxes are normalized [x, y, w, h]; ultralytics Results expects
+    # absolute pixel [x1, y1, x2, y2]. Denormalize here without mutating the
+    # caller's DataFrame so stored detections stay normalized.
+    img_h, img_w = original_image.shape[:2]
+    box_array = np.array([
+        [b[0] * img_w, b[1] * img_h, (b[0] + b[2]) * img_w, (b[1] + b[3]) * img_h]
+        for b in df['box'].tolist()
+    ])
     box_array = np.hstack((box_array, np.expand_dims(conf_array, axis=1),
                            np.expand_dims(class_array, axis=1)))
     mask_array = np.stack(df['bin_mask'].tolist(), axis=0)

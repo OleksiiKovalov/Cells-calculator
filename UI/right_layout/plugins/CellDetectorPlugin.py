@@ -771,8 +771,12 @@ class CellDetectorPlugin(BasePlugin):
                 else None
             )
             model_class_name = type(cell_counter).__name__.lower()
+            # Masks are always drawn over the ORIGINAL image. InstanSeg returns
+            # masks normalized to the (resized/padded) inference image, so use the
+            # alignment path ("auto") to map them back onto the original. The other
+            # segmenters already produce masks in original-image space.
             mask_coordinate_space = (
-                "inference"
+                "auto"
                 if "instanseg" in model_class_name
                 else "original"
             )
