@@ -1,16 +1,6 @@
 ## Contributors
 
-**CellsCalculator V4.0** is a restyled, restructured rebuild of the original
-*CellsCalculator* project, carrying forward its segmentation core. It builds on
-the work of all earlier release teams listed below.
-
-* **Kovalov O.** — *tech‑lead*
-
----
-
-The original *CellsCalculator* releases were developed by students of NTU "KhPI":
-
-**CellsCalculator V2.0**
+**CellsCalculator V2.0** has been developed by the following students of NTU "KhPI":
 * **Ponomarov Y.** - *team-lead, ML engineer*;
 * **Kuznesova I.** - *ML engineer, data labelling*;
 * **Batiuchenko O.** - *software developer*;
@@ -19,14 +9,14 @@ The original *CellsCalculator* releases were developed by students of NTU "KhPI"
 * **Baluka A.** - *documentation editing assistance, data labelling*;
 * **Ipatko K.** - *documentation editing assistance, data labelling*.
 
-**CellsCalculator V3.0**
+**CellsCalculator V3.0** has been developed by the following students of NTU "KhPI":
 * **Cherkashyna I.** - *Team-lead, lead of documentary editing*
 * **Fesenko M.** - *ML-engineer*
 * **Lytvynenko S.** - *ML-engineer*
 * **Olijnyk V.** - *ML-engineer*
 * **Kovalov O.** - *tech-lead*
 
-**CellsCalculator V3.1**
+**CellsCalculator V3.1** has been developed by the following students of NTU "KhPI":
 * **Cherkashyna I.** - *Team-lead, lead of documentary editing*
 * **Noskova K.** - *ML-engineer*
 * **Lytvynenko S.** - *ML-engineer*
@@ -37,7 +27,7 @@ The original *CellsCalculator* releases were developed by students of NTU "KhPI"
 * **Tkachenko V.** - *documentation editing assistance, data labelling*
 * **Kovalov O.** - *tech-lead*
 
-**CellsCalculator V3.2**
+**CellsCalculator V3.2** has been developed by the following students of NTU "KhPI":
 * **Kharkivskyi I.** - *Software Development team lead, functionality fix*
 * **Koziuk D.** - *Software engineer, functionality fix*
 * **Kremliov R.** - *Software engineer, functionality fix*
@@ -61,4 +51,7 @@ The original *CellsCalculator* releases were developed by students of NTU "KhPI"
 * **Husachenko M.** - *Data Labeling*
 * **Vuziian Y.** - *Data Labeling*
 * **Borovko L.** - *Data Labeling*
+* **Kovalov O.** - *tech-lead*
+
+**CellsCalculator V4.0** has been developed by the following students of NTU "KhPI":
 * **Kovalov O.** - *tech-lead*

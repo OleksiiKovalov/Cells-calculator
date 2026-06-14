@@ -1,4 +1,4 @@
-# Cells Calculator (V6) — Developer Manual
+# Cells Calculator (v4.0) — Developer Manual
 
 ## Setup
 ```bash

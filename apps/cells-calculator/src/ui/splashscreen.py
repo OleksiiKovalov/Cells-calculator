@@ -49,7 +49,7 @@ class SplashScreen(QSplashScreen):
         p.setPen(_TEXT_TITLE)
         f = QFont("Segoe UI", 10, QFont.Bold)
         p.setFont(f)
-        p.drawText(0, 1, _W, 36, Qt.AlignCenter, "V6  ·  Cell Analysis Viewer")
+        p.drawText(0, 1, _W, 36, Qt.AlignCenter, "Cells Calculator  ·  v4.0")
 
         # ── icon / logo ──────────────────────────────────────────────────────
         icon_y = 54
@@ -71,7 +71,7 @@ class SplashScreen(QSplashScreen):
             p.drawEllipse(cx - r, cy - r, r * 2, r * 2)
             p.setPen(Qt.white)
             p.setFont(QFont("Segoe UI", 20, QFont.Bold))
-            p.drawText(cx - r, cy - r, r * 2, r * 2, Qt.AlignCenter, "V6")
+            p.drawText(cx - r, cy - r, r * 2, r * 2, Qt.AlignCenter, "CC")
 
         # ── app title ────────────────────────────────────────────────────────
         p.setPen(_TEXT_TITLE)

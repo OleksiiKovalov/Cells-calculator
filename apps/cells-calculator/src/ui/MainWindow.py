@@ -81,7 +81,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         """Build the window, its widgets and panels, then load saved settings."""
         super().__init__()
-        self.setWindowTitle("V6 Image Viewer")
+        self.setWindowTitle("Cells Calculator")
         self.resize(1000, 700)
 
         self.viewer = ImageViewer(self)
@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
             return
         if self.load_image(path):
             self._statusbar.showMessage(f"Loaded: {path}")
-            self.setWindowTitle(f"V6 Image Viewer - {path}")
+            self.setWindowTitle(f"Cells Calculator - {path}")
         else:
             QMessageBox.warning(self, "Open Image", f"Cannot load image:\n{path}")
             self._statusbar.showMessage("Failed to load image")
@@ -893,7 +893,7 @@ class MainWindow(QMainWindow):
         """Load the image chosen in the file browser, reporting success or failure."""
         if self.load_image(file_path):
             self._statusbar.showMessage(f"Loaded: {file_path}")
-            self.setWindowTitle(f"V6 Image Viewer - {file_path}")
+            self.setWindowTitle(f"Cells Calculator - {file_path}")
         else:
             QMessageBox.warning(self, "Open Image", f"Cannot load image:\n{file_path}")
             self._statusbar.showMessage("Failed to load image")
@@ -1090,7 +1090,8 @@ class MainWindow(QMainWindow):
         QMessageBox.about(
             self,
             "About",
-            "V6 Image Viewer\n\nA simple PyQt5 image viewer with zoom and pan.",
+            "Cells Calculator 4.0\n\n"
+            "Cell & spheroid instance segmentation and morphology analysis.",
         )
 
     def _update_actions_enabled(self):

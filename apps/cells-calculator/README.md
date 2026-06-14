@@ -1,4 +1,4 @@
-# Cells Calculator (V6)
+# Cells Calculator (v4.0)
 
 A PyQt5 desktop application for automated **cell / spheroid instance
 segmentation and morphology analysis** in microscopy images. Open an image,
@@ -8,10 +8,10 @@ relative units and, with a pixel‑size calibration, in micrometres.
 
 ![Cells Calculator](docs/images/app_screenshot.png)
 
-> **About this version.** V6 is a restyled, restructured rebuild of the original
+> **About this version.** v4.0 is a restyled, restructured rebuild of the original
 > *CellsCalculator* project. It keeps the proven segmentation core but replaces
 > the old plugin/right‑panel UI with a lean floating‑panel interface and a
-> single, uniform model seam. See [What's new in V6](#whats-new-in-v6) and
+> single, uniform model seam. See [What's new in v4.0](#whats-new-in-v40) and
 > [PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md) for the architecture.
 
 ## Quick references
@@ -22,7 +22,7 @@ relative units and, with a pixel‑size calibration, in micrometres.
 * [Configuring models](#configuring-models)
 * [Testing](#testing)
 * [Project layout](#project-layout)
-* [What's new in V6](#whats-new-in-v6)
+* [What's new in v4.0](#whats-new-in-v40)
 * [Credits](#credits)
 
 ## Features
@@ -129,7 +129,7 @@ tests/                  # unit/, data/, golden/, fuzzing/ + smoke/golden/fuzz te
 ```
 A deeper description lives in [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUMENTATION.md).
 
-## What's new in V6
+## What's new in v4.0
 - **Restyled UI**: the old plugin/right‑panel layout is replaced by a single
   image viewer with draggable, resizable floating panels (Info, Console,
   Options, Progress, File Browser).
@@ -147,7 +147,7 @@ A deeper description lives in [docs/PROJECT_DOCUMENTATION.md](docs/PROJECT_DOCUM
 
 Earlier release history (V2 plugin architecture, the spheroid tracker, the
 nuclei/%‑alive pipeline, x10/SAHI tiling) belongs to the original project and is
-not part of the V6 rebuild.
+not part of the v4.0 rebuild.
 
 ## Credits
 Developed at NTU "KhPI". For the full contributor list across releases, see

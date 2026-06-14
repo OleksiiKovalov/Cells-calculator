@@ -5,7 +5,8 @@ This repository hosts multiple desktop/scientific applications, each
 docs, packaging, and its runtime data (e.g. model weights) all live together, so
 it can be zipped and run as-is.
 
-The flagship application is **Cells Calculator**.
+The flagship application is **Cells Calculator**; the repo also ships
+**Dataset Viewer**.
 
 ---
 
@@ -65,9 +66,27 @@ Full usage, model configuration, architecture and development docs:
 **[apps/cells-calculator/README.md](apps/cells-calculator/README.md)** and its
 [docs/](apps/cells-calculator/docs/).
 
-> Cells Calculator is a restyled, restructured rebuild of the original
-> *CellsCalculator* project, carrying forward its proven segmentation core. See
-> its [contributors](apps/cells-calculator/docs/CONTRIBUTORS.md).
+> Cells Calculator is a **redesign and restyling of the well-known previous
+> version** of *CellsCalculator* (V3.2), carrying forward its proven
+> segmentation core in a cleaner architecture and UI. That original version is
+> preserved in this repository at
+> **[apps/cells-calculator.V32/](apps/cells-calculator.V32/)**. See also the
+> [contributors](apps/cells-calculator/docs/CONTRIBUTORS.md).
+
+---
+
+## 🗂 Dataset Viewer
+
+**[apps/dataset-viewer/](apps/dataset-viewer/README.md)** — a PyQt5 tool for
+**browsing and converting annotated image datasets**. Open a dataset folder (the
+format is auto-detected), view every image with its bounding boxes, polygons and
+masks overlaid, and export the whole dataset to another format.
+
+- **Formats** (load + export): YOLO (v5/v8), COCO JSON, Pascal VOC, InstanSeg
+  PTH — including COCO RLE masks and YOLO segmentation polygons.
+- **Viewer**: zoom / pan / fit, a split-aware browser, color-cycled overlays.
+- Shares the flagship **Cells Calculator** conda environment — no separate
+  install; launch with `apps/dataset-viewer/run.bat`.
 
 ---
 
@@ -88,9 +107,71 @@ New apps drop in as `apps/<name>/` with the same internal shape.
 ## Continuous integration
 `.github/workflows/ci.yml` (GitHub requires workflows at the repo root) runs each
 app's checks — type-checking (`mypy`) and the weight-free unit tests — on
-Windows / Python 3.13. It's structured so more apps are added as extra jobs / a
-matrix.
+Windows via a **matrix** over the apps (`cells-calculator` and `dataset-viewer`
+on Python 3.13, plus the legacy V3.2 app on 3.11, non-blocking). New apps are
+added as one more matrix entry.
 
 ## Contributing
 See each app's `docs/CONTRIBUTING.md` (e.g.
 [Cells Calculator](apps/cells-calculator/docs/CONTRIBUTING.md)).
+
+## 👥 Contributors
+Cells Calculator was created by students of **NTU "KhPI"** across successive
+releases (V2 → V4.0). The current v4.0 redesign builds directly on their work —
+full credit to everyone who contributed (see also [CONTRIBUTORS.md](CONTRIBUTORS.md)):
+
+**CellsCalculator V2.0**
+- **Ponomarov Y.** — team-lead, ML engineer
+- **Kuznesova I.** — ML engineer, data labelling
+- **Batiuchenko O.** — software developer
+- **Noskova K.** — ML engineer
+- **Glushchenko D.** — lead of documentation editing assistance, lead of data labelling
+- **Baluka A.** — documentation editing assistance, data labelling
+- **Ipatko K.** — documentation editing assistance, data labelling
+
+**CellsCalculator V3.0**
+- **Cherkashyna I.** — team-lead, lead of documentary editing
+- **Fesenko M.** — ML engineer
+- **Lytvynenko S.** — ML engineer
+- **Olijnyk V.** — ML engineer
+- **Kovalov O.** — tech-lead
+
+**CellsCalculator V3.1**
+- **Cherkashyna I.** — team-lead, lead of documentary editing
+- **Noskova K.** — ML engineer
+- **Lytvynenko S.** — ML engineer
+- **Kharkivskyi I.** — ML engineer
+- **Zharskyi N.** — software engineer
+- **Besedina Y.** — documentation editing assistance, data labelling
+- **Borysenko M.** — documentation editing assistance, data labelling
+- **Tkachenko V.** — documentation editing assistance, data labelling
+- **Kovalov O.** — tech-lead
+
+**CellsCalculator V3.2**
+- **Kharkivskyi I.** — Software Development team lead, functionality fix
+- **Koziuk D.** — software engineer, functionality fix
+- **Kremliov R.** — software engineer, functionality fix
+- **Savchenko V.** — software engineer, refactoring
+- **Rudenko H.** — software engineer, refactoring
+- **Ohanjanyan A.** — software engineer, automated testing
+- **Hazin H.** — software engineer, automated testing
+- **Smirnov S.** — QA, manual testing
+- **Lytvynenko S.** — Data Science and Documentation team lead
+- **Malakhov R.** — ML engineer
+- **Lyndin Y.** — ML engineer
+- **Pohasii M.** — ML engineer
+- **Moskalenko O.** — ML engineer
+- **Li P.** — ML engineer
+- **Lysachenko S.** — ML engineer
+- **Borysenko M.** — documentation editing assistance
+- **Tyshchenko K.** — documentation editing assistance
+- **Boiko K.** — documentation editing assistance
+- **Fesenko M.** — Data Labeling team lead
+- **Dolhodush A.** — Data Labeling
+- **Husachenko M.** — Data Labeling
+- **Vuziian Y.** — Data Labeling
+- **Borovko L.** — Data Labeling
+- **Kovalov O.** — tech-lead
+
+**CellsCalculator V4.0** (redesign)
+- **Kovalov O.** — tech-lead

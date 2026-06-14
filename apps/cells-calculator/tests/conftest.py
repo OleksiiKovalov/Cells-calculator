@@ -1,4 +1,4 @@
-"""Shared pytest configuration for the V6 test suite."""
+"""Shared pytest configuration for the Cells Calculator test suite."""
 import os
 
 # Render Qt off-screen so GUI tests need no display.

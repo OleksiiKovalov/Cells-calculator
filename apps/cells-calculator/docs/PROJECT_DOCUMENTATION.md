@@ -1,9 +1,9 @@
-# Cells Calculator (V6) — Architecture Documentation
+# Cells Calculator (v4.0) — Architecture Documentation
 
 ## 1. Overview
 
 **Cells Calculator** is a PyQt5 desktop application for cell/spheroid instance
-segmentation and morphology analysis in microscopy images. V6 is a restructured
+segmentation and morphology analysis in microscopy images. v4.0 is a restructured
 rebuild of the original project: a single image viewer with floating panels on
 top, and a thin, uniform model layer underneath.
 
@@ -131,7 +131,7 @@ BaseSegmenter
 ```
 
 `src/app.py` also maps a `cellcounter` type, but the box‑detector and the LSM
-nuclei/%‑alive pipeline from the original project are **not** part of V6.
+nuclei/%‑alive pipeline from the original project are **not** part of v4.0.
 
 ### 4.4 `utils.py`
 The shared toolbox: image I/O (`read_img`, `read_standard_img`,
