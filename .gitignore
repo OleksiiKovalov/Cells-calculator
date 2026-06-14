@@ -1,28 +1,92 @@
-**/__pycache__
-/.ipynb_checkpoints
-/model/best_m_openvino_model
-/lsm_files
-/.cache
-/myenv
-/output
-*.ipynb
-*.npy
-*.exe
-*.csv
-*xlsx
-qwe.py
-/tracker_output
-/tracker_output/frames
-/tracker_output/tabular data
-/trainedmodels
-app.log
-/.cache
-/.vscode
-/.vs
-/packages
-/logs
-.DS_Store
+# ─────────────────────────────────────────────────────────────────────────────
+# Python
+# ─────────────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging / build
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+sdist/
+wheels/
+*.egg-info/
+*.egg
+MANIFEST
+pip-wheel-metadata/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Virtual environments
+# ─────────────────────────────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.env
+.python-version
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Test / type-check / lint caches
+# ─────────────────────────────────────────────────────────────────────────────
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.hypothesis/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Cells Calculator runtime artifacts (regenerated at run/test time)
+# ─────────────────────────────────────────────────────────────────────────────
+logs/
+.cache/
+ui_settings.json
 application_settings*.json
-/.idea
-*.log
-/scripts/.cache
+*_output/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# IDE / editor / OS
+# ─────────────────────────────────────────────────────────────────────────────
+.idea/
+.vs/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+# .vscode/ is kept by default; uncomment to ignore local editor settings.
+# .vscode/
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Model weights (large binaries)
+# Kept out of git by default — ship them beside the app, or track via Git LFS.
+# Remove/relax these lines if you prefer to commit the weights directly.
+# ─────────────────────────────────────────────────────────────────────────────
+*.pt
+*.pth
+*.onnx
+*.h5
+*.keras
+*.tflite
+**/trainedmodels/**
+!**/trainedmodels/models.readme
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Bundled redistributable installers (large; fetched via download-conda.bat)
+# ─────────────────────────────────────────────────────────────────────────────
+**/redistributables/

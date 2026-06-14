@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  ci:
+    name: ${{ matrix.name }} (Windows, Python ${{ matrix.python }})
+    runs-on: windows-latest
+    # The legacy app's leg is allowed to fail without failing the whole workflow.
+    continue-on-error: ${{ matrix.allow_failure }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # New restructured app (flat src/ layout, py3.13).
+          - name: cells-calculator
+            dir: apps/cells-calculator
+            python: "3.13"
+            mypy_target: src
+            pytest_target: tests/unit
+            allow_failure: false
+          # Legacy V3.2 app (root layout, py3.11) — non-blocking.
+          - name: cells-calculator.V32
+            dir: apps/cells-calculator.V32
+            python: "3.11"
+            mypy_target: main.py model UI
+            pytest_target: tests
+            allow_failure: true
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: "pip"
+          cache-dependency-path: "${{ matrix.dir }}/requirements*.txt"
+
+      - name: Install dev requirements
+        run: pip install -r requirements-dev.txt
+
+      - name: Verify environment integrity
+        # `pip check` is informational, not a hard gate: some backends declare
+        # numpy<2.x bounds while the app may pin a newer numpy; genuine *new*
+        # conflicts still surface as a warning.
+        run: |
+          echo "Running pip check to surface dependency conflicts..."
+          pip check || echo "::warning::pip check reported declared-bound conflicts (numpy pin may be deliberate)"
+          echo "Verifying core science libraries are intact..."
+          python -c "import numpy, cv2, pandas, torch; print('NumPy', numpy.__version__, '- core imports OK')"
+
+      - name: Verify numpy pin (new app)
+        if: ${{ matrix.name == 'cells-calculator' }}
+        # The restructured app pins numpy>=2.1,<2.3 (TensorFlow/ml_dtypes on
+        # py3.13 need >=2.1; numba/StarDist need <2.3).
+        run: |
+          python -c "import numpy; mm=tuple(int(x) for x in numpy.__version__.split('.')[:2]); assert (2,1)<=mm<(2,3), f'numpy {numpy.__version__} outside >=2.1,<2.3'; print('numpy pin OK', numpy.__version__)"
+
+      - name: Smoke test Qt UI (headless)
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          # Verifies the Windows DLLs for Qt are present and working.
+          python -c "from PyQt5.QtWidgets import QApplication; QApplication([]); print('Qt UI initialized successfully')"
+
+      - name: Type check (mypy)
+        run: python -m mypy ${{ matrix.mypy_target }}
+
+      - name: Run tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+          TF_CPP_MIN_LOG_LEVEL: "3"
+        # Weight-free tests only; suites needing model weights run locally.
+        run: python -m pytest ${{ matrix.pytest_target }} -q

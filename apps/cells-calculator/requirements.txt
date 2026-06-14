@@ -1,0 +1,19 @@
+PyQt5>=5.15
+superqt
+numpy>=2.1,<2.3  # >=2.1 for TensorFlow/ml_dtypes on py3.13; <2.3 for numba/stardist
+scikit-image
+opencv-python
+pandas
+scikit-learn
+matplotlib
+tifffile
+torch
+csbdeep
+ultralytics
+shapely
+instanseg-torch[io]
+cellpose
+stardist
+tensorflow
+
+

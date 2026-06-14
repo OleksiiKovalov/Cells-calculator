@@ -1,0 +1,85 @@
+{
+	"YOLO-512 Segmenter": {
+		"path": "trainedmodels/YOLO11x-512-seg.pt",
+		"model_type": "yolo",
+		"preload": "true"
+	},
+	"InstanSeg Flu_nc": {
+		"enabled": "true",
+		"path": "fluorescence_nuclei_and_cells",
+		"model_type": "instanseg"
+	},
+	"InstanSeg V3 (512)": {
+		"enabled": "true",
+		"path": "trainedmodels/instanseg_20250605.pt",
+		"model_type": "instanseg",
+		"x20":
+		{
+			"inference_method_name": "eval_medium_image",
+			"tile_size": 512,
+			"image_preprocess": [
+				{
+					"gray2rgb":""
+				},
+				{
+					"resize": "512:512"
+				}
+			]
+		},
+		"x10":
+		{
+			"inference_method_name": "eval_medium_image",
+			"tile_size": "1024",
+			"image_preprocess": [
+				{
+					"gray2rgb":""
+				}
+			]
+		}
+	},
+	"Neuroblastoma Inst V3.1": {
+		"enabled": "true",
+		"path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt",
+		"model_type": "instanseg"
+	},
+
+	"Neuroblastoma Inst V3.1(512)": {
+		"enabled": "true",
+		"path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt",
+		"model_type": "instanseg",
+		"x20":
+		{
+			"inference_method_name": "eval_medium_image",
+			"tile_size": 512,
+			"image_preprocess": [
+				{
+					"gray2rgb":""
+				},
+				{
+					"resize": "512:512"
+				}
+			]
+		},
+		"x10":
+		{
+			"inference_method_name": "eval_medium_image",
+			"tile_size": "1024",
+			"image_preprocess": [
+				{
+					"gray2rgb":""
+				}
+			]
+		}
+
+	},
+	"Cellpose cyto3": {
+		"enabled": "true",
+		"path": "cyto3",
+		"model_type": "cellpose"
+	},
+	"Stardist trained 0602": {
+		"enabled": "true",
+		"path": "trainedmodels/stardist0602",
+		"model_type": "stardist"
+	}
+}

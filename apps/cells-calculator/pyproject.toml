@@ -1,0 +1,44 @@
+# Tooling configuration for the cells-calculator app.
+#
+# The app ships and runs as a self-contained folder via `python main.py`; `src/`
+# is the import root holding the top-level `app`, `ui` and `model` modules.
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = ["ignore"]
+
+[tool.mypy]
+mypy_path = "src"
+explicit_package_bases = true
+warn_unused_configs = true
+disable_error_code = ["annotation-unchecked"]
+check_untyped_defs = true
+warn_return_any = true
+
+# The UI layer is checked less strictly (lots of Qt dynamic attributes).
+[[tool.mypy.overrides]]
+module = "ui.*"
+check_untyped_defs = false
+warn_return_any = false
+
+# Staged "import the universe" module — intentionally side-effect-only.
+[[tool.mypy.overrides]]
+module = "ui.imports"
+ignore_errors = true
+
+# PyQt5 stubs are strict enough to produce false positives; treat as untyped.
+[[tool.mypy.overrides]]
+module = "PyQt5.*"
+ignore_missing_imports = true
+follow_imports = "skip"
+
+# Third-party libraries without (sufficient) type information.
+[[tool.mypy.overrides]]
+module = [
+    "cv2.*", "pandas.*", "tifffile.*", "skimage.*", "scipy.*", "matplotlib.*",
+    "csbdeep.*", "superqt.*", "shapely.*", "ultralytics.*", "instanseg.*",
+    "cellpose.*", "stardist.*", "tensorflow.*",
+]
+ignore_missing_imports = true
