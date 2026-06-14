@@ -20,6 +20,15 @@ jobs:
             python: "3.13"
             mypy_target: src
             pytest_target: tests/unit
+            core_imports: "numpy, cv2, pandas, torch"
+            allow_failure: false
+          # Dataset Viewer app (flat src/ layout, py3.13).
+          - name: dataset-viewer
+            dir: apps/dataset-viewer
+            python: "3.13"
+            mypy_target: src
+            pytest_target: tests
+            core_imports: "numpy, matplotlib, yaml"
             allow_failure: false
           # Legacy V3.2 app (root layout, py3.11) — non-blocking.
           - name: cells-calculator.V32
@@ -27,6 +36,7 @@ jobs:
             python: "3.11"
             mypy_target: main.py model UI
             pytest_target: tests
+            core_imports: "numpy"
             allow_failure: true
     defaults:
       run:
@@ -53,8 +63,8 @@ jobs:
         run: |
           echo "Running pip check to surface dependency conflicts..."
           pip check || echo "::warning::pip check reported declared-bound conflicts (numpy pin may be deliberate)"
-          echo "Verifying core science libraries are intact..."
-          python -c "import numpy, cv2, pandas, torch; print('NumPy', numpy.__version__, '- core imports OK')"
+          echo "Verifying core libraries are intact..."
+          python -c "import ${{ matrix.core_imports }}; import numpy; print('NumPy', numpy.__version__, '- core imports OK')"
 
       - name: Verify numpy pin (new app)
         if: ${{ matrix.name == 'cells-calculator' }}

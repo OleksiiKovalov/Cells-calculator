@@ -1,0 +1,35 @@
+# Tooling configuration for Dataset Viewer.
+# The app runs as a folder via `python main.py` (the `app` package is importable
+# from the project root).
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = ["ignore"]
+
+[tool.mypy]
+mypy_path = "src"
+explicit_package_bases = true
+warn_unused_configs = true
+disable_error_code = ["annotation-unchecked"]
+check_untyped_defs = true
+warn_return_any = true
+
+# The Qt/UI layer is dynamic (PyQt5 Optional-return stubs); check it less
+# strictly. The dataset loaders/exporters stay strict (default).
+[[tool.mypy.overrides]]
+module = ["widgets.*", "main_window", "app", "dialogs.*"]
+check_untyped_defs = false
+warn_return_any = false
+
+# PyQt5 stubs are strict enough to produce false positives; treat as untyped.
+[[tool.mypy.overrides]]
+module = "PyQt5.*"
+ignore_missing_imports = true
+follow_imports = "skip"
+
+# Third-party libraries without bundled type information.
+[[tool.mypy.overrides]]
+module = ["matplotlib.*", "yaml.*", "PIL.*", "torch.*"]
+ignore_missing_imports = true

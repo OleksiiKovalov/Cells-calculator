@@ -15,5 +15,6 @@ instanseg-torch[io]
 cellpose
 stardist
 tensorflow
+PyYAML  # used by the dataset-viewer app (shares this env) for YOLO data.yaml
 
 

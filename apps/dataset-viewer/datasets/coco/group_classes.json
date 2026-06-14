@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "classes": [
+    {
+      "id": "cls_001",
+      "name": "cell",
+      "color_hue": 130,
+      "color_sat": 45,
+      "color_light": 42,
+      "constraints": {
+        "min": {
+          "nucleus": 1,
+          "vesicle": 1
+        },
+        "max": {}
+      }
+    },
+    {
+      "id": "cls_002",
+      "name": "vesicle_cluster",
+      "color_hue": 28,
+      "color_sat": 55,
+      "color_light": 48,
+      "constraints": {
+        "min": {
+          "vesicle": 1
+        },
+        "max": {
+          "nucleus": 0
+        }
+      }
+    },
+    {
+      "id": "cls_003",
+      "name": "nuclei",
+      "color_hue": 280,
+      "color_sat": 40,
+      "color_light": 48,
+      "constraints": {
+        "min": {
+          "nucleus": 1
+        }
+      }
+    }
+  ]
+}
