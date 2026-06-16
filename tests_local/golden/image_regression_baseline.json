@@ -42,12 +42,20 @@
     "Neuroblastoma Inst V3.1": {
       "images": {
         "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
-          "area_mean": 0.001043,
-          "area_sum": 0.27639,
+          "area_mean": 0.001379,
+          "area_sum": 0.359801,
           "confidence_mean": 1.0,
-          "confidence_sum": 265.0,
-          "count": 265,
-          "diameter_mean": 0.032693
+          "confidence_sum": 261.0,
+          "count": 261,
+          "diameter_mean": 0.037488
+        },
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ_1.jpg": {
+          "area_mean": 0.001283,
+          "area_sum": 0.245113,
+          "confidence_mean": 1.0,
+          "confidence_sum": 191.0,
+          "count": 191,
+          "diameter_mean": 0.038068
         }
       },
       "model_type": "instanseg",
@@ -56,12 +64,20 @@
     "Neuroblastoma Inst V3.1(512)": {
       "images": {
         "testimages/Neuroblastoma Cells Images/SK-N-DZ.jpg": {
-          "area_mean": 0.001043,
-          "area_sum": 0.27639,
+          "area_mean": 0.001379,
+          "area_sum": 0.359801,
           "confidence_mean": 1.0,
-          "confidence_sum": 265.0,
-          "count": 265,
-          "diameter_mean": 0.032693
+          "confidence_sum": 261.0,
+          "count": 261,
+          "diameter_mean": 0.037488
+        },
+        "testimages/Neuroblastoma Cells Images/SK-N-DZ_1.jpg": {
+          "area_mean": 0.001282,
+          "area_sum": 0.247418,
+          "confidence_mean": 1.0,
+          "confidence_sum": 193.0,
+          "count": 193,
+          "diameter_mean": 0.038063
         }
       },
       "model_type": "instanseg",

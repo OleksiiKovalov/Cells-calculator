@@ -309,6 +309,56 @@ def test_instanseg_pads_narrow_eval_medium_image_window(request, monkeypatch):
     assert padded.shape[:2] == (512, 512)
 
 
+def test_instanseg_keeps_legacy_tile_padding_when_enabled(request, monkeypatch):
+    instanseg_module = _import_with_fakes(
+        request,
+        monkeypatch,
+        "model.InstanSegSegmenter",
+        _fake_instanseg_modules(),
+    )
+    segmenter = instanseg_module.InstansegSegmenter.__new__(
+        instanseg_module.InstansegSegmenter
+    )
+    dummy_logger = logging.getLogger("dummy_logger")
+    dummy_logger.addHandler(logging.NullHandler())
+    segmenter._logger = dummy_logger
+
+    image = np.zeros((508, 510, 3), dtype=np.uint8)
+    padded = segmenter._ensure_eval_window_size(
+        image,
+        method_name="eval_medium_image",
+        tile_size=512,
+    )
+
+    assert padded.shape[:2] == (512, 512)
+
+
+def test_instanseg_keeps_valid_eval_medium_image_window_unpadded(
+    request,
+    monkeypatch,
+):
+    instanseg_module = _import_with_fakes(
+        request,
+        monkeypatch,
+        "model.InstanSegSegmenter",
+        _fake_instanseg_modules(),
+    )
+    segmenter = instanseg_module.InstansegSegmenter.__new__(
+        instanseg_module.InstansegSegmenter
+    )
+
+    image = np.zeros((508, 510, 3), dtype=np.uint8)
+    padded = segmenter._ensure_eval_window_size(
+        image,
+        method_name="eval_medium_image",
+        tile_size=512,
+        pad_to_tile_size=False,
+    )
+
+    assert padded is image
+    assert padded.shape[:2] == (508, 510)
+
+
 def test_instanseg_preprocess_keeps_rgba_input_to_three_channels():
     rgba = np.zeros((32, 31, 4), dtype=np.uint8)
 
