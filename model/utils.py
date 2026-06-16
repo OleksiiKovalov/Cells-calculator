@@ -288,9 +288,9 @@ def count_detected_objects(detections) -> int:
 
 def calculate_alive_percentage(cell_count: int, nuclei_count: int):
     """Calculates alive percentage, returning -100 when it cannot be computed."""
-    if cell_count <= 0 or nuclei_count == -100:
+    if cell_count <= 0 or nuclei_count < 0:
         return -100
-    return round((1 - nuclei_count / cell_count) * 100, 3)
+    return max(0.0, round((1 - nuclei_count / cell_count) * 100, 3))
 
 def _select_channel(image, channel, *, empty_on_missing=False):
     """Return a valid channel, falling back to channel 0 or an empty image."""
@@ -540,8 +540,12 @@ def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
     if len(conf_array) == 0:
         return None
     class_array = np.array(df['id_label'].tolist())
-    df['box'] = df['box'].apply(lambda b: [b[0], b[1], b[2] + b[0], b[3] + b[1]])
-    box_array = np.array(df['box'].tolist())
+    box_array = np.array(
+        [
+            [box[0], box[1], box[2] + box[0], box[3] + box[1]]
+            for box in df['box'].tolist()
+        ]
+    )
     box_array = np.hstack((box_array, np.expand_dims(conf_array, axis=1),
                            np.expand_dims(class_array, axis=1)))
     mask_array = np.stack(df['bin_mask'].tolist(), axis=0)
@@ -549,7 +553,7 @@ def pandas_to_ultralytics(df, original_image, path, frame_num: int = 0):
     boxes = torch.Tensor(box_array)
     try:
         masks = torch.Tensor(mask_array)
-    except:
+    except (TypeError, ValueError):
         masks = torch.Tensor(mask_array.astype(np.uint8))
     results = Results(orig_img=original_image, path=path, names=names, boxes=boxes,
                       masks=masks, probs=probs, keypoints=None, obb=None, speed=None)
