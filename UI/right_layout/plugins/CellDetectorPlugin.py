@@ -777,8 +777,11 @@ class CellDetectorPlugin(BasePlugin):
                 else None
             )
             model_class_name = type(cell_counter).__name__.lower()
+            # InstanSeg masks are normalized to the preprocessed inference image.
+            # Map them back to the original image so normalized/float inference
+            # inputs do not become the display background.
             mask_coordinate_space = (
-                "inference"
+                "auto"
                 if "instanseg" in model_class_name
                 else "original"
             )
