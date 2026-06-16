@@ -461,7 +461,7 @@ class CellDetectorPlugin(BasePlugin):
     def reset_detection(self):
         try:
             self.model.cell_counter.detections = None
-        except:
+        except AttributeError:
             pass
 
     def set_size(self, detection, img_size : tuple = (512,512)):
@@ -1056,7 +1056,7 @@ class CellDetectorPlugin(BasePlugin):
         finally:
             self.lsm_path = saved_lsm_path
             self.batchProcessButtonMultiImage.setEnabled(savedEnabled)    
-            self.batchProcessButtonMultiImage.setText(f"Current model on multiple images")
+            self.batchProcessButtonMultiImage.setText("Current model on multiple images")
         
     def print_result(self, result):
         """
@@ -1247,13 +1247,13 @@ class CellDetectorPlugin(BasePlugin):
                 self._format_value("Mean S", avg_area_permyriad, avg_area_um2, "µm²"),
                 self._format_value("Mean V", avg_volume_permyriad, avg_volume_um3, "µm³"),
             ]
-        except:
+        except Exception:
             results = [
-                f"Objects detected: - ",
-                f"Duration        : - ",
-                f"Mean D: -",
-                f"Mean S: -",
-                f"Mean V: -",
+                "Objects detected: - ",
+                "Duration        : - ",
+                "Mean D: -",
+                "Mean S: -",
+                "Mean V: -",
             ]
         # try:
         # except AttributeError:
