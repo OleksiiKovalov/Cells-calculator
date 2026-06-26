@@ -7,6 +7,10 @@ pandas
 scikit-learn
 matplotlib
 tifffile
+# GPU (CUDA): install torch separately BEFORE this file:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# (adjust cu128 to match your installed CUDA version: cu121, cu124, cu128, etc.)
+# The plain 'torch' line below is a CPU-only fallback for environments without a GPU.
 torch
 csbdeep
 ultralytics

@@ -13,7 +13,7 @@ set INSTALLER=redistributables\Miniconda3-latest-Windows-x86_64.exe
 
 REM --- locate conda: on PATH, then our own install, then bundled installer ----
 set "CONDA_EXE="
-where conda >nul 2>nul && set "CONDA_EXE=conda"
+for /f "delims=" %%I in ('where conda.exe 2^>nul') do if not defined CONDA_EXE set "CONDA_EXE=%%I"
 if not defined CONDA_EXE if exist "%CONDA_HOME%\Scripts\conda.exe" set "CONDA_EXE=%CONDA_HOME%\Scripts\conda.exe"
 
 if not defined CONDA_EXE (

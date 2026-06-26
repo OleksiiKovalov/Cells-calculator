@@ -60,7 +60,7 @@ class InstansegSegmenter(BaseSegmenter):
 
         if path_to_model and os.path.exists(path_to_model):
             print(f"Initializing InstanSeg with model: {path_to_model}")
-            model_module = torch.jit.load(path_to_model)
+            model_module = torch.jit.load(path_to_model, map_location=self.device)
             self.model = InstanSeg(model_module, verbosity=1)
         elif path_to_model in [
             'brightfield_nuclei',
@@ -81,9 +81,9 @@ class InstansegSegmenter(BaseSegmenter):
                     f"Using '{default_model}'."
                 )
             self.model = InstanSeg(default_model, verbosity=1)
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            app_logger().warning(f"InstansegSegmenter: Device used: {device}")
-            self.model = self.model.to(device)
+
+        self.model = self.model.to(self.device)
+        app_logger().warning(f"InstansegSegmenter: Device used: {self.device}")
 
     def call_inference(
         self,

@@ -55,6 +55,7 @@ class YoloSegmenter(BaseSegmenter):
         """
         outputs = self.model(
             input_image,
+            device=self.device,
             conf=0.3,
             iou=0.6,
             max_det=2000,
