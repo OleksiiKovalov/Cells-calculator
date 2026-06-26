@@ -216,12 +216,12 @@ class SpheroidSegmenterPlugin(BasePlugin):
             result = self.models[model].calculate(
                 img_path=self.lsm_path, cell_channel=self.parametrs['Cell'],\
                     nuclei_channel=self.parametrs['Nuclei'])
-        except:
+        except Exception:
             traceback.print_exc()
             try:
                 # If an error occurs, try without channel information
                 result = self.models[model].calculate(img_path=self.lsm_path)
-            except:
+            except Exception:
                 traceback.print_exc()
                 # If still not successful, show an error dialog
                 self.plugin_signal.emit("show_warning", "Error during calculation \n\nChoose another model or change channels settings")
@@ -267,7 +267,7 @@ class SpheroidSegmenterPlugin(BasePlugin):
             avg_diameter = round(spheroid_df["diameter"].mean(), 2)
             avg_area = round(spheroid_df["area"].mean(), 2)
             avg_volume = round(spheroid_df["volume"].mean(), 2)
-        except:
+        except Exception:
             avg_diameter = "-"
             avg_area = "-"
             avg_volume = "-"

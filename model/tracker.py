@@ -19,6 +19,20 @@ from model.YOLOSegmenter import YoloSegmenter
 from model.utils import compute_iou, plot_mask, pandas_to_ultralytics, safe_image_read
 
 
+TRACKER_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".lsm", ".tif", ".tiff"}
+TRACKER_RESULT_COLUMNS = [
+    "frame_num",
+    "id_label",
+    "old_label",
+    "box",
+    "mask",
+    "confidence",
+    "diameter",
+    "area",
+    "volume",
+]
+
+
 class Tracker:
     """
     Class for spheroid tracking model.
@@ -84,34 +98,28 @@ class Tracker:
             - ID assignment uses maximum IoU matching with conflict resolution
         """
 
-        try:
+        if self.output_dir.exists():
             shutil.rmtree(self.output_dir)
-        except:
-            pass
 
         os.makedirs(self.output_dir, exist_ok=True)
         os.makedirs(self.img_dir, exist_ok=True)
         os.makedirs(self.table_dir, exist_ok=True)
 
-        self.results = {
-            "frame_num": [],
-            "id_label": [],
-            "old_label": [],
-            "box": [],
-            "mask": [],
-            "confidence": [],
-            "diameter": [],
-            "area": [],
-            "volume": []
-        }
+        self.results = {column: [] for column in TRACKER_RESULT_COLUMNS}
 
-        frame_names = os.listdir(img_seq_folder)
+        input_dir = Path(img_seq_folder)
+        frame_paths = [
+            path
+            for path in input_dir.iterdir()
+            if path.is_file() and path.suffix.lower() in TRACKER_IMAGE_EXTENSIONS
+        ]
+        frame_paths = sorted(frame_paths, key=lambda path: (path.name.lower(), path.name))
         zero_frame = True
         i = -1
         # we process each frame one-by-one in the loop below
-        for frame_name in frame_names:
+        for frame_path in frame_paths:
             i += 1
-            path = os.path.join(img_seq_folder, frame_name)
+            path = os.fspath(frame_path)
             filename = str(self.img_dir / ("frame_" + str(i).zfill(3) + ".png"))
             output = self.model.count_x20(
                 path,
@@ -250,6 +258,8 @@ class Tracker:
                 )
             zero_frame = False
         # now we processed all frames and start saving the results
+        if isinstance(self.results, dict):
+            self.results = pd.DataFrame(self.results, columns=TRACKER_RESULT_COLUMNS)
         self.results['id_label'].dropna(inplace=True)
         self.results = self.results[self.results['id_label'] != -1]
         unique_spheroids = self.results['id_label'].unique().tolist()

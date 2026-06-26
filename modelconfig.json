@@ -48,13 +48,15 @@
 	"Neuroblastoma Inst V3.1": {
 		"enabled": "true",
 		"path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt",
-		"model_type": "instanseg"
+		"model_type": "instanseg",
+		"pad_to_tile_size": false
 	},
 
 	"Neuroblastoma Inst V3.1(512)": {
 		"enabled": "true",
 		"path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt",
 		"model_type": "instanseg",
+		"pad_to_tile_size": false,
 		"x20":
 		{
 			"inference_method_name": "eval_medium_image",

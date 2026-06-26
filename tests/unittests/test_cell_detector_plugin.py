@@ -271,6 +271,9 @@ def test_call_inference_publishes_returned_inference_image(monkeypatch, tmp_path
 
 
 def test_render_model_result_uses_prediction_result_for_segmentation(monkeypatch):
+    class _InstansegSegmenterStub(SimpleNamespace):
+        pass
+
     plugin = CellDetectorPlugin.__new__(CellDetectorPlugin)
     plugin.object_size = {"color_map": "tab20", "alpha": 0.75}
     original_image = np.full((12, 13, 3), 40, dtype=np.uint8)
@@ -290,7 +293,7 @@ def test_render_model_result_uses_prediction_result_for_segmentation(monkeypatch
         original_image=original_image,
         inference_image=inference_image,
     )
-    cell_counter = SimpleNamespace(
+    cell_counter = _InstansegSegmenterStub(
         original_image=None,
         inference_image=None,
         detections=detections,
@@ -313,6 +316,7 @@ def test_render_model_result_uses_prediction_result_for_segmentation(monkeypatch
         captured["inference"] = inference
         captured["pred_masks"] = pred_masks
         captured["color_ids"] = color_ids
+        captured["mask_coordinate_space"] = mask_coordinate_space
         return original
 
     monkeypatch.setattr(
@@ -330,6 +334,7 @@ def test_render_model_result_uses_prediction_result_for_segmentation(monkeypatch
     assert len(captured["pred_masks"]) == 1
     assert np.array_equal(captured["pred_masks"][0], detections["mask"].iloc[0])
     assert captured["color_ids"] == [1]
+    assert captured["mask_coordinate_space"] == "auto"
     assert cell_counter.prediction_image is rendered
 
 

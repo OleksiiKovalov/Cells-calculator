@@ -220,7 +220,7 @@ class SettingsSaver:
                 temp_file = self.settings_file.parent / f"{self.settings_file.name}.tmp"
                 if temp_file.exists():
                     temp_file.unlink()
-            except:
+            except OSError:
                 pass
             return False
 
@@ -404,7 +404,7 @@ class SettingsManager:
                 if self.auto_save:
                     self.save()
 
-                self.logger.info(f"Reset settings to defaults" + (f" for section: {section}" if section else ""))
+                self.logger.info("Reset settings to defaults" + (f" for section: {section}" if section else ""))
                 return True
             except Exception as e:
                 self.logger.error(f"Error resetting settings: {e}")

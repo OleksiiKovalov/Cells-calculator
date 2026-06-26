@@ -102,7 +102,8 @@
 	"Neuroblastoma Inst": {
 		"enabled": "true",
 		"path": "trainedmodels/Instanseg-Neuroblastoma-v3.1.pt",
-		"model_type": "instanseg"
+		"model_type": "instanseg",
+		"pad_to_tile_size": false
 	},
 	"Stardist 2D_versatile_he": {
 		"enabled": "false",

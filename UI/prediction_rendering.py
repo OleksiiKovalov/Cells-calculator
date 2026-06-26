@@ -297,10 +297,12 @@ def plot_predictions_with_alignment(
 
     metadata = get_resize_and_pad_metadata(original_image.shape, w, h)
     aligned_image = resize_and_pad_cv(original_image, w, h)
+    # Draw on the aligned inference-sized canvas without persisting it;
+    # only the restored original-size result should be written to disk.
     rendered_aligned = plot_predictions(
         aligned_image,
         pred_masks,
-        filename=filename if mask_coordinate_space != "inference" else None,
+        filename=None,
         colormap=colormap,
         alpha=alpha,
         color_ids=color_ids,

@@ -28,6 +28,11 @@ def _format_result_value(key, value):
     return str(value)
 
 
+def _table_metric_name(result_key):
+    """Map model result keys to table metric columns."""
+    return "Alive" if result_key == "%" else result_key
+
+
 def calculate_table(
     model_dict: Dict[str, object],
     files_name: List[str],
@@ -74,13 +79,14 @@ def calculate_table(
                 # Attempt to apply the method to the image file
                 result = getattr(model, 'calculate', lambda **kwargs: None)(img_path=file_path, cell_channel=parameters['Cell'],\
                     nuclei_channel=parameters['Nuclei'])
-            except:
+            except Exception:
                 result = None
 
             if result:
                 # If the method returns a result, add the values to the row dictionary
                 for key, value in result.items():
-                    row[f"{model_name}/{key}"] = _format_result_value(key, value)
+                    metric = _table_metric_name(key)
+                    row[f"{model_name}/{metric}"] = _format_result_value(key, value)
             else:
                 # If no result is returned, mark the row with "-"
                 for i in column_list:

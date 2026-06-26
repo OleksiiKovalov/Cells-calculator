@@ -124,12 +124,33 @@ class InstansegSegmenter(BaseModel):
         """
         pass
 
-    def _ensure_eval_window_size(self, image, method_name, tile_size):
-        """Pad very narrow inputs so InstanSeg's fixed overlap is valid."""
+    @staticmethod
+    def _config_bool(value, default=True):
+        if value is None:
+            return default
+        if isinstance(value, str):
+            return value.strip().lower() not in {'false', '0', 'no', 'off'}
+        return bool(value)
+
+    def _ensure_eval_window_size(
+        self,
+        image,
+        method_name,
+        tile_size,
+        pad_to_tile_size=True,
+    ):
+        """Pad inputs for legacy tile sizing or when fixed overlap is invalid."""
         if method_name != 'eval_medium_image':
             return image
 
         height, width = image.shape[:2]
+        needs_overlap_padding = (
+            height < INSTANSEG_MIN_WINDOW_SIZE
+            or width < INSTANSEG_MIN_WINDOW_SIZE
+        )
+        if not pad_to_tile_size and not needs_overlap_padding:
+            return image
+
         padding_floor = max(
             min(int(tile_size), INSTANSEG_MAX_PADDING_FLOOR),
             INSTANSEG_MIN_WINDOW_SIZE,
@@ -194,6 +215,12 @@ class InstansegSegmenter(BaseModel):
                 else self.image_preprocess_settings_default
             )
             pixel_size = config_node['pixel_size'] if 'pixel_size' in config_node else None
+            pad_to_tile_size = self._config_bool(
+                config_node.get(
+                    'pad_to_tile_size',
+                    self.model_data.get('pad_to_tile_size', True),
+                )
+            )
             tile_size = config_node['tile_size'] if 'tile_size' in config_node else '512'
             if isinstance(tile_size, str) and tile_size.endswith('%'):
                 tile_size = int(int(tile_size[:-1]) * max(image.shape[:2]) / 100)
@@ -212,6 +239,9 @@ class InstansegSegmenter(BaseModel):
             self._logger.info('InstanSeg config not found, using defaults')
             image_preprocess_settings = self.image_preprocess_settings_default
             pixel_size = None
+            pad_to_tile_size = self._config_bool(
+                self.model_data.get('pad_to_tile_size', True)
+            )
             tile_size = 512
             method_name = 'eval_medium_image'
 
@@ -223,6 +253,7 @@ class InstansegSegmenter(BaseModel):
             img_inference,
             method_name,
             tile_size,
+            pad_to_tile_size=pad_to_tile_size,
         )
         self.original_image = safegray2rgb(image)
 
