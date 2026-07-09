@@ -58,16 +58,18 @@ class InstansegSegmenter(BaseSegmenter):
             '[{"gray2rgb":""}]', object_pairs_hook=OrderedDict
         )
 
+        device = self.device.type
+
         if path_to_model and os.path.exists(path_to_model):
             print(f"Initializing InstanSeg with model: {path_to_model}")
             model_module = torch.jit.load(path_to_model, map_location=self.device)
-            self.model = InstanSeg(model_module, verbosity=1)
+            self.model = InstanSeg(model_module, device=device, verbosity=1)
         elif path_to_model in [
             'brightfield_nuclei',
             'fluorescence_nuclei_and_cells',
         ]:
             print(f"Initializing InstanSeg with standard model: {path_to_model}")
-            self.model = InstanSeg(path_to_model, verbosity=1)
+            self.model = InstanSeg(path_to_model, device=device, verbosity=1)
         else:
             default_model = 'fluorescence_nuclei_and_cells'
             if path_to_model:
@@ -80,9 +82,8 @@ class InstansegSegmenter(BaseSegmenter):
                     f"Warning: no InstanSeg model specified. "
                     f"Using '{default_model}'."
                 )
-            self.model = InstanSeg(default_model, verbosity=1)
+            self.model = InstanSeg(default_model, device=device, verbosity=1)
 
-        self.model = self.model.to(self.device)
         app_logger().warning(f"InstansegSegmenter: Device used: {self.device}")
 
     def call_inference(
