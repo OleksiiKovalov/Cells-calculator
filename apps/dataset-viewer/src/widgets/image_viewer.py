@@ -1,8 +1,8 @@
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem,
 )
-from PyQt5.QtCore import Qt, QRectF, QPointF, pyqtSignal
-from PyQt5.QtGui import QPixmap, QPen, QColor, QBrush, QPainter, QFont, QPolygonF, QImage
+from PySide6.QtCore import Qt, QRectF, QPointF, Signal
+from PySide6.QtGui import QPixmap, QPen, QColor, QBrush, QPainter, QFont, QPolygonF, QImage
 
 
 def _build_colors() -> list[QColor]:
@@ -25,7 +25,7 @@ _COLORS = _build_colors()
 
 
 class ImageViewer(QGraphicsView):
-    zoom_changed = pyqtSignal(float)   # emits zoom percent
+    zoom_changed = Signal(float)   # emits zoom percent
 
     _ZOOM_IN  = 1.25
     _ZOOM_OUT = 1.0 / 1.25
@@ -81,7 +81,7 @@ class ImageViewer(QGraphicsView):
             return
 
         self._pixmap_item = QGraphicsPixmapItem(pixmap)
-        self._pixmap_item.setTransformationMode(Qt.SmoothTransformation)
+        self._pixmap_item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         self._scene.addItem(self._pixmap_item)
         self._scene.setSceneRect(QRectF(pixmap.rect()))
 
@@ -129,7 +129,7 @@ class ImageViewer(QGraphicsView):
 
             else:  # bbox
                 x, y, w, h = ann['x'], ann['y'], ann['w'], ann['h']
-                item = self._scene.addRect(x, y, w, h, pen, QBrush(Qt.NoBrush))
+                item = self._scene.addRect(x, y, w, h, pen, QBrush(Qt.BrushStyle.NoBrush))
                 item.setZValue(1)
                 self._ann_items.append(item)
 
@@ -140,7 +140,7 @@ class ImageViewer(QGraphicsView):
                 font = QFont("Segoe UI", 9)
                 font.setBold(True)
                 txt.setFont(font)
-                txt.setFlag(QGraphicsItem.ItemIgnoresTransformations)
+                txt.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations)
                 txt.setPos(lx, ly)
                 txt.setZValue(2)
                 self._ann_items.append(txt)

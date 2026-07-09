@@ -1,11 +1,11 @@
 import os
-from PyQt5.QtWidgets import (
-    QMainWindow, QAction, QFileDialog, QMessageBox,
+from PySide6.QtWidgets import (
+    QMainWindow, QFileDialog, QMessageBox,
     QToolBar, QDockWidget, QLabel, QSizePolicy,
     QProgressDialog, QDialog, QApplication,
 )
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QKeySequence
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QKeySequence, QAction
 
 from widgets.image_viewer import ImageViewer
 from widgets.file_browser import FileBrowser
@@ -258,7 +258,7 @@ class MainWindow(QMainWindow):
         from datasets.pth_exporter import PTHExporter
 
         dialog = SaveAsDialog(self)
-        if dialog.exec_() != QDialog.Accepted:
+        if dialog.exec() != QDialog.Accepted:
             return
 
         fmt = dialog.selected_format()
@@ -298,7 +298,7 @@ class MainWindow(QMainWindow):
         name = os.path.basename(path)
         n = len(annotations)
         ann_txt = f"{n} annotation{'s' if n != 1 else ''}"
-        from PyQt5.QtGui import QImageReader
+        from PySide6.QtGui import QImageReader
         size = QImageReader(path).size()
         dim_txt = f"{size.width()}×{size.height()}" if size.isValid() else ""
         parts = [name, dim_txt, ann_txt]

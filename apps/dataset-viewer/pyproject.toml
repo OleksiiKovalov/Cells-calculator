@@ -16,16 +16,16 @@ disable_error_code = ["annotation-unchecked"]
 check_untyped_defs = true
 warn_return_any = true
 
-# The Qt/UI layer is dynamic (PyQt5 Optional-return stubs); check it less
+# The Qt/UI layer is dynamic (PySide6 Optional-return stubs); check it less
 # strictly. The dataset loaders/exporters stay strict (default).
 [[tool.mypy.overrides]]
 module = ["widgets.*", "main_window", "app", "dialogs.*"]
 check_untyped_defs = false
 warn_return_any = false
 
-# PyQt5 stubs are strict enough to produce false positives; treat as untyped.
+# PySide6 stubs are strict enough to produce false positives; treat as untyped.
 [[tool.mypy.overrides]]
-module = "PyQt5.*"
+module = "PySide6.*"
 ignore_missing_imports = true
 follow_imports = "skip"
 

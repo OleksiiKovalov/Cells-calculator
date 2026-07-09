@@ -15,7 +15,7 @@ DATASETS = os.path.join(ROOT, "datasets")
 
 @pytest.fixture(scope="session", autouse=True)
 def qapp():
-    from PyQt5.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
     yield app
 

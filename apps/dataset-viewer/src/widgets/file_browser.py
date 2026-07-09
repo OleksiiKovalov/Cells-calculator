@@ -1,16 +1,16 @@
 import os
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QTreeWidget, QTreeWidgetItem,
     QTreeWidgetItemIterator, QLabel, QAbstractItemView,
 )
-from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QFont
+from PySide6.QtCore import Signal, Qt
+from PySide6.QtGui import QFont
 
 
 class FileBrowser(QWidget):
     """Floating/dockable panel showing dataset files grouped by split."""
 
-    image_selected = pyqtSignal(str, list)   # (image_path, annotations)
+    image_selected = Signal(str, list)   # (image_path, annotations)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -64,7 +64,7 @@ class FileBrowser(QWidget):
                 for img in images:
                     child = QTreeWidgetItem(header)
                     child.setText(0, os.path.basename(img['path']))
-                    child.setData(0, Qt.UserRole, img)
+                    child.setData(0, Qt.ItemDataRole.UserRole, img)
                     child.setToolTip(0, img['path'])
                 header.setExpanded(True)
                 total += len(images)
@@ -74,7 +74,7 @@ class FileBrowser(QWidget):
             for img in images:
                 item = QTreeWidgetItem(self.tree)
                 item.setText(0, os.path.basename(img['path']))
-                item.setData(0, Qt.UserRole, img)
+                item.setData(0, Qt.ItemDataRole.UserRole, img)
                 item.setToolTip(0, img['path'])
             self.info.setText(f"{len(images)} images")
 
@@ -90,7 +90,7 @@ class FileBrowser(QWidget):
             self._emit_image(current)
 
     def _emit_image(self, item: QTreeWidgetItem):
-        img_info = item.data(0, Qt.UserRole)
+        img_info = item.data(0, Qt.ItemDataRole.UserRole)
         if not img_info:
             return
         path = img_info['path']
@@ -117,7 +117,7 @@ class FileBrowser(QWidget):
 
     def _selectable_items(self) -> list:
         result = []
-        it = QTreeWidgetItemIterator(self.tree, QTreeWidgetItemIterator.Selectable)
+        it = QTreeWidgetItemIterator(self.tree, QTreeWidgetItemIterator.IteratorFlag.Selectable)
         while it.value():
             result.append(it.value())
             it += 1

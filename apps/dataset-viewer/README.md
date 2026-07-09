@@ -1,6 +1,6 @@
 # Dataset Viewer
 
-A PyQt5 desktop app for **browsing and converting annotated image datasets**.
+A PySide6 desktop app for **browsing and converting annotated image datasets**.
 Open a dataset folder — the format is auto-detected — view every image with its
 bounding boxes, polygons and masks overlaid, and export the whole thing to a
 different format.
@@ -30,7 +30,7 @@ the full contract and design invariants.
 
 > **Runs in the flagship app's environment.** Within this monorepo, Dataset
 > Viewer is meant to run inside the **Cells Calculator** conda environment rather
-> than having its own — its dependencies (PyQt5, numpy, matplotlib; PyYAML for
+> than having its own — its dependencies (PySide6, numpy, matplotlib; PyYAML for
 > YOLO `data.yaml`; torch + Pillow for `.pth`) are already provided there. After
 > setting up the flagship env (`apps/cells-calculator/install.bat`), launch it
 > with **`run.bat`** (or `conda run -n cells-calculator python main.py`). No

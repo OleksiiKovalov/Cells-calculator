@@ -1,12 +1,12 @@
 # Dataset Viewer — Full Specification
 
-Build a **PyQt5 desktop application** called "Dataset Viewer" for browsing and converting annotated image datasets. Use the Fusion style. Entry point is `main.py`; all app code lives under `app/`.
+Build a **PySide6 desktop application** called "Dataset Viewer" for browsing and converting annotated image datasets. Use the Fusion style. Entry point is `main.py`; all app code lives under `app/`.
 
 ---
 
 ## Dependencies (`requirements.txt`)
 ```
-PyQt5>=5.15.0
+PySide6>=6.5.0
 PyYAML>=6.0
 numpy>=1.21.0
 matplotlib>=3.5.0
@@ -45,7 +45,7 @@ app/
 ---
 
 ## `main.py`
-Enable `AA_EnableHighDpiScaling` and `AA_UseHighDpiPixmaps`. Set app name to `"Dataset Viewer"`, style to `"Fusion"`. Show `MainWindow`, call `sys.exit(app.exec_())`.
+High-DPI scaling is always on in Qt6, no attribute needed. Set app name to `"Dataset Viewer"`, style to `"Fusion"`. Show `MainWindow`, call `sys.exit(app.exec())`.
 
 ---
 
@@ -245,7 +245,7 @@ Output: single `dataset.pth` in the chosen folder.
 `QWidget` (placed in a `QDockWidget`).
 
 - `QTreeWidget` (header hidden, alternating row colors, single selection) + small `QLabel` info bar.
-- `image_selected = pyqtSignal(str, list)` — emits `(image_path, annotations)`.
+- `image_selected = Signal(str, list)` — emits `(image_path, annotations)`.
 - `load_dataset(loader)`: if splits exist, create non-selectable bold header items + child image items; else flat list. Store `img_info` dict in `Qt.UserRole`.
 - Selection via `itemClicked` and `currentItemChanged` (for keyboard nav).
 - `select_offset(delta)`: move selection by delta among selectable items using `QTreeWidgetItemIterator`.

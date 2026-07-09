@@ -1,12 +1,10 @@
 import sys
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import Qt
+from PySide6.QtWidgets import QApplication
 from main_window import MainWindow
 
 
 def main():
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
+    # High-DPI scaling is always on in Qt6; no attribute needed.
     app = QApplication(sys.argv)
     app.setApplicationName("Dataset Viewer")
     app.setStyle("Fusion")
@@ -14,7 +12,7 @@ def main():
     window = MainWindow()
     window.show()
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

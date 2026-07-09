@@ -4,7 +4,7 @@ from .base_loader import BaseDatasetLoader
 
 
 def _image_size(path: str) -> tuple[int, int]:
-    from PyQt5.QtGui import QImageReader
+    from PySide6.QtGui import QImageReader
     r = QImageReader(path)
     s = r.size()
     return (s.width(), s.height()) if s.isValid() else (0, 0)

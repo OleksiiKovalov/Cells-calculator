@@ -160,7 +160,7 @@ class YOLOLoader(BaseDatasetLoader):
 
     @staticmethod
     def _image_size(path: str) -> tuple[int, int]:
-        from PyQt5.QtGui import QImageReader
+        from PySide6.QtGui import QImageReader
         reader = QImageReader(path)
         size = reader.size()
         return (size.width(), size.height()) if size.isValid() else (0, 0)

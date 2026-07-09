@@ -39,7 +39,7 @@ because the loaders use `QImageReader`/`QPixmap`.
 python -m mypy src
 ```
 Config in `pyproject.toml`: strict on the `datasets` loaders/exporters, lenient
-on the Qt/UI modules (`widgets`, `dialogs`, `main_window`, `app`), with PyQt5 and
+on the Qt/UI modules (`widgets`, `dialogs`, `main_window`, `app`), with PySide6 and
 the untyped third-party libs (`matplotlib`, `yaml`, `PIL`, `torch`) treated as
 `ignore_missing_imports`. Keep it clean.
 
