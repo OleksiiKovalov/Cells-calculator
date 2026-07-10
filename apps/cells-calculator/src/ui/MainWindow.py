@@ -230,7 +230,7 @@ class MainWindow(QMainWindow):
 
         self.cbShowOriginal = QCheckBox("Show original", self)
         self.cbShowOriginal.setObjectName("cbShowOriginal")
-        self.cbShowOriginal.stateChanged.connect(self._on_show_original_changed)
+        self.cbShowOriginal.toggled.connect(self._on_show_original_changed)
         toolbar.addWidget(self.cbShowOriginal)
         toolbar.addSeparator()
 
@@ -409,9 +409,9 @@ class MainWindow(QMainWindow):
         finally:
             self.cbShowOriginal.blockSignals(False)
 
-    def _on_show_original_changed(self, state: int):
+    def _on_show_original_changed(self, checked: bool):
         """Switch the viewer image when the 'Show original' checkbox toggles."""
-        self._set_current_image(state == Qt.CheckState.Checked)
+        self._set_current_image(checked)
 
     # =========================================================================
     # Zoom

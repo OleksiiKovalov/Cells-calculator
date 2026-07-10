@@ -28,6 +28,34 @@ def test_load_image_sample(qapp):
     assert w > 0 and h > 0 and ch == 3
 
 
+def test_show_original_toggle(qapp):
+    """'Show original' must stay toggled and swap original vs prediction correctly.
+
+    Regression: stateChanged(int) compared against the Qt.CheckState enum was
+    always False under PySide6, so checking the box showed the masks and
+    silently unchecked itself.
+    """
+    import numpy as np
+    from ui.MainWindow import MainWindow
+    win = MainWindow()
+    original = np.zeros((8, 8, 3), np.uint8); original[..., 0] = 10   # red marker
+    prediction = np.zeros((8, 8, 3), np.uint8); prediction[..., 1] = 200  # green marker
+    win.original_image = original
+    win.prediction_image = prediction
+
+    win._set_current_image(False)  # state after Calculate: show prediction/masks
+    assert win.cbShowOriginal.isChecked() is False
+
+    win.cbShowOriginal.setChecked(True)          # user asks for the original
+    assert win.cbShowOriginal.isChecked() is True  # stays checked (no self-uncheck)
+    shown = win.viewer.get_image()
+    assert shown is not None and shown[..., 0].max() == 10 and shown[..., 1].max() == 0
+
+    win.cbShowOriginal.setChecked(False)         # back to masks
+    shown = win.viewer.get_image()
+    assert shown is not None and shown[..., 1].max() == 200
+
+
 def _win_with_detections(qapp, df):
     from ui.MainWindow import MainWindow
     win = MainWindow()
