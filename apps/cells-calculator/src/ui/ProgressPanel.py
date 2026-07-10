@@ -1,8 +1,8 @@
 """Floating resizable progress panel for long-running operations."""
 
-from PyQt5.QtCore import QElapsedTimer, QPoint, QSize, QTimer, Qt, pyqtSignal
-from PyQt5.QtGui import QColor, QFont, QPainter, QPen
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import QElapsedTimer, QPoint, QSize, QTimer, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton,
     QVBoxLayout, QWidget,
 )
@@ -63,8 +63,8 @@ class ProgressPanel(QFrame):
     Not a dialog — stays as a child widget over the viewer.
     """
 
-    cancel_requested = pyqtSignal()
-    panel_moved = pyqtSignal()
+    cancel_requested = Signal()
+    panel_moved = Signal()
 
     def __init__(self, parent=None):
         """Initialize the panel, its drag state and elapsed timers, and build the UI."""

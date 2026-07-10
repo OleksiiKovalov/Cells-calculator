@@ -22,7 +22,7 @@
 					"gray2rgb":""
 				},
 				{
-					"resize": "512:512"
+					"resizeandpad": "512:512"
 				}
 			]
 		},

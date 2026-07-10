@@ -13,7 +13,7 @@ from numpy.typing import NDArray
 import pandas as pd
 import tifffile
 from csbdeep.utils import normalize
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox
 from skimage.color import gray2rgb, rgb2gray
 from skimage.io import imsave
 from skimage.transform import resize
@@ -563,15 +563,55 @@ def morphology_to_micrometers(diameter_norm, area_norm, volume_norm,
         volume_px3 * (um_per_px ** 3),
     )
 
-def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
-    """Resize image keeping aspect ratio and pad to target size."""
+# A geometric transform recording what a resize/pad step actually did, as
+# ``dst_px = src_px * scale + pad`` (uniform scale, centered padding). The
+# resize/pad code reports this so detections found on the preprocessed image can
+# be mapped back exactly — no guessing the geometry from image shapes.
+IDENTITY_TRANSFORM = {"scale": 1.0, "pad_x": 0.0, "pad_y": 0.0}
+
+
+def compose_transforms(first: dict, second: dict) -> dict:
+    """Compose two scale-then-centered-pad transforms.
+
+    ``first`` is applied to the original image, ``second`` to the already
+    transformed image. Returns the net transform mapping original-image pixels
+    to the final image's pixels: applying ``second`` to ``p * s1 + pad1`` gives
+    ``p * s1*s2 + (pad1*s2 + pad2)``.
+    """
+    return {
+        "scale": first["scale"] * second["scale"],
+        "pad_x": first["pad_x"] * second["scale"] + second["pad_x"],
+        "pad_y": first["pad_y"] * second["scale"] + second["pad_y"],
+    }
+
+
+def invert_transform_points(pts_xy: NDArray, transform: dict) -> NDArray:
+    """Map (N, 2) x/y points from preprocessed space back to original pixels.
+
+    Inverts ``p * scale + pad`` → ``(p - pad) / scale``.
+    """
+    scale = transform["scale"] if transform["scale"] else 1.0
+    out = np.asarray(pts_xy, dtype=np.float32).reshape(-1, 2).copy()
+    out[:, 0] = (out[:, 0] - transform["pad_x"]) / scale
+    out[:, 1] = (out[:, 1] - transform["pad_y"]) / scale
+    return out
+
+
+def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True,
+                      return_transform=False):
+    """Resize image keeping aspect ratio and pad to target size.
+
+    When ``return_transform`` is True, also returns the transform this call
+    applied (uniform scale + centered pad) so detections on the output can be
+    mapped back to the input.
+    """
     h, w = image.shape[:2]
     scale = min(target_width / w, target_height / h)
     new_w, new_h = int(w * scale), int(h * scale)
 
     resized = resize(image, (new_h, new_w), anti_aliasing=anti_aliasing, preserve_range=True)
     resized = resized.astype(image.dtype)
-    
+
     top = (target_height - new_h) // 2
     bottom = target_height - new_h - top
     left = (target_width - new_w) // 2
@@ -589,14 +629,23 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True):
     elif resized.ndim == 3:
         pad_width_3d = pad_width + ((0, 0),)  # no padding on channels
         padded = np.pad(resized, pad_width_3d, mode='constant', constant_values=0)
-        
+
+    if return_transform:
+        return padded, {"scale": scale, "pad_x": float(left), "pad_y": float(top)}
     return padded
 
 
-def process_loaded_image(image, settings):
-    """Apply a sequence of image processing operations based on settings."""
+def process_loaded_image(image, settings, return_transform=False):
+    """Apply a sequence of image processing operations based on settings.
+
+    When ``return_transform`` is True, also returns the net transform the
+    geometric steps (resize/resizeandpad) applied; non-geometric steps
+    (gray2rgb, normalize, …) leave it unchanged. Callers invert it to map
+    detections back onto the original image.
+    """
+    transform = dict(IDENTITY_TRANSFORM)
     for step in settings:
-        key, value = next(iter(step.items()))    
+        key, value = next(iter(step.items()))
         match key:
             case "resize":
                 target_width, target_height = map(int, value.strip().split(":"))
@@ -605,16 +654,23 @@ def process_loaded_image(image, settings):
                 resized_width = int(orig_width * scale)
                 resized_height = int(orig_height * scale)
                 image = resize(
-                    image, 
-                    output_shape=(resized_height,resized_width), 
-                    order=0, 
-                    preserve_range=True, 
+                    image,
+                    output_shape=(resized_height,resized_width),
+                    order=0,
+                    preserve_range=True,
                     anti_aliasing=False
                     ).astype(image.dtype)
+                # Aspect-preserving resize, no padding: pure uniform scale.
+                transform = compose_transforms(
+                    transform, {"scale": scale, "pad_x": 0.0, "pad_y": 0.0}
+                )
 
             case "resizeandpad":
                 target_width, target_height = map(int, value.strip().split(":"))
-                image = resize_and_pad_cv(image,target_width, target_height )
+                image, step_transform = resize_and_pad_cv(
+                    image, target_width, target_height, return_transform=True
+                )
+                transform = compose_transforms(transform, step_transform)
             case "gray2rgb":
                 image = safegray2rgb(image)
             case "rgb2gray":
@@ -627,6 +683,8 @@ def process_loaded_image(image, settings):
                 image = np.clip(image, a_min=a_min, a_max=a_max)
             case _:
                 raise RuntimeError(f"Unknow process_loaded_image instruction:{key}")
+    if return_transform:
+        return image, transform
     return image
 
 def safegray2rgb(image):
@@ -649,4 +707,4 @@ def show_error_message(title, message):
     msg_box.setIcon(QMessageBox.Critical)
     msg_box.setWindowTitle(title)
     msg_box.setText(message)
-    msg_box.exec_()
+    msg_box.exec()

@@ -16,11 +16,7 @@ from shapely.geometry import shape
 # Local application imports
 from ui.errorhandling import app_logger
 from model.BaseSegmenter import BaseSegmenter
-from model.utils import (
-    plot_mask,
-    process_loaded_image,
-    resize_and_pad_cv,
-)
+from model.utils import IDENTITY_TRANSFORM, plot_mask, resize_and_pad_cv
 
 # InstanSeg's eval_medium_image uses a fixed overlap window; inputs narrower than
 # that window crash. Pad small images up to a safe floor before inference.
@@ -138,23 +134,24 @@ class InstansegSegmenter(BaseSegmenter):
             tile_size = 512
             method_name = 'eval_medium_image'
 
-        img_inference = process_loaded_image(
-            image=input_image,
-            settings=image_preprocess_settings
-        )
-        img_inference = self._ensure_eval_window_size(
+        # Preprocess through the base class so the resize/pad geometry is
+        # recorded; the eval-window padding below is registered on top of it.
+        # instanseg_results_to_pandas then maps masks back via self.to_original_norm.
+        img_inference = self.preprocess(input_image, image_preprocess_settings)
+        img_inference, window_transform = self._ensure_eval_window_size(
             img_inference, method_name, tile_size
         )
+        img_inference = self.add_geometry_step(img_inference, window_transform)
 
         try:
             method = getattr(self.model, method_name, None)
             if not method:
                 raise AttributeError(f"Method '{method_name}' not found on model")
-            
+
             # Check if method accepts tile_size parameter
             sig = inspect.signature(method)
             has_tile_size = 'tile_size' in sig.parameters
-            
+
             # Prepare base arguments
             kwargs = {
                 'image': img_inference,
@@ -168,9 +165,14 @@ class InstansegSegmenter(BaseSegmenter):
             raise RuntimeError(f"Error when inferrecing InstanSeg: {e}")
 
     def _ensure_eval_window_size(self, image, method_name, tile_size):
-        """Pad very narrow inputs so InstanSeg's fixed overlap is valid."""
+        """Pad very narrow inputs so InstanSeg's fixed overlap is valid.
+
+        Returns ``(image, transform)`` where ``transform`` maps the input
+        image's pixels to the padded output (identity when no padding is
+        applied), so the caller can register it with ``add_geometry_step``.
+        """
         if method_name != 'eval_medium_image':
-            return image
+            return image, dict(IDENTITY_TRANSFORM)
 
         height, width = image.shape[:2]
         padding_floor = max(
@@ -181,14 +183,16 @@ class InstansegSegmenter(BaseSegmenter):
         target_width = max(width, padding_floor)
 
         if target_height == height and target_width == width:
-            return image
+            return image, dict(IDENTITY_TRANSFORM)
 
         app_logger().info(
             "Padding InstanSeg inference image from "
             f"{width}x{height} to {target_width}x{target_height} "
             "to keep overlap smaller than the inference window."
         )
-        return resize_and_pad_cv(image, target_width, target_height)
+        return resize_and_pad_cv(
+            image, target_width, target_height, return_transform=True
+        )
 
     def _extract_polygon_from_geometry(self, geometry):
         """
@@ -232,6 +236,11 @@ class InstansegSegmenter(BaseSegmenter):
         """
         Convert InstanSeg labeled output to the standardized DataFrame format.
 
+        Masks are mapped from the model's output space back onto the original
+        image via ``self.to_original_norm`` (base class), which undoes the
+        resize/pad geometry recorded during ``preprocess`` / ``add_geometry_step``
+        — so detections land correctly regardless of preprocessing.
+
         Args:
             labeled_output (torch.Tensor): InstanSeg output tensor of shape
                 (1, 1, height, width) containing instance labels as integers.
@@ -249,7 +258,9 @@ class InstansegSegmenter(BaseSegmenter):
             label_map_np = labeled_output[:, 0, :].detach().cpu().numpy()
         else:
             label_map_np = labeled_output[:, 0, :]
-        h, w = labeled_output.shape[-2], labeled_output.shape[-1]
+        out_h, out_w = labeled_output.shape[-2], labeled_output.shape[-1]
+        orig_h, orig_w = getattr(self, "_original_shape", None) or (out_h, out_w)
+
         instanseg_objects = labels_to_features(label_map_np)
         data: dict[str, list[Any]] = {
             'id_label': [],
@@ -262,21 +273,21 @@ class InstansegSegmenter(BaseSegmenter):
         }
 
         features = instanseg_objects['features']
-        minx, miny, maxx, maxy = None, None, None, None
         for i, feature in enumerate(features):
             geom = shape(feature['geometry'])  # Convert to shapely geometry
             poly, p_mask = self._extract_polygon_from_geometry(geom)
             if poly is None:
                 continue
-            bounds = poly.bounds  # (minx, miny, maxx, maxy)
-            minx, miny, maxx, maxy = bounds
+            norm_mask = self.to_original_norm(p_mask, src_shape=(out_h, out_w))
+            # Box from the mapped contour's bounds (normalized, original space).
+            x_min, y_min = norm_mask.min(axis=0)
+            x_max, y_max = norm_mask.max(axis=0)
             box = np.array([
-                minx / w,
-                miny / h,
-                (maxx - minx) / w,
-                (maxy - miny) / h
+                x_min,
+                y_min,
+                x_max - x_min,
+                y_max - y_min,
             ], dtype=np.float32)
-            norm_mask = p_mask / np.array([w, h], dtype=np.float32)
 
             data['id_label'].append(i)
             data['box'].append(box)
@@ -285,7 +296,7 @@ class InstansegSegmenter(BaseSegmenter):
             data['confidence'].append(
                 1 #outputs.boxes.conf[i].cpu().detach().numpy()
             )
-            bin_mask, morphology = plot_mask(norm_mask, image_size=(h, w))
+            bin_mask, morphology = plot_mask(norm_mask, image_size=(orig_h, orig_w))
             data['diameter'].append(morphology['diameter'])
             data['area'].append(morphology['area'])
             data['volume'].append(morphology['volume'])

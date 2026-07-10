@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-**Cells Calculator** is a PyQt5 desktop application for cell/spheroid instance
+**Cells Calculator** is a PySide6 desktop application for cell/spheroid instance
 segmentation and morphology analysis in microscopy images. v4.0 is a restructured
 rebuild of the original project: a single image viewer with floating panels on
 top, and a thin, uniform model layer underneath.

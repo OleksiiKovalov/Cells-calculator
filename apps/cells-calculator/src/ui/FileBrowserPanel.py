@@ -1,9 +1,9 @@
 """Floating resizable file browser panel that stays within its parent widget."""
 
 from pathlib import Path
-from PyQt5.QtCore import QEvent, QPoint, Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QPixmap
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import QEvent, QPoint, Qt, Signal
+from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QPushButton, QFrame,
     QVBoxLayout, QWidget,
 )
@@ -56,8 +56,8 @@ class FileBrowserPanel(QFrame):
     file_selected(path) – signal emitted when file is double-clicked
     """
 
-    panel_moved = pyqtSignal()
-    file_selected = pyqtSignal(str)  # emits file path
+    panel_moved = Signal()
+    file_selected = Signal(str)  # emits file path
 
     def __init__(self, parent: QWidget | None = None):
         """Initialize the panel, its drag/resize state, and build the UI."""

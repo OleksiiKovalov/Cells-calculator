@@ -1,8 +1,8 @@
 import math
 import numpy as np
-from PyQt5.QtCore import QPoint, QPointF, QRectF, Qt, pyqtSignal
-from PyQt5.QtGui import QColor, QImage, QPainter, QPen, QPixmap
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QImage, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (
     QGraphicsEllipseItem, QGraphicsLineItem, QGraphicsPixmapItem,
     QGraphicsRectItem, QGraphicsScene, QGraphicsView,
 )
@@ -11,10 +11,10 @@ from PyQt5.QtWidgets import (
 class ImageViewer(QGraphicsView):
     """Graphics view that displays an image with zoom/pan support."""
 
-    zoom_changed = pyqtSignal(float)       # emitted with scale as fraction (1.0 == 100%)
-    measure_distance = pyqtSignal(float)   # emitted with distance in image pixels
-    region_selected = pyqtSignal(QRectF)   # emitted with selected rect in image coords
-    mouse_image_pos = pyqtSignal(QPointF)  # emitted with cursor position in image coords
+    zoom_changed = Signal(float)       # emitted with scale as fraction (1.0 == 100%)
+    measure_distance = Signal(float)   # emitted with distance in image pixels
+    region_selected = Signal(QRectF)   # emitted with selected rect in image coords
+    mouse_image_pos = Signal(QPointF)  # emitted with cursor position in image coords
 
     ZOOM_IN_FACTOR = 1.25
     ZOOM_OUT_FACTOR = 1 / 1.25

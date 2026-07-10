@@ -1,8 +1,8 @@
 """Floating resizable info panel that stays within its parent widget."""
 
-from PyQt5.QtCore import QEvent, QPoint, Qt, pyqtSignal
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import QEvent, QPoint, Qt, Signal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QPushButton, QFrame, QTextEdit,
     QVBoxLayout, QWidget,
 )
@@ -59,7 +59,7 @@ class InfoPanel(QFrame):
     show_and_raise()  – show and bring to front
     """
 
-    panel_moved = pyqtSignal()
+    panel_moved = Signal()
 
     def __init__(self, parent: QWidget | None = None):
         """Initialize the panel, its drag/resize state, and build the UI."""

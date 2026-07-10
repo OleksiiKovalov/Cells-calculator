@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QPoint, Qt
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QWidget
+from PySide6.QtCore import QPoint, Qt
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QWidget
 
 
 class ToolbarDropDown(QFrame):

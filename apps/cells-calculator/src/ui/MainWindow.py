@@ -3,10 +3,10 @@ import json
 from ui.ImageViewer import ImageViewer
 
 import numpy as np
-from PyQt5.QtCore import Qt, QPointF
-from PyQt5.QtGui import QFontMetrics, QKeySequence
-from PyQt5.QtWidgets import (
-    QAction, QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout,
+from PySide6.QtCore import Qt, QPointF
+from PySide6.QtGui import QAction, QFontMetrics, QKeySequence
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStatusBar, QStyle,
     QToolBar, QToolTip, QVBoxLayout, QWidget,
 )
@@ -843,7 +843,7 @@ class MainWindow(QMainWindow):
             QToolTip.hideText()
             return
         import cv2 as _cv2
-        from PyQt5.QtGui import QCursor
+        from PySide6.QtGui import QCursor
         cache = self._detection_cache
         px, py = pos.x(), pos.y()
         # Discard positions outside the image

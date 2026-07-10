@@ -1,6 +1,6 @@
 # Cells Calculator (v4.0)
 
-A PyQt5 desktop application for automated **cell / spheroid instance
+A PySide6 desktop application for automated **cell / spheroid instance
 segmentation and morphology analysis** in microscopy images. Open an image,
 pick a model, hit **Calculate**, and the app overlays the detected cell masks
 and reports per‑object morphology (area, diameter, extrapolated volume) — in
@@ -71,7 +71,7 @@ Notes:
 - **numpy** is pinned to `>=2.1,<2.3` — TensorFlow/ml_dtypes need ≥2.1 on
   Python 3.13, while numba/StarDist need <2.3.
 - **StarDist / TensorFlow**: TensorFlow is only needed for StarDist models. On
-  Windows its native runtime must initialise before torch/PyQt5, so `main.py`
+  Windows its native runtime must initialise before torch/PySide6, so `main.py`
   imports it first automatically when a StarDist model is enabled.
 - Built‑in InstanSeg/Cellpose weights are downloaded on first use; local weights
   live under `trainedmodels/`.
@@ -121,7 +121,7 @@ modelconfig.json        # enabled models (runtime, beside the app)
 trainedmodels/          # local model weights (ship beside the app)
 src/                    # import root
   app.py                #   startup (splash, model registration, TF preload)
-  ui/                   #   PyQt5 UI: MainWindow, ImageViewer, floating panels, …
+  ui/                   #   PySide6 UI: MainWindow, ImageViewer, floating panels, …
   model/                #   BaseSegmenter, Model factory, the 4 segmenters, utils
   resources/            #   icons
 docs/                   # documentation

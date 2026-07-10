@@ -3,16 +3,16 @@
 import ctypes
 import threading
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 
 class InferenceWorker(QThread):
     """Background thread that runs model inference and reports results via signals."""
 
-    status_changed = pyqtSignal(str)   # safe to connect to status bar
-    finished = pyqtSignal(object)      # emits detections DataFrame
-    error = pyqtSignal(str)
-    cancelled = pyqtSignal()
+    status_changed = Signal(str)   # safe to connect to status bar
+    finished = Signal(object)      # emits detections DataFrame
+    error = Signal(str)
+    cancelled = Signal()
 
     def __init__(self, model, image, parent=None):
         """Store the model and image to run inference on when the thread starts."""

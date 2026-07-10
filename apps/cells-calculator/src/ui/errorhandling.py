@@ -7,15 +7,15 @@ import traceback  # For more detailed traceback formatting if needed
 from datetime import datetime
 
 # Third-party imports
-from PyQt5.QtCore import QObject, pyqtSignal
-from PyQt5.QtWidgets import QMessageBox
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QMessageBox
 
 class LogEventEmitter(QObject):
     """
     Event emitter for log file events.
     Emits signals when new lines are added to the log file.
     """
-    log_line_added = pyqtSignal(str)  # Signal emitted when new log line is added
+    log_line_added = Signal(str)  # Signal emitted when new log line is added
     
     def __init__(self):
         """Initialize the emitter as a plain QObject so its signal can fire."""
@@ -169,7 +169,7 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     msgbox.setWindowTitle("Unhandled Exception")
     msgbox.setText("An error occurred:")
     msgbox.setDetailedText(error_msg)
-    msgbox.exec_()
+    msgbox.exec()
     
 def app_logger():
     """Return the application's root logger."""

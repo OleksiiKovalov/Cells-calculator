@@ -1,4 +1,4 @@
-PyQt5>=5.15
+PySide6
 superqt
 numpy>=2.1,<2.3  # >=2.1 for TensorFlow/ml_dtypes on py3.13; <2.3 for numba/stardist
 scikit-image
@@ -20,6 +20,5 @@ cellpose
 stardist
 tensorflow
 PyYAML  # used by the dataset-viewer app (shares this env) for YOLO data.yaml
-PySide6  # used by the dataset-viewer app (shares this env) for its Qt UI
 
 

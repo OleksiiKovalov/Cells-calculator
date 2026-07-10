@@ -12,7 +12,7 @@ Environment notes:
 - **numpy** must stay in `>=2.1,<2.3` (pinned in `requirements.txt`):
   TensorFlow/ml_dtypes need ≥2.1 on py3.13, numba/StarDist need <2.3.
 - **TensorFlow** is only required for StarDist. On Windows it must initialise
-  before torch/PyQt5 (a native DLL load‑order constraint); `main.py` and the test
+  before torch/PySide6 (a native DLL load‑order constraint); `main.py` and the test
   `conftest.py` both import it first when needed.
 
 ## Running the app

@@ -213,6 +213,45 @@ def test_resize_and_pad_cv_target_shape():
 
 
 # --------------------------------------------------------------------------- #
+# geometric transform tracking (mask-mapping correctness for padded inference)
+# --------------------------------------------------------------------------- #
+def test_resize_and_pad_cv_reports_transform():
+    # 100x50 (WxH) -> 64x64: uniform scale 0.64, content 64x32 padded with 16 top/bottom.
+    _, tf = U.resize_and_pad_cv(
+        np.zeros((50, 100, 3), dtype=np.uint8), 64, 64, return_transform=True
+    )
+    assert tf["scale"] == pytest.approx(0.64)
+    assert tf["pad_x"] == pytest.approx(0.0)
+    assert tf["pad_y"] == pytest.approx(16.0)
+
+
+def test_process_loaded_image_reports_resize_transform():
+    img = np.zeros((500, 1000), dtype=np.uint8)  # H=500, W=1000
+    settings = [OrderedDict([("gray2rgb", "")]), OrderedDict([("resize", "512:512")])]
+    out, tf = U.process_loaded_image(img, settings, return_transform=True)
+    assert out.shape[:2] == (256, 512)          # aspect preserved, no padding
+    assert tf["scale"] == pytest.approx(0.512)
+    assert tf["pad_x"] == 0.0 and tf["pad_y"] == 0.0
+
+
+def test_compose_and_invert_round_trip():
+    # resize (scale 0.512, no pad) then centered-pad by 128 in y — the exact
+    # chain InstanSeg applies to a non-square image under a 512 config.
+    tf = U.compose_transforms(
+        {"scale": 0.512, "pad_x": 0.0, "pad_y": 0.0},
+        {"scale": 1.0, "pad_x": 0.0, "pad_y": 128.0},
+    )
+    assert tf["scale"] == pytest.approx(0.512)
+    assert tf["pad_y"] == pytest.approx(128.0)
+    # A point at the top edge of the original (y=0) forward-maps to y=128 in the
+    # padded image; inverting must return it to y=0 (the buggy path left it at 128).
+    orig = np.array([[500.0, 0.0], [1000.0, 500.0]], dtype=np.float32)
+    fwd = orig * tf["scale"] + np.array([tf["pad_x"], tf["pad_y"]], dtype=np.float32)
+    back = U.invert_transform_points(fwd, tf)
+    assert np.allclose(back, orig, atol=1e-3)
+
+
+# --------------------------------------------------------------------------- #
 # colormap helpers
 # --------------------------------------------------------------------------- #
 def test_colormap_to_hex_and_bgr():

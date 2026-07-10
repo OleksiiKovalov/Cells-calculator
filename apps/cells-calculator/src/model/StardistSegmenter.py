@@ -18,13 +18,12 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from skimage.measure import regionprops
-from skimage.transform import resize
 from stardist.models import model2d, StarDist2D
 
 # Local application imports
 from ui.errorhandling import app_logger
 from model.BaseSegmenter import BaseSegmenter
-from model.utils import plot_mask, process_loaded_image
+from model.utils import plot_mask
 
 
 class StardistSegmenter(BaseSegmenter):
@@ -62,9 +61,9 @@ class StardistSegmenter(BaseSegmenter):
             if self.model_data and "image_preprocess" in self.model_data
             else self.image_preprocess_settings_default
         )
-        img_inference = process_loaded_image(
-            image=image, settings=image_preprocess_settings
-        )
+        # Preprocess through the base class so any resize/pad geometry is
+        # recorded; stardist_results_to_pandas maps masks back via to_original_norm.
+        img_inference = self.preprocess(image, image_preprocess_settings)
         try:
             # Clip distances before the C++ NMS to avoid a crash on extreme
             # values (e.g. > 1e22); restore the original afterwards.
@@ -84,8 +83,6 @@ class StardistSegmenter(BaseSegmenter):
             detections = self.stardist_results_to_pandas(
                 labels,
                 scores=details["prob"],
-                original_shape=image.shape[:2],
-                inference_shape=img_inference.shape[:2],
             )
             return detections[detections["confidence"] >= min_score]
         except Exception as e:
@@ -98,15 +95,13 @@ class StardistSegmenter(BaseSegmenter):
         instances,
         scores=None,
         labels=None,
-        original_shape=None,
-        inference_shape=None,
     ) -> pd.DataFrame:
         """Convert a StarDist label map to the standard detections DataFrame.
 
-        ``prop.bbox`` is in inference (instances) space; the mask contour is
-        taken from a binary mask resized back to the original image. Both are
-        normalized to [0, 1] so they align on the original image, matching the
-        convention used by the other segmenters.
+        Contours are taken in the label map's (inference) space and mapped back
+        onto the original image via ``self.to_original_norm`` (base class),
+        which undoes any resize/pad recorded during ``preprocess`` — so masks
+        align on the original image, matching the other segmenters.
         """
         data: Dict[str, List[Any]] = {
             "id_label": [],
@@ -119,32 +114,11 @@ class StardistSegmenter(BaseSegmenter):
         }
         props = regionprops(instances)
 
-        inference_h, inference_w = (
-            inference_shape if inference_shape is not None else instances.shape[:2]
-        )
-        original_h, original_w = (
-            original_shape if original_shape is not None else instances.shape[:2]
-        )
+        src_shape = instances.shape[:2]
+        original_h, original_w = getattr(self, "_original_shape", None) or src_shape
 
         for i, prop in enumerate(props):
-            minr, minc, maxr, maxc = prop.bbox
-            box = [
-                minc / inference_w,
-                minr / inference_h,
-                (maxc - minc) / inference_w,
-                (maxr - minr) / inference_h,
-            ]
-
             binary_mask = (instances == prop.label).astype(np.uint8)
-            if original_h != inference_h or original_w != inference_w:
-                binary_mask = resize(
-                    binary_mask,
-                    output_shape=(original_h, original_w),
-                    order=0,
-                    preserve_range=True,
-                    anti_aliasing=False,
-                ).astype(binary_mask.dtype)
-
             contours, _ = cv2.findContours(
                 binary_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
             )
@@ -160,11 +134,12 @@ class StardistSegmenter(BaseSegmenter):
             if pts is None:
                 continue
 
-            # Normalize the contour to [0, 1] in original-image space, stored as
-            # an (N, 2) array like the other segmenters.
-            norm_mask = pts.reshape(-1, 2).astype(np.float32) / np.array(
-                [original_w, original_h], dtype=np.float32
-            )
+            # Map the contour from label-map space to [0, 1] on the original image.
+            norm_mask = self.to_original_norm(pts.reshape(-1, 2), src_shape=src_shape)
+            # Box from the mapped contour's bounds (normalized, original space).
+            x_min, y_min = norm_mask.min(axis=0)
+            x_max, y_max = norm_mask.max(axis=0)
+            box = [x_min, y_min, x_max - x_min, y_max - y_min]
 
             confidence = scores[i] if scores is not None and i < len(scores) else None
 

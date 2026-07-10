@@ -1,4 +1,4 @@
-"""PyQt5 image viewer application.
+"""PySide6 image viewer application.
 
 Features:
     - Main window with menu, toolbar (buttons bar), and status bar.
@@ -17,8 +17,8 @@ def _preload_tensorflow_if_needed():
     """Import TensorFlow before anything else when a StarDist model is enabled.
 
     On Windows, TensorFlow's native runtime must initialize before the other
-    native libraries (PyQt5/Qt, torch) or its DLL load fails. Those are pulled
-    in by the PyQt5 / MainWindow imports below, so this MUST run first — and only
+    native libraries (PySide6/Qt, torch) or its DLL load fails. Those are pulled
+    in by the PySide6 / MainWindow imports below, so this MUST run first — and only
     when StarDist is actually enabled, to avoid loading TensorFlow for users who
     don't need it.
     """
@@ -38,8 +38,8 @@ def _preload_tensorflow_if_needed():
 
 _preload_tensorflow_if_needed()
 
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtGui import QIcon
+from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
 from ui.MainWindow import MainWindow
 from ui.splashscreen import close_splash, init_splash
 
@@ -82,7 +82,7 @@ def main():
 
     close_splash()
 
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":

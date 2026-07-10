@@ -1,10 +1,10 @@
 """Splash screen — dark theme matching the main application visual style."""
 
 # Third-party imports
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPixmap, QFont, QPainter, QColor, QPen
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap, QFont, QPainter, QColor, QPen
 from pathlib import Path
-from PyQt5.QtWidgets import QSplashScreen, QProgressBar, QLabel, QApplication
+from PySide6.QtWidgets import QSplashScreen, QProgressBar, QLabel, QApplication
 
 # Local application imports
 from ui.errorhandling import app_logger
