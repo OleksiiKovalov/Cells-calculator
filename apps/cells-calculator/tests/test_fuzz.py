@@ -6,7 +6,6 @@ shapes/dtypes) and assert they never crash and return sane values.
 """
 import numpy as np
 import pandas as pd
-import pytest
 from hypothesis import given, settings, strategies as st, HealthCheck
 from hypothesis.extra.numpy import arrays, array_shapes
 

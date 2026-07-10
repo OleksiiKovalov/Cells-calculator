@@ -3,7 +3,7 @@ import glob
 import logging
 import os
 import sys
-import traceback  # For more detailed traceback formatting if needed
+import traceback
 from datetime import datetime
 
 # Third-party imports
@@ -134,10 +134,6 @@ def setup_logging():
     formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(message)s'
     )
-    error_formatter = logging.Formatter( # Potentially a more detailed one for errors
-        '%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(funcName)s - %(message)s\n%(exc_info)s'
-    )
-
 
     # Add formatter to handlers
     ch.setFormatter(formatter)
@@ -165,7 +161,7 @@ def handle_unhandled_exception(exc_type, exc_value, exc_traceback):
     app_logger().critical("Unhandled exception caught:", exc_info=(exc_type, exc_value, exc_traceback))
     error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
     msgbox = QMessageBox()
-    msgbox.setIcon(QMessageBox.Critical)
+    msgbox.setIcon(QMessageBox.Icon.Critical)
     msgbox.setWindowTitle("Unhandled Exception")
     msgbox.setText("An error occurred:")
     msgbox.setDetailedText(error_msg)
@@ -258,141 +254,6 @@ def setup_console_logging():
     
     logger.info("Console output redirection setup complete - all print statements will now be logged to file")
 
-def restore_console():
-    """
-    Restore original stdout and stderr.
-    Call this if you need to disable console logging redirection.
-    """
-    sys.stdout = sys.__stdout__
-    sys.stderr = sys.__stderr__
-    app_logger_int.info("Console output redirection disabled - restored original stdout/stderr")
-
-class TeeLogger:
-    """
-    A more advanced logger that can capture and log specific operations.
-    Use this for selective logging of operations.
-    """
-    def __init__(self, logger, original_stream, log_level=logging.INFO):
-        """Store the logger, the wrapped stream, and the log level.
-
-        Args:
-            logger: Logger that mirrored output is written to.
-            original_stream: The original stream (console) to also write to.
-            log_level: Logging level used for mirrored messages.
-        """
-        self.logger = logger
-        self.original_stream = original_stream
-        self.log_level = log_level
-
-    def write(self, message):
-        """Write the message to the console and log it with a ``CONSOLE:`` prefix.
-
-        Args:
-            message: The text written to the stream.
-        """
-        # Write to original stream (console)
-        self.original_stream.write(message)
-
-        # Log to file if message is not empty/whitespace
-        if message and message.strip():
-            self.logger.log(self.log_level, f"CONSOLE: {message.strip()}")
-
-    def flush(self):
-        """Flush the wrapped console stream."""
-        self.original_stream.flush()
-
-def setup_selective_console_logging():
-    """
-    Alternative setup that prefixes console messages in the log file.
-    This makes it easier to distinguish between direct log calls and console output.
-    """
-    logger = app_logger_int
-    
-    # Store original streams
-    original_stdout = sys.stdout
-    original_stderr = sys.stderr
-    
-    # Create tee loggers
-    sys.stdout = TeeLogger(logger, original_stdout, logging.INFO)
-    sys.stderr = TeeLogger(logger, original_stderr, logging.ERROR)
-    
-    logger.info("Selective console logging setup - console output will be prefixed with 'CONSOLE:' in log file")
-
-def log_function_calls(func):
-    """
-    Decorator to log function calls and their results.
-    Usage: @log_function_calls
-    """
-    def wrapper(*args, **kwargs):
-        """Log entry, success, or failure around the wrapped call and return its result."""
-        logger = app_logger_int
-        func_name = func.__name__
-        
-        # Log function entry
-        logger.info(f"FUNCTION_CALL: Entering {func_name} with args={args}, kwargs={kwargs}")
-        
-        try:
-            result = func(*args, **kwargs)
-            logger.info(f"FUNCTION_CALL: {func_name} completed successfully")
-            return result
-        except Exception as e:
-            logger.error(f"FUNCTION_CALL: {func_name} failed with error: {str(e)}")
-            raise
-            
-    return wrapper
-
-def log_print(*args, **kwargs):
-    """
-    Enhanced print function that always logs to file.
-    Use this instead of print() for important messages you want logged.
-    
-    Usage: log_print("This will appear in console AND log file")
-    """
-    # Print to console
-    print(*args, **kwargs)
-    
-    # Also log to file
-    message = ' '.join(str(arg) for arg in args)
-    app_logger_int.info(f"LOG_PRINT: {message}")
-
-def connect_to_log_events(callback):
-    """
-    Connect a callback function to log line events.
-    
-    Args:
-        callback (callable): Function to call when new log line is added.
-                           Should accept one string parameter (the log line).
-    
-    Example:
-        def on_new_log_line(log_line):
-            print(f"New log: {log_line}")
-        
-        connect_to_log_events(on_new_log_line)
-    """
-    log_event_emitter.log_line_added.connect(callback)
-
-def disconnect_from_log_events(callback):
-    """
-    Disconnect a callback function from log line events.
-    
-    Args:
-        callback (callable): Function to disconnect from log events.
-    """
-    try:
-        log_event_emitter.log_line_added.disconnect(callback)
-    except TypeError:
-        # Signal was not connected
-        pass
-
-def get_log_event_emitter():
-    """
-    Get the global log event emitter instance.
-    
-    Returns:
-        LogEventEmitter: The global log event emitter
-    """
-    return log_event_emitter
-
 # Set the custom excepthook
 
 app_logger_int = setup_logging()
@@ -400,6 +261,3 @@ sys.excepthook = handle_unhandled_exception
 
 # Setup console output redirection
 setup_console_logging()
-
-# Get a logger for the current module (best practice)
-logger = logging.getLogger(__name__) # This will inherit settings from the root logger configured above

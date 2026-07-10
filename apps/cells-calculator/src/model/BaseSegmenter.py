@@ -17,17 +17,20 @@ from model.utils import (
     IDENTITY_TRANSFORM,
     compose_transforms,
     invert_transform_points,
+    plot_mask,
     process_loaded_image,
 )
 
 
 class BaseSegmenter:
     """
-    Base class for general YOLO instance models.
+    Base class for all segmentation/detection models used in the application.
 
-    Implements the necessary high-level functional utils for using the model.
+    Provides the shared machinery each concrete segmenter (YOLO, Cellpose,
+    StarDist, InstanSeg) builds on: device selection, timed inference, the
+    preprocessing-geometry tracking used to map detections back onto the
+    original image, and detection-DataFrame assembly helpers.
     """
-    detections: pd.DataFrame | None
     image_preprocess_settings_default: object
     _original_shape: tuple[int, int] | None
     _inference_transform: dict
@@ -44,11 +47,7 @@ class BaseSegmenter:
         self.model_name = "<not specified>"
         self.model_data = model_data
         self.image_preprocess_settings_default = OrderedDict()
-        self.use_gpu = False
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
-        else:
-            self.device = torch.device("cpu")
+        self.device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
         self.use_gpu = self.device.type == "cuda"
 
         # Geometry recorded during preprocessing so detections can be mapped back
@@ -62,7 +61,7 @@ class BaseSegmenter:
         self.inference_duration = 0.0
 
     def init_model(self, path_to_model: str):
-        """Helper function for initialization of actual YOLO model instance for images processing."""
+        """Load the concrete model instance from ``path_to_model``. Overridden by subclasses."""
         pass
 
     # =====================================================================
@@ -136,6 +135,51 @@ class BaseSegmenter:
         pts[:, 1] /= orig_h
         return pts
 
+    # =====================================================================
+    # Detection DataFrame assembly — shared by all segmenter converters
+    # =====================================================================
+
+    @staticmethod
+    def _new_detection_frame() -> dict:
+        """Return an empty dict keyed by the canonical detection columns."""
+        return {
+            "id_label": [],
+            "box": [],
+            "mask": [],
+            "confidence": [],
+            "diameter": [],
+            "area": [],
+            "volume": [],
+        }
+
+    @staticmethod
+    def _append_detection(data, *, id_label, norm_mask, confidence,
+                          original_shape, box=None):
+        """Append one detection row to a frame built by :meth:`_new_detection_frame`.
+
+        ``norm_mask`` is an (N, 2) polygon in [0, 1] original-image coordinates.
+        ``box`` (``[x, y, w, h]`` normalized) is derived from the mask bounds
+        when not supplied; morphology (diameter/area/volume) is computed from
+        the mask via ``plot_mask`` against ``original_shape`` (height, width).
+        """
+        norm_mask = np.asarray(norm_mask, dtype=np.float32).reshape(-1, 2)
+        if box is None:
+            if norm_mask.shape[0] > 0:
+                x_min, y_min = norm_mask.min(axis=0)
+                x_max, y_max = norm_mask.max(axis=0)
+                box = [float(x_min), float(y_min),
+                       float(x_max - x_min), float(y_max - y_min)]
+            else:
+                box = [0.0, 0.0, 0.0, 0.0]
+        _, morphology = plot_mask(norm_mask, image_size=original_shape)
+        data["id_label"].append(id_label)
+        data["box"].append(box)
+        data["mask"].append(norm_mask)
+        data["confidence"].append(confidence)
+        data["diameter"].append(morphology["diameter"])
+        data["area"].append(morphology["area"])
+        data["volume"].append(morphology["volume"])
+
     def inference(self, input_image: np.ndarray) -> pd.DataFrame | None:
         """Run inference on an image, measuring duration, and return the detections DataFrame."""
         start_time = time.time()
@@ -144,5 +188,5 @@ class BaseSegmenter:
         return result
 
     def call_inference(self, input_image: np.ndarray) -> pd.DataFrame | None:
-        """Method for processing images of x20 scale using single-time inference, as usual."""
+        """Run the model on ``input_image`` and return detections. Implemented by subclasses."""
         raise NotImplementedError

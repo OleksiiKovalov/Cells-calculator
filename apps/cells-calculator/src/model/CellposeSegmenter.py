@@ -9,7 +9,7 @@ detection columns (id_label, box, mask, confidence, diameter, area, volume).
 import json
 import os
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
 # Third-party imports
 import cv2
@@ -21,7 +21,6 @@ from scipy.ndimage import find_objects
 # Local application imports
 from ui.errorhandling import app_logger
 from model.BaseSegmenter import BaseSegmenter
-from model.utils import plot_mask
 
 
 class CellposeSegmenter(BaseSegmenter):
@@ -90,13 +89,12 @@ class CellposeSegmenter(BaseSegmenter):
             )
             return detections[detections["confidence"] >= min_score]
         except Exception as e:
-            raise RuntimeError(f"Error during Cellpose inference: {e}")
+            raise RuntimeError(f"Error during Cellpose inference: {e}") from e
 
     def cellpose_results_to_pandas(
         self,
         masks: np.ndarray,
         cellprob_map: Optional[np.ndarray] = None,
-        store_bin_mask: bool = False,
     ) -> pd.DataFrame:
         """Convert a Cellpose label map to the standard detections DataFrame.
 
@@ -107,54 +105,26 @@ class CellposeSegmenter(BaseSegmenter):
         the other segmenters' convention.
         """
         src_shape = masks.shape[:2]
-        original_h, original_w = getattr(self, "_original_shape", None) or src_shape
+        original_shape = getattr(self, "_original_shape", None) or src_shape
 
-        data: Dict[str, List[Any]] = {
-            "id_label": [],
-            "box": [],
-            "mask": [],
-            "confidence": [],
-            "diameter": [],
-            "area": [],
-            "volume": [],
-        }
-        if store_bin_mask:
-            data["bin_mask"] = []
+        data = self._new_detection_frame()
 
         unique_object_ids = np.unique(masks)
         unique_object_ids = unique_object_ids[unique_object_ids != 0]
-        if len(unique_object_ids) == 0:
-            return pd.DataFrame(data)
 
         for object_id in unique_object_ids:
             current_bin_mask = (masks == object_id)
-            area = int(np.sum(current_bin_mask))
-            if area == 0:
+            if int(np.sum(current_bin_mask)) == 0:
                 continue
 
-            data["id_label"].append(int(object_id))
-            if store_bin_mask:
-                data["bin_mask"].append(current_bin_mask)
-
-            # Bounding box (find_objects returns one slice-tuple per object).
-            slices = find_objects(current_bin_mask)
-            if not slices or slices[0] is None:
-                data["box"].append([np.nan, np.nan, np.nan, np.nan])
-                data["mask"].append([])
-                data["confidence"].append(np.nan if cellprob_map is not None else 1.0)
-                data["id_label"].pop()
-                if store_bin_mask:
-                    data["bin_mask"].pop()
-                continue
-
-            y_slice, x_slice = slices[0]
-            y_min, y_max = y_slice.start, y_slice.stop
-            x_min, x_max = x_slice.start, x_slice.stop
-            # Map the bbox corners (label-map px) to [0, 1] on the original image.
+            # Bounding box from the object's slice (area > 0 guarantees a slice),
+            # mapped to [0, 1] on the original image.
+            y_slice, x_slice = find_objects(current_bin_mask)[0]
             (bx0, by0), (bx1, by1) = self.to_original_norm(
-                [[x_min, y_min], [x_max, y_max]], src_shape=src_shape
+                [[x_slice.start, y_slice.start], [x_slice.stop, y_slice.stop]],
+                src_shape=src_shape,
             )
-            data["box"].append([bx0, by0, bx1 - bx0, by1 - by0])
+            box = [bx0, by0, bx1 - bx0, by1 - by0]
 
             # Mask contour, mapped to [0, 1] on the original image.
             contours, _ = cv2.findContours(
@@ -165,11 +135,9 @@ class CellposeSegmenter(BaseSegmenter):
             normalized_contour = np.empty((0, 2), dtype=np.float32)
             if contours:
                 contour = max(contours, key=cv2.contourArea)
-                squeezed_contour = contour.squeeze(axis=1)
                 normalized_contour = self.to_original_norm(
-                    squeezed_contour, src_shape=src_shape
+                    contour.squeeze(axis=1), src_shape=src_shape
                 )
-            data["mask"].append(normalized_contour)
 
             # Confidence (mean cell probability inside the mask).
             if cellprob_map is not None:
@@ -185,13 +153,14 @@ class CellposeSegmenter(BaseSegmenter):
                     )
             else:
                 confidence = 1.0
-            data["confidence"].append(confidence)
 
-            _, morphology = plot_mask(
-                normalized_contour, image_size=(original_h, original_w)
+            self._append_detection(
+                data,
+                id_label=int(object_id),
+                norm_mask=normalized_contour,
+                confidence=confidence,
+                original_shape=original_shape,
+                box=box,
             )
-            data["diameter"].append(morphology["diameter"])
-            data["area"].append(morphology["area"])
-            data["volume"].append(morphology["volume"])
 
         return pd.DataFrame(data)

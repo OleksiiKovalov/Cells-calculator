@@ -13,21 +13,12 @@ import json
 from collections import OrderedDict
 from pathlib import Path
 
-import numpy as np
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
+from tests._models import BACKEND_DEP, KNOWN_MODELS, ROOT
+
 SAMPLE_IMAGE = Path(__file__).parent / "data" / "TYPE_13_10.jpg"
 BASELINE_PATH = Path(__file__).parent / "golden" / "baseline.json"
-
-KNOWN_MODELS = {
-    "yolo": "model.YOLOSegmenter.YoloSegmenter",
-    "instanseg": "model.InstanSegSegmenter.InstansegSegmenter",
-    "cellpose": "model.CellposeSegmenter.CellposeSegmenter",
-    "stardist": "model.StardistSegmenter.StardistSegmenter",
-}
-BACKEND_DEP = {"yolo": "ultralytics", "instanseg": "instanseg",
-               "cellpose": "cellpose", "stardist": "stardist"}
 
 COUNT_ABS, COUNT_REL = 2, 0.05
 FLOAT_TOL = {  # metric -> (abs, rel)

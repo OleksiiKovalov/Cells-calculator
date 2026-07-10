@@ -1,10 +1,13 @@
 import json
+import math
+import os
 
 from ui.ImageViewer import ImageViewer
 
+import cv2
 import numpy as np
 from PySide6.QtCore import Qt, QPointF
-from PySide6.QtGui import QAction, QFontMetrics, QKeySequence
+from PySide6.QtGui import QAction, QCursor, QFontMetrics, QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QDoubleSpinBox, QFileDialog, QHBoxLayout,
     QLabel, QMainWindow, QMessageBox, QPushButton, QStatusBar, QStyle,
@@ -18,9 +21,10 @@ from ui.FileBrowserPanel import FileBrowserPanel
 from ui.InferenceWorker import InferenceWorker
 from ui.ProgressPanel import ProgressPanel
 from ui.ToolbarDropDown import ToolbarDropDown
-from ui.errorhandling import log_event_emitter
+from ui.errorhandling import app_logger, log_event_emitter
 from model.Model import Model
 from model.utils import (
+    filter_detections,
     filter_segmentation_detections,
     get_segmentation_detections_range,
     morphology_to_micrometers,
@@ -58,7 +62,6 @@ def _compute_grid_dims(img_w: int, img_h: int, n_masks: int) -> tuple:
 
     Both axes are clamped to [1, MAX].
     """
-    import math
     if n_masks <= 0:
         return 1, 1
     target = max(1, DETECTION_GRID_TARGET_PER_BUCKET)
@@ -100,7 +103,7 @@ class MainWindow(QMainWindow):
         self._create_tools_dropdown()
         self._create_file_browser_panel()
         self.viewer.measure_distance.connect(self._on_measure_distance)
-        self.viewer.region_selected.connect(self.RegionSelected)
+        self.viewer.region_selected.connect(self._on_region_selected)
         self.viewer.mouse_image_pos.connect(self._on_mouse_image_pos)
         log_event_emitter.log_line_added.connect(self.write_console)
         self._load_settings()
@@ -196,7 +199,6 @@ class MainWindow(QMainWindow):
         toolbar = QToolBar("Main Toolbar", self)
         self._toolbar = toolbar
         toolbar.setMovable(False)
-        toolbar.setIconSize(toolbar.iconSize())
         self.addToolBar(Qt.TopToolBarArea, toolbar)
 
         toolbar.addAction(self.act_open)
@@ -215,20 +217,20 @@ class MainWindow(QMainWindow):
 
         self.cbModel = QComboBox(self)
         self.cbModel.setObjectName("cbModel")
-        # ~20 characters wide
+        # ~40 characters wide
         char_width = QFontMetrics(self.cbModel.font()).averageCharWidth()
         self.cbModel.setFixedWidth(char_width * 40)
         toolbar.addWidget(self.cbModel)
 
         self.btnCalculate = QPushButton("Calculate", self)
         self.btnCalculate.setObjectName("btnCalculate")
-        self.btnCalculate.clicked.connect(self.calculateButtonClicked)
+        self.btnCalculate.clicked.connect(self._on_calculate_clicked)
         toolbar.addWidget(self.btnCalculate)
         toolbar.addSeparator()
 
         self.cbShowOriginal = QCheckBox("Show original", self)
         self.cbShowOriginal.setObjectName("cbShowOriginal")
-        self.cbShowOriginal.stateChanged.connect(self.cbShowOriginalChanged)
+        self.cbShowOriginal.stateChanged.connect(self._on_show_original_changed)
         toolbar.addWidget(self.cbShowOriginal)
         toolbar.addSeparator()
 
@@ -238,13 +240,13 @@ class MainWindow(QMainWindow):
         self.cellSizeSlider.setMaximum(100)
         self.cellSizeSlider.setValue((0, 100))
         self.cellSizeSlider.setFixedWidth(150)
-        self.cellSizeSlider.valueChanged.connect(self.cellSizeChanged)
+        self.cellSizeSlider.valueChanged.connect(self._on_cell_size_changed)
         toolbar.addWidget(self.cellSizeSlider)
         toolbar.addSeparator()
 
         self.btnFilter = QPushButton("Filter", self)
         self.btnFilter.setObjectName("btnFilter")
-        self.btnFilter.clicked.connect(self.filterButtonClicked)
+        self.btnFilter.clicked.connect(self._on_filter_clicked)
         toolbar.addWidget(self.btnFilter)
         toolbar.addSeparator()
 
@@ -352,13 +354,13 @@ class MainWindow(QMainWindow):
         try:
             image: np.ndarray = read_img(path)
         except Exception:
+            app_logger().exception("Failed to read image: %s", path)
             return False
         if image is None or image.size == 0:
             return False
         self.original_image = image
         self.viewer.set_image(image)
         self.act_fit.trigger()
-        import os
         name = os.path.basename(path)
         h, w = image.shape[:2]
         ch = image.shape[2] if image.ndim == 3 else 1
@@ -368,7 +370,6 @@ class MainWindow(QMainWindow):
         self._image_info_label.setText(f"{name}  {w} × {h}  ({ch}ch)")
         # Update file browser directory
         if self._file_browser_panel:
-            import os
             dir_path = os.path.dirname(path)
             self._file_browser_panel.set_directory(dir_path)
         return True
@@ -391,7 +392,7 @@ class MainWindow(QMainWindow):
             self._statusbar.showMessage("Failed to load image")
         self._update_actions_enabled()
 
-    def setCurrentImage(self, show_original: bool = True):
+    def _set_current_image(self, show_original: bool = True):
         """Show either the original or the prediction image in the viewer.
 
         Args:
@@ -408,9 +409,9 @@ class MainWindow(QMainWindow):
         finally:
             self.cbShowOriginal.blockSignals(False)
 
-    def cbShowOriginalChanged(self, state: int):
+    def _on_show_original_changed(self, state: int):
         """Switch the viewer image when the 'Show original' checkbox toggles."""
-        self.setCurrentImage(state == Qt.Checked)
+        self._set_current_image(state == Qt.CheckState.Checked)
 
     # =========================================================================
     # Zoom
@@ -485,21 +486,20 @@ class MainWindow(QMainWindow):
         self.loaded_models = models
         self.cbModel.addItems(self.loaded_models.keys())
         self.cbModel.setCurrentIndex(0)
-        #set_global('loaded_models', models)
 
 
-    def filterButtonClicked(self):
+    def _on_filter_clicked(self):
         """Re-apply the cell-size filter and refresh the prediction image and stats."""
         if self.prediction_image is None or self.detections is None:
             return
-        self.refreshPredictionImage()
+        self._refresh_prediction_image()
         self.show_detection_stats()
 
-    def calculateButtonClicked(self):
+    def _on_calculate_clicked(self):
         """Start inference when the Calculate button is clicked."""
-        self.callInference()
+        self._start_inference()
 
-    def cellSizeChanged(self, value: tuple):
+    def _on_cell_size_changed(self, value: tuple):
         """Show the current cell-size slider range in the status bar."""
         self._statusbar.showMessage(f"Cell size: {value[0]} – {value[1]}")
 
@@ -507,7 +507,7 @@ class MainWindow(QMainWindow):
     # Inference (threaded)
     # =========================================================================
 
-    def callInference(self):
+    def _start_inference(self):
         """Run model inference on the current image in a background worker.
 
         Lazily (re)constructs the selected model, disables the toolbar, shows
@@ -561,9 +561,7 @@ class MainWindow(QMainWindow):
             self._info_panel.show_and_raise()
 
     # =========================================================================
-    # Distance measurement  (Ctrl + click)
-    # =========================================================================
-    # Options dropdown
+    # Options panel
     # =========================================================================
 
     def _create_options_panel(self):
@@ -586,7 +584,7 @@ class MainWindow(QMainWindow):
 
         self.chkDrawLabels = QCheckBox("Draw labels on masks")
         self.chkDrawLabels.setChecked(False)
-        self.chkDrawLabels.toggled.connect(lambda _: self.refreshPredictionImage() if self.prediction_image is not None else None)
+        self.chkDrawLabels.toggled.connect(lambda _: self._refresh_prediction_image() if self.prediction_image is not None else None)
         self._options_panel.add_widget(self.chkDrawLabels)
 
         self.chkWrapInfo = QCheckBox("Wrap Info window")
@@ -605,7 +603,7 @@ class MainWindow(QMainWindow):
 
         self.chkFillPolygons = QCheckBox("Fill polygons")
         self.chkFillPolygons.setChecked(False)
-        self.chkFillPolygons.toggled.connect(lambda _: self.refreshPredictionImage() if self.prediction_image is not None else None)
+        self.chkFillPolygons.toggled.connect(lambda _: self._refresh_prediction_image() if self.prediction_image is not None else None)
         self._options_panel.add_widget(self.chkFillPolygons)
 
         # µm/mm scale row: [0.] [spinbox] [µm/mm]
@@ -718,7 +716,7 @@ class MainWindow(QMainWindow):
         layout.setSpacing(4)
 
         btn_print = QPushButton("Print detection")
-        btn_print.clicked.connect(lambda: (self._tools_dropdown.hide(), self.PrintDetection()))
+        btn_print.clicked.connect(lambda: (self._tools_dropdown.hide(), self._print_detection()))
         layout.addWidget(btn_print)
 
         self._tools_dropdown.set_content(content)
@@ -742,7 +740,7 @@ class MainWindow(QMainWindow):
             self._file_browser_panel.set_directory(folder_path)
             self._file_browser_panel.show_and_raise()
 
-    def PrintDetection(self):
+    def _print_detection(self):
         """Called when 'Print detection' is selected from the Tools dropdown."""
         if self.detections is None:
             self.write_info("No detections available.")
@@ -770,13 +768,13 @@ class MainWindow(QMainWindow):
 
     def _build_detection_cache(self):
         """Pre-compute bounding boxes, denormalized coords and tooltip strings for all masks,
-        then assign each mask into a spatial grid of DETECTION_GRID_COLS x DETECTION_GRID_ROWS
-        buckets so _on_mouse_image_pos only checks the small subset in the cursor's tile.
+        then assign each mask into a spatial grid (sized by _compute_grid_dims, bounded by
+        DETECTION_GRID_MAX_COLS x DETECTION_GRID_MAX_ROWS) so _on_mouse_image_pos only checks
+        the small subset in the cursor's tile.
         """
         if self.detections is None or self.original_image is None:
             self._detection_cache = None
             return
-        import numpy as _np
         df = self.detections
         masks = df['mask'].tolist()
         if not masks:
@@ -784,12 +782,12 @@ class MainWindow(QMainWindow):
             return
         img_h, img_w = self.original_image.shape[:2]
         # Contract: mask coordinates are normalized [0, 1]; multiply by image size to get pixel space.
-        scale = _np.array([img_w, img_h], dtype=_np.float32)
+        scale = np.array([img_w, img_h], dtype=np.float32)
 
         # --- build flat entry list ---
         entries = []
         for _, row in df.iterrows():
-            coords = _np.asarray(row['mask'], dtype=_np.float32).reshape(-1, 2)
+            coords = np.asarray(row['mask'], dtype=np.float32).reshape(-1, 2)
             if coords.shape[0] < 3:
                 continue
             coords = coords * scale
@@ -842,8 +840,6 @@ class MainWindow(QMainWindow):
         if self._detection_cache is None:
             QToolTip.hideText()
             return
-        import cv2 as _cv2
-        from PySide6.QtGui import QCursor
         cache = self._detection_cache
         px, py = pos.x(), pos.y()
         # Discard positions outside the image
@@ -857,7 +853,7 @@ class MainWindow(QMainWindow):
             x1, y1, x2, y2 = entry['bbox']
             if not (x1 <= px <= x2 and y1 <= py <= y2):
                 continue
-            if _cv2.pointPolygonTest(entry['coords'], (float(px), float(py)), False) >= 0:
+            if cv2.pointPolygonTest(entry['coords'], (float(px), float(py)), False) >= 0:
                 QToolTip.showText(QCursor.pos(), entry['tooltip'], self.viewer)
                 return
         QToolTip.hideText()
@@ -874,7 +870,7 @@ class MainWindow(QMainWindow):
     # Region selection  (Shift + click)
     # =========================================================================
 
-    def RegionSelected(self, rect):
+    def _on_region_selected(self, rect):
         """Called when the user finishes a rubber-band region selection.
 
         Args:
@@ -938,11 +934,9 @@ class MainWindow(QMainWindow):
         self._file_browser_panel_anchor = None
         # Set initial directory
         if self._image_path:
-            import os
             dir_path = os.path.dirname(self._image_path)
             self._file_browser_panel.set_directory(dir_path)
         else:
-            import os
             self._file_browser_panel.set_directory(os.getcwd())
 
     def _on_inference_status(self, text: str):
@@ -961,7 +955,7 @@ class MainWindow(QMainWindow):
         self.min_value = min_value
         self.max_value = max_value
         self.show_detection_stats()
-        self.refreshPredictionImage()
+        self._refresh_prediction_image()
         self._statusbar.showMessage(f"Model processed image in {elapsed:.2f} seconds")
         self._finish_inference_ui()
         self._update_actions_enabled()
@@ -1033,7 +1027,7 @@ class MainWindow(QMainWindow):
             self.write_info(f"Avg area        : {a_um2:.2f} µm²")
             self.write_info(f"Avg volume      : {v_um3:.2f} µm³")
 
-    def refreshPredictionImage(self):
+    def _refresh_prediction_image(self):
         """Rebuild the prediction overlay from the current slider/option settings.
 
         Maps the cell-size slider range onto the detection size range, filters
@@ -1042,7 +1036,7 @@ class MainWindow(QMainWindow):
         """
         min_value = (self.max_value - self.min_value) * self.cellSizeSlider.value()[0] / 100 + self.min_value
         max_value = (self.max_value - self.min_value) * self.cellSizeSlider.value()[1] / 100 + self.min_value
-        filtered_detections = self.getFilteredDetections(min_value, max_value)
+        filtered_detections = self._get_filtered_detections(min_value, max_value)
         self.prediction_image = plot_predictions(
             self.original_image.copy(),
             filtered_detections["mask"].tolist(),
@@ -1051,9 +1045,9 @@ class MainWindow(QMainWindow):
             outline_thickness=2,
             draw_labels=self.chkDrawLabels.isChecked(),
         )
-        self.setCurrentImage(False)
+        self._set_current_image(False)
 
-    def getFilteredDetections(self, min_value, max_value):
+    def _get_filtered_detections(self, min_value, max_value):
         """Return detections whose size falls within the given range.
 
         Uses area-based segmentation filtering when the detections carry
@@ -1078,7 +1072,6 @@ class MainWindow(QMainWindow):
                 size_metric="area",
             )
         else:
-            from model.utils import filter_detections
             return filter_detections(self.detections, min_size=min_value, max_size=max_value)
 
     # =========================================================================

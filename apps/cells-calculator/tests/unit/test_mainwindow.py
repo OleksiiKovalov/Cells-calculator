@@ -1,9 +1,7 @@
 """GUI-layer tests (run off-screen via the qapp fixture)."""
-import os
 from pathlib import Path
 
 import pandas as pd
-import pytest
 
 
 def test_compute_grid_dims_bounds(qapp):

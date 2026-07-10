@@ -9,22 +9,11 @@ from model.utils import results_to_pandas
 
 class YoloSegmenter(BaseSegmenter):
     """
-    Instance segmentation using YOLO11 model.
-
-    Provides interface to YOLOv8/YOLO11 for single-image instance segmentation.
+    Instance segmentation using an Ultralytics YOLO segmentation model.
 
     Attributes:
-        model (YOLO): YOLOv8/YOLO11 segmentation model.
+        model (YOLO): The Ultralytics YOLO segmentation model.
     """
-    DETECTION_COLUMNS = [
-        "id_label",
-        "box",
-        "mask",
-        "confidence",
-        "diameter",
-        "area",
-        "volume",
-    ]
 
     def init_model(self, path_to_model: str):
         """
@@ -63,6 +52,5 @@ class YoloSegmenter(BaseSegmenter):
             **kwargs
         )[0]
         detections = results_to_pandas(outputs, True)
-        #self.detections['box'] = self.detections['box'].apply(lambda b: b * np.array([self.w, self.h, self.w, self.h])       )
         return detections
 

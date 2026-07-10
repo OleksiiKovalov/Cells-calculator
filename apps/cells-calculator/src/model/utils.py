@@ -1,6 +1,7 @@
 """Some useful functions used by the model or its submodels."""
 
 # Standard library imports
+import logging
 import os
 from typing import Any
 
@@ -21,6 +22,8 @@ from ultralytics.engine.results import Results
 
 # Local application imports
 from ui.app_globals import IMAGE_FILE_NAME_DETECTION
+
+logger = logging.getLogger(__name__)
 
 
 COLOR_NUMBER = {
@@ -103,7 +106,7 @@ def safe_image_read(img_path, color_mode='color', channel=None):
     """
     try:
         if not os.path.exists(img_path):
-            print(f"Image file not found: {img_path}")
+            logger.warning("Image file not found: %s", img_path)
             return None
             
         extension = img_path.split('.')[-1].lower()
@@ -115,7 +118,7 @@ def safe_image_read(img_path, color_mode='color', channel=None):
                 image = lsm_to_channels_last(image)
                 if 0 <= channel < image.shape[-1]:
                     return image[:, :, channel]
-                print(f"Channel {channel} not available in LSM file")
+                logger.warning("Channel %s not available in LSM file", channel)
                 return None
             return image
         else:
@@ -132,13 +135,13 @@ def safe_image_read(img_path, color_mode='color', channel=None):
             image = cv2.imdecode(img_array, cv_flag)
             
             if image is None:
-                print(f"Failed to read image: {img_path}")
+                logger.warning("Failed to read image: %s", img_path)
                 return None
                 
             return image
             
-    except Exception as e:
-        print(f"Error reading image {img_path}: {str(e)}")
+    except Exception:
+        logger.exception("Error reading image %s", img_path)
         return None
 
 
@@ -157,7 +160,7 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
     """
     try:
         if image is None:
-            print("Cannot save None image")
+            logger.warning("Cannot save None image")
             return False
 
         filename = os.fspath(filename)
@@ -202,13 +205,13 @@ def safe_image_write(image, filename, quality=95, preserve_dtype=True):
             imsave(filename, image_to_save)
             write_success = os.path.exists(filename)
         else:
-            print(f"Unsupported image extension: {extension}")
+            logger.warning("Unsupported image extension: %s", extension)
             return False
 
         return bool(write_success and os.path.exists(filename))
 
-    except Exception as e:
-        print(f"Error saving image {filename}: {str(e)}")
+    except Exception:
+        logger.exception("Error saving image %s", filename)
         return False
 
 def read_standard_img(img_path):
@@ -251,9 +254,12 @@ def filter_detections(
     img_size: tuple = (512, 512)
 ) -> pd.DataFrame:
     """
-    [DEPRECATED] Filters bounding boxes based on their area.
-    No longer used - new inference pipeline implemented.
-    
+    Filters bounding boxes based on their area.
+
+    Legacy box-only fallback used by the UI when detections carry bounding
+    boxes but no segmentation masks (see MainWindow._get_filtered_detections);
+    the mask-based pipeline uses filter_segmentation_detections instead.
+
     Bboxes of size < min_size or > max_size are removed.
     Area is measured in % of image size (between 0.0 and 1.0).
 
@@ -309,7 +315,7 @@ def get_segmentation_detections_range(
     Returns the (min, max) values of the given size metric across all detections.
 
     Args:
-        detections: DataFrame as returned by results_to_pandas / sahi_to_pandas.
+        detections: detections DataFrame as returned by the segmenters.
         size_metric: column to inspect — "area", "diameter", or "volume".
 
     Returns:
@@ -328,47 +334,36 @@ def get_segmentation_detections_range(
 
 def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataFrame:
     """Converts ultralytics Results instance to pandas DataFrame for easy filtering."""
-    if not store_bin_mask:
-        data: dict[str, list[Any]] = {
-            "id_label": [],
-            "box": [],
-            "mask": [],
-            "confidence": [],
-            "diameter": [],
-            "area": [],
-            "volume": []
-        }
-    else:
-        data = {
-            "id_label": [],
-            "box": [],
-            "mask": [],
-            "confidence": [],
-            "diameter": [],
-            "area": [],
-            "volume": [],
-            "bin_mask": []
-        }
+    data: dict[str, list[Any]] = {
+        "id_label": [],
+        "box": [],
+        "mask": [],
+        "confidence": [],
+        "diameter": [],
+        "area": [],
+        "volume": [],
+    }
+    if store_bin_mask:
+        data["bin_mask"] = []
     # No masks at all (zero detections) -> return an empty, correctly-typed frame
     # instead of crashing on outputs.masks.xyn (outputs.masks is None).
     if outputs.masks is None:
         return pd.DataFrame(data)
     for i, _ in enumerate(outputs.masks.xyn):
         if len(outputs.masks.xyn[i]) == 0:
-            pass
-        else:
-            data['id_label'].append(i)
-            box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
-            box[2:] -= box[:2]
-            data['box'].append(box)
-            data['mask'].append(outputs.masks.xyn[i])
-            data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
-            bin_mask, morphology = plot_mask(outputs.masks.xyn[i], image_size=outputs.orig_shape)
-            data['diameter'].append(morphology['diameter'])
-            data['area'].append(morphology['area'])
-            data['volume'].append(morphology['volume'])
-            if store_bin_mask is True:
-                data['bin_mask'].append(bin_mask)
+            continue
+        data['id_label'].append(i)
+        box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
+        box[2:] -= box[:2]
+        data['box'].append(box)
+        data['mask'].append(outputs.masks.xyn[i])
+        data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
+        bin_mask, morphology = plot_mask(outputs.masks.xyn[i], image_size=outputs.orig_shape)
+        data['diameter'].append(morphology['diameter'])
+        data['area'].append(morphology['area'])
+        data['volume'].append(morphology['volume'])
+        if store_bin_mask:
+            data['bin_mask'].append(bin_mask)
     return pd.DataFrame(data)
 
 def plot_mask(in_mask: NDArray, image_size=(1000, 1000)) -> tuple[NDArray, dict]:
@@ -629,6 +624,8 @@ def resize_and_pad_cv(image, target_width, target_height, anti_aliasing=True,
     elif resized.ndim == 3:
         pad_width_3d = pad_width + ((0, 0),)  # no padding on channels
         padded = np.pad(resized, pad_width_3d, mode='constant', constant_values=0)
+    else:
+        raise ValueError(f"resize_and_pad_cv expects a 2D or 3D image, got ndim={resized.ndim}")
 
     if return_transform:
         return padded, {"scale": scale, "pad_x": float(left), "pad_y": float(top)}
@@ -704,7 +701,7 @@ def safergb2gray(image):
 def show_error_message(title, message):
     """Show error message box to user"""
     msg_box = QMessageBox()
-    msg_box.setIcon(QMessageBox.Critical)
+    msg_box.setIcon(QMessageBox.Icon.Critical)
     msg_box.setWindowTitle(title)
     msg_box.setText(message)
     msg_box.exec()

@@ -37,7 +37,7 @@ app.main()  (started by the thin root main.py launcher, which puts src/ on the p
   └─ load_models_on_startup()          # read modelconfig.json -> register_model(...)
   └─ import ui.imports                 # staged heavy-lib preload, advancing the splash
   └─ MainWindow() + _register_segmenters() + showMaximized()
-  └─ close_splash() + app.exec_()
+  └─ close_splash() + app.exec()
 ```
 
 `load_models_on_startup()` reads `modelconfig.json`, keeps the entries whose
@@ -56,11 +56,11 @@ Tools / File‑Browser panels), a menu and a status bar (image info + zoom).
 
 Responsibilities that used to live in the model layer now live here:
 - `load_image()` → `model.utils.read_img()` → `ImageViewer.set_image()`.
-- `callInference()` builds a `Model` for the selected entry and runs it on an
+- `_start_inference()` builds a `Model` for the selected entry and runs it on an
   `InferenceWorker` (QThread); `_on_inference_finished()` stores the detections,
   builds the tooltip grid, seeds the size‑filter range, renders the overlay and
   prints stats.
-- `refreshPredictionImage()` / `getFilteredDetections()` filter by area and
+- `_refresh_prediction_image()` / `_get_filtered_detections()` filter by area and
   re‑render via `model.utils.plot_predictions` over a copy of the original image.
 - `show_detection_stats()` prints the morphology summary, including µm values
   when a µm/px scale is set (`morphology_to_micrometers`).
@@ -155,7 +155,7 @@ Open image ── read_img() ──> RGB uint8 ndarray ──> ImageViewer
                  DataFrame[id_label, box, mask, confidence, diameter, area, volume]
                                    ▼
    _on_inference_finished: build tooltip grid · seed size range ·
-                           show_detection_stats() · refreshPredictionImage()
+                           show_detection_stats() · _refresh_prediction_image()
                                    ▼
             plot_predictions(original.copy(), filtered masks) ──> overlay shown
 ```

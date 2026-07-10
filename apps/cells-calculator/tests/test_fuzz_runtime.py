@@ -12,17 +12,13 @@ import os
 
 import pytest
 
-from tests.fuzzing.runner import ROOT, _enabled_models, run
+from tests._models import BACKEND_DEP, DOWNLOAD_HINTS, ROOT, enabled_models
+from tests.fuzzing.runner import run
 
 MAX_CASES = int(os.environ.get("FUZZ_MAX_CASES", "20"))
 SEED = int(os.environ.get("FUZZ_SEED", "20240614"))
 
-BACKEND_DEP = {"yolo": "ultralytics", "instanseg": "instanseg",
-               "cellpose": "cellpose", "stardist": "stardist"}
-_DOWNLOAD_HINTS = ("download", "url", "connection", "http", "timed out",
-                   "no such file", "not found", "certificate")
-
-_MODELS = list(_enabled_models().items())
+_MODELS = list(enabled_models().items())
 
 
 @pytest.mark.parametrize("name,data", _MODELS, ids=[m[0] for m in _MODELS])
@@ -37,7 +33,7 @@ def test_runtime_fuzz_each_model(name, data):
     try:
         rc = run(name, max_cases=MAX_CASES, seed=SEED, profile="mixed", corpus_dir=None)
     except Exception as exc:  # model weights download / offline backend -> skip
-        if any(h in str(exc).lower() for h in _DOWNLOAD_HINTS):
+        if any(h in str(exc).lower() for h in DOWNLOAD_HINTS):
             pytest.skip(f"{name}: backend/weights unavailable ({exc})")
         raise
 

@@ -3,7 +3,7 @@
 These exercise the label-map -> DataFrame conversion directly on synthetic
 masks, so they need neither model weights nor a forward pass. StarDist's module
 imports TensorFlow at import time; importorskip handles environments without it
-(including a torch/PyQt-before-TF DLL load failure, which raises ImportError).
+(including a torch/PySide6-before-TF DLL load failure, which raises ImportError).
 """
 import numpy as np
 import pytest

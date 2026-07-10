@@ -1,9 +1,7 @@
 # Standard library imports
-import inspect
 import json
 import os
 from collections import OrderedDict
-from typing import Any
 
 # Third-party imports
 import numpy as np
@@ -16,7 +14,7 @@ from shapely.geometry import shape
 # Local application imports
 from ui.errorhandling import app_logger
 from model.BaseSegmenter import BaseSegmenter
-from model.utils import IDENTITY_TRANSFORM, plot_mask, resize_and_pad_cv
+from model.utils import IDENTITY_TRANSFORM, resize_and_pad_cv
 
 # InstanSeg's eval_medium_image uses a fixed overlap window; inputs narrower than
 # that window crash. Pad small images up to a safe floor before inference.
@@ -82,11 +80,7 @@ class InstansegSegmenter(BaseSegmenter):
 
         app_logger().warning(f"InstansegSegmenter: Device used: {self.device}")
 
-    def call_inference(
-        self,
-        input_image,
-        **kwargs
-    ):
+    def call_inference(self, input_image):
         """
         Segment cells/nuclei with InstanSeg at x20 magnification.
 
@@ -95,7 +89,6 @@ class InstansegSegmenter(BaseSegmenter):
 
         Args:
             input_image: Input microscopy image (array) to segment.
-            **kwargs: Additional inference configuration.
 
         Returns:
             pd.DataFrame: Instance segmentation results with the standard detection columns.
@@ -103,7 +96,7 @@ class InstansegSegmenter(BaseSegmenter):
         Raises:
             RuntimeError: If InstanSeg inference fails.
         """
-        config_node = self.model_data['x20'] if 'x20' in self.model_data else None
+        config_node = self.model_data['x20'] if self.model_data and 'x20' in self.model_data else None
         app_logger().info('Using x20 configuration for InstanSeg inference.')
         if config_node is not None:
             app_logger().info('InstanSeg config found')
@@ -148,21 +141,15 @@ class InstansegSegmenter(BaseSegmenter):
             if not method:
                 raise AttributeError(f"Method '{method_name}' not found on model")
 
-            # Check if method accepts tile_size parameter
-            sig = inspect.signature(method)
-            has_tile_size = 'tile_size' in sig.parameters
-
-            # Prepare base arguments
-            kwargs = {
-                'image': img_inference,
-                'return_image_tensor': False,
-                'target': 'cells',
-                'pixel_size': pixel_size
-            }
-            labeled_output = method(**kwargs)
+            labeled_output = method(
+                image=img_inference,
+                return_image_tensor=False,
+                target='cells',
+                pixel_size=pixel_size,
+            )
             return self.instanseg_results_to_pandas(labeled_output)
         except Exception as e:
-            raise RuntimeError(f"Error when inferrecing InstanSeg: {e}")
+            raise RuntimeError(f"Error while running InstanSeg inference: {e}") from e
 
     def _ensure_eval_window_size(self, image, method_name, tile_size):
         """Pad very narrow inputs so InstanSeg's fixed overlap is valid.
@@ -262,43 +249,21 @@ class InstansegSegmenter(BaseSegmenter):
         orig_h, orig_w = getattr(self, "_original_shape", None) or (out_h, out_w)
 
         instanseg_objects = labels_to_features(label_map_np)
-        data: dict[str, list[Any]] = {
-            'id_label': [],
-            'box': [],
-            'mask': [],
-            'confidence': [],
-            'diameter': [],
-            'area': [],
-            'volume': [],
-        }
+        data = self._new_detection_frame()
 
         features = instanseg_objects['features']
         for i, feature in enumerate(features):
-            geom = shape(feature['geometry'])  # Convert to shapely geometry
-            poly, p_mask = self._extract_polygon_from_geometry(geom)
+            poly, p_mask = self._extract_polygon_from_geometry(feature['geometry'])
             if poly is None:
                 continue
             norm_mask = self.to_original_norm(p_mask, src_shape=(out_h, out_w))
-            # Box from the mapped contour's bounds (normalized, original space).
-            x_min, y_min = norm_mask.min(axis=0)
-            x_max, y_max = norm_mask.max(axis=0)
-            box = np.array([
-                x_min,
-                y_min,
-                x_max - x_min,
-                y_max - y_min,
-            ], dtype=np.float32)
-
-            data['id_label'].append(i)
-            data['box'].append(box)
-            data['mask'].append(norm_mask)
-            #todo restore confidence
-            data['confidence'].append(
-                1 #outputs.boxes.conf[i].cpu().detach().numpy()
+            # InstanSeg does not expose per-object confidence; use 1.0.
+            self._append_detection(
+                data,
+                id_label=i,
+                norm_mask=norm_mask,
+                confidence=1.0,
+                original_shape=(orig_h, orig_w),
             )
-            bin_mask, morphology = plot_mask(norm_mask, image_size=(orig_h, orig_w))
-            data['diameter'].append(morphology['diameter'])
-            data['area'].append(morphology['area'])
-            data['volume'].append(morphology['volume'])
 
         return pd.DataFrame(data)

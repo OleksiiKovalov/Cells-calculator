@@ -10,7 +10,6 @@ import json
 import os
 import traceback
 from collections import OrderedDict
-from typing import Any, Dict, List
 
 # Third-party imports
 import cv2
@@ -23,7 +22,6 @@ from stardist.models import model2d, StarDist2D
 # Local application imports
 from ui.errorhandling import app_logger
 from model.BaseSegmenter import BaseSegmenter
-from model.utils import plot_mask
 
 
 class StardistSegmenter(BaseSegmenter):
@@ -31,20 +29,17 @@ class StardistSegmenter(BaseSegmenter):
 
     def init_model(self, path_to_model: str):
         """Load a built-in or custom StarDist model for x20 segmentation."""
-        self.is_custom_model = False
         app_logger().warning(
             f"Stardist: Num GPUs Available: "
             f"{len(tf.config.list_physical_devices('GPU'))}"
         )
         if path_to_model in ("2D_versatile_fluo", "2D_versatile_he", "2D_paper_dsb2018"):
-            self.is_custom_model = False
             self.model = StarDist2D.from_pretrained(path_to_model)
             self.image_preprocess_settings_default = json.loads(
                 '[{"gray2rgb":""},{"normalize":"1,99.8"}]',
                 object_pairs_hook=OrderedDict,
             )
         else:
-            self.is_custom_model = True
             path = os.path.dirname(path_to_model)
             name = os.path.basename(path_to_model)
             self.model = StarDist2D(None, name=name, basedir=path)
@@ -94,7 +89,6 @@ class StardistSegmenter(BaseSegmenter):
         self,
         instances,
         scores=None,
-        labels=None,
     ) -> pd.DataFrame:
         """Convert a StarDist label map to the standard detections DataFrame.
 
@@ -103,19 +97,11 @@ class StardistSegmenter(BaseSegmenter):
         which undoes any resize/pad recorded during ``preprocess`` — so masks
         align on the original image, matching the other segmenters.
         """
-        data: Dict[str, List[Any]] = {
-            "id_label": [],
-            "box": [],
-            "mask": [],
-            "confidence": [],
-            "diameter": [],
-            "area": [],
-            "volume": [],
-        }
+        data = self._new_detection_frame()
         props = regionprops(instances)
 
         src_shape = instances.shape[:2]
-        original_h, original_w = getattr(self, "_original_shape", None) or src_shape
+        original_shape = getattr(self, "_original_shape", None) or src_shape
 
         for i, prop in enumerate(props):
             binary_mask = (instances == prop.label).astype(np.uint8)
@@ -136,21 +122,13 @@ class StardistSegmenter(BaseSegmenter):
 
             # Map the contour from label-map space to [0, 1] on the original image.
             norm_mask = self.to_original_norm(pts.reshape(-1, 2), src_shape=src_shape)
-            # Box from the mapped contour's bounds (normalized, original space).
-            x_min, y_min = norm_mask.min(axis=0)
-            x_max, y_max = norm_mask.max(axis=0)
-            box = [x_min, y_min, x_max - x_min, y_max - y_min]
-
             confidence = scores[i] if scores is not None and i < len(scores) else None
-
-            data["id_label"].append(prop.label)
-            data["box"].append(box)
-            data["mask"].append(norm_mask)
-            data["confidence"].append(confidence)
-
-            _, morphology = plot_mask(norm_mask, image_size=(original_h, original_w))
-            data["diameter"].append(morphology["diameter"])
-            data["area"].append(morphology["area"])
-            data["volume"].append(morphology["volume"])
+            self._append_detection(
+                data,
+                id_label=prop.label,
+                norm_mask=norm_mask,
+                confidence=confidence,
+                original_shape=original_shape,
+            )
 
         return pd.DataFrame(data)

@@ -3,9 +3,9 @@ import argparse
 import json
 import sys
 import traceback
-from collections import OrderedDict
 from pathlib import Path
 
+from tests._models import KNOWN_MODELS, enabled_models as _enabled_models
 from .generation import PROFILES, generate_case
 from .oracles import check_detections
 
@@ -17,24 +17,8 @@ _SRC = ROOT / "src"
 if _SRC.exists() and str(_SRC) not in sys.path:
     sys.path.insert(0, str(_SRC))
 
-MODEL_CONFIG = ROOT / "modelconfig.json"
 DEFAULT_CORPUS = ROOT / "testimages"
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp", ".lsm"}
-
-KNOWN_MODELS = {
-    "yolo": "model.YOLOSegmenter.YoloSegmenter",
-    "instanseg": "model.InstanSegSegmenter.InstansegSegmenter",
-    "cellpose": "model.CellposeSegmenter.CellposeSegmenter",
-    "stardist": "model.StardistSegmenter.StardistSegmenter",
-}
-
-
-def _enabled_models():
-    cfg = json.loads(MODEL_CONFIG.read_text(encoding="utf-8"), object_pairs_hook=OrderedDict)
-    return OrderedDict(
-        (name, data) for name, data in cfg.items()
-        if str(data.get("enabled", "true")).lower() == "true"
-    )
 
 
 def discover_models():

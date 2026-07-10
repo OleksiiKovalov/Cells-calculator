@@ -370,7 +370,7 @@ class ImageViewer(QGraphicsView):
         pen = QPen(QColor(255, 220, 0))
         pen.setCosmetic(True)
         pen.setWidth(2)
-        pen.setStyle(Qt.DashLine)
+        pen.setStyle(Qt.PenStyle.DashLine)
         return pen
 
     # ---- selection helpers ----------------------------------------------
@@ -379,7 +379,7 @@ class ImageViewer(QGraphicsView):
         pen = QPen(QColor(100, 180, 255))
         pen.setCosmetic(True)
         pen.setWidth(1)
-        pen.setStyle(Qt.DashLine)
+        pen.setStyle(Qt.PenStyle.DashLine)
         return pen
 
     def _clear_selection(self):

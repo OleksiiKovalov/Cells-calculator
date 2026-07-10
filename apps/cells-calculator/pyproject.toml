@@ -23,11 +23,6 @@ module = "ui.*"
 check_untyped_defs = false
 warn_return_any = false
 
-# Staged "import the universe" module — intentionally side-effect-only.
-[[tool.mypy.overrides]]
-module = "ui.imports"
-ignore_errors = true
-
 # PySide6 stubs are strict enough to produce false positives; treat as untyped.
 [[tool.mypy.overrides]]
 module = "PySide6.*"
@@ -38,7 +33,7 @@ follow_imports = "skip"
 [[tool.mypy.overrides]]
 module = [
     "cv2.*", "pandas.*", "tifffile.*", "skimage.*", "scipy.*", "matplotlib.*",
-    "csbdeep.*", "superqt.*", "shapely.*", "ultralytics.*", "instanseg.*",
+    "csbdeep.*", "shapely.*", "ultralytics.*", "instanseg.*",
     "cellpose.*", "stardist.*", "tensorflow.*",
 ]
 ignore_missing_imports = true
