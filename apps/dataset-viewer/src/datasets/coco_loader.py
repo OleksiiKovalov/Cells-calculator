@@ -19,8 +19,10 @@ def _decode_compressed_rle(counts_str: str, size: list) -> list | None:
                 more = c & 32
                 x |= (c & 31) << (5 * k)
                 k += 1
-            if m > 2 and x <= cnts[-2]:
-                x += cnts[-2]
+                if not more and (c & 16):
+                    x |= -1 << (5 * k)   # sign-extend negative deltas
+            if m > 2:
+                x += cnts[m - 2]         # counts are deltas vs. two back
             cnts.append(x)
             m += 1
         return cnts
@@ -34,6 +36,7 @@ class COCOLoader(BaseDatasetLoader):
         self._images: dict[int, dict] = {}       # image_id -> info
         self._annotations: dict[int, list] = {}  # image_id -> [ann]
         self._categories: dict[int, str] = {}    # cat_id -> name
+        self._path_to_id: dict[str, int] = {}    # resolved abs path -> image_id
         self._load_all()
 
     # ------------------------------------------------------------------
@@ -46,6 +49,14 @@ class COCOLoader(BaseDatasetLoader):
             self.class_names = [
                 self._categories[k] for k in sorted(self._categories)
             ]
+        # Assign class ids only once every file is loaded, so indices are
+        # stable even when a later JSON introduces new categories.
+        cat_ids = sorted(self._categories)
+        for anns in self._annotations.values():
+            for entry in anns:
+                cat_id = entry.pop('cat_id')
+                entry['class_id'] = cat_ids.index(cat_id) if cat_id in self._categories else 0
+                entry['label'] = self._categories.get(cat_id, str(cat_id))
 
     def _find_json_files(self) -> list[str]:
         files = []
@@ -79,15 +90,11 @@ class COCOLoader(BaseDatasetLoader):
                 'split': split,
             }
 
-        cat_ids = sorted(self._categories)
         for ann in data['annotations']:
             img_id = ann['image_id']
             bbox = ann.get('bbox', [0, 0, 0, 0])  # [x, y, w, h] absolute pixels
-            cat_id = ann['category_id']
-            cls = cat_ids.index(cat_id) if cat_id in cat_ids else 0
             entry = {
-                'class_id': cls,
-                'label': self._categories.get(cat_id, str(cat_id)),
+                'cat_id': ann['category_id'],  # class_id/label filled in _load_all
                 'x': bbox[0], 'y': bbox[1],
                 'w': bbox[2], 'h': bbox[3],
             }
@@ -143,15 +150,23 @@ class COCOLoader(BaseDatasetLoader):
                 continue
             path = self._resolve_path(info)
             if path:
+                self._path_to_id[path] = img_id
                 result.append({'path': path, 'name': info['file_name'], 'id': img_id})
         return sorted(result, key=lambda x: x['name'])
 
     def get_annotations(self, image_path: str) -> list[dict]:
-        base = os.path.basename(image_path)
-        for img_id, info in self._images.items():
-            if os.path.basename(info['file_name']) == base:
-                return list(self._annotations.get(img_id, []))
-        return []
+        norm = os.path.normpath(image_path)
+        img_id = self._path_to_id.get(norm)
+        if img_id is None:
+            # Fallback for paths not seen via get_images: match by basename.
+            base = os.path.basename(image_path)
+            for iid, info in self._images.items():
+                if os.path.basename(info['file_name']) == base:
+                    img_id = iid
+                    break
+        if img_id is None:
+            return []
+        return list(self._annotations.get(img_id, []))
 
     # ------------------------------------------------------------------
     # Path resolution

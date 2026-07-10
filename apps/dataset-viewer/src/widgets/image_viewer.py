@@ -152,16 +152,9 @@ class ImageViewer(QGraphicsView):
         """Decode uncompressed COCO RLE and return a colored RGBA QImage."""
         try:
             import numpy as np
+            from datasets.rle import decode_mask
             h, w = size
-            flat = np.zeros(h * w, dtype=np.uint8)
-            idx, val = 0, 0
-            for cnt in counts:
-                end = min(idx + cnt, h * w)
-                flat[idx:end] = val
-                idx += cnt
-                val ^= 1
-            # Column-major (Fortran order) → row-major (h, w)
-            mask = flat.reshape(h, w, order='F')
+            mask = decode_mask(counts, size)
             rgba = np.zeros((h, w, 4), dtype=np.uint8)
             m = mask == 1
             rgba[m, 0] = color.red()

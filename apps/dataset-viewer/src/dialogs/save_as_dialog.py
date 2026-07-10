@@ -7,8 +7,9 @@ from PySide6.QtWidgets import (
 class SaveAsDialog(QDialog):
     FORMATS = ['YOLO', 'COCO', 'Pascal VOC', 'InstanSeg PTH']
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, start_dir: str = ""):
         super().__init__(parent)
+        self._start_dir = start_dir
         self.setWindowTitle("Save Dataset As")
         self.setFixedWidth(460)
 
@@ -35,7 +36,9 @@ class SaveAsDialog(QDialog):
         layout.addRow(buttons)
 
     def _browse(self):
-        folder = QFileDialog.getExistingDirectory(self, "Select Output Folder")
+        folder = QFileDialog.getExistingDirectory(
+            self, "Select Output Folder", self._folder_edit.text().strip() or self._start_dir
+        )
         if folder:
             self._folder_edit.setText(folder)
 

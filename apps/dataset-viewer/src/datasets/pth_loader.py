@@ -4,6 +4,7 @@ import shutil
 import tempfile
 import numpy as np
 from .base_loader import BaseDatasetLoader
+from .rle import encode_mask
 
 
 def _save_image(array: np.ndarray, path: str) -> None:
@@ -42,16 +43,21 @@ def _mask_to_annotations(item: dict) -> list[dict]:
     for iid in np.unique(mask):
         if iid == 0:
             continue
-        rows, cols = np.where(mask == iid)
+        instance = mask == iid
+        rows, cols = np.where(instance)
         if not len(rows):
             continue
         x, y = int(cols.min()), int(rows.min())
         w = int(cols.max()) - x + 1
         h = int(rows.max()) - y + 1
+        # Real mask shape as uncompressed RLE (the viewer renders 'mask'
+        # directly); bbox fields stay for exporters without mask support.
         result.append({
             'class_id': 0,
             'label': label,
-            'type': 'bbox',
+            'type': 'mask',
+            'rle_counts': encode_mask(instance),
+            'rle_size': [int(instance.shape[0]), int(instance.shape[1])],
             'x': float(x), 'y': float(y),
             'w': float(w), 'h': float(h),
         })

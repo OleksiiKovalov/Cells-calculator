@@ -4,8 +4,8 @@ from PySide6.QtWidgets import (
     QToolBar, QDockWidget, QLabel, QSizePolicy,
     QProgressDialog, QDialog, QApplication,
 )
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QKeySequence, QAction
+from PySide6.QtCore import Qt, QSize, QSettings
+from PySide6.QtGui import QKeySequence, QAction, QImageReader
 
 from widgets.image_viewer import ImageViewer
 from widgets.file_browser import FileBrowser
@@ -18,12 +18,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Dataset Viewer")
         self.resize(1440, 900)
         self._loader = None
+        self._settings = QSettings("DatasetViewer", "DatasetViewer")
 
         self._init_viewer()
         self._init_browser_dock()
         self._init_menu()
         self._init_toolbar()
         self._init_statusbar()
+        self._restore_ui_state()
 
     # ------------------------------------------------------------------
     # Widget setup
@@ -209,11 +211,34 @@ class MainWindow(QMainWindow):
         )
 
     # ------------------------------------------------------------------
+    # UI state persistence
+    # ------------------------------------------------------------------
+    def _restore_ui_state(self):
+        geometry = self._settings.value("geometry")
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+        state = self._settings.value("windowState")
+        if state is not None:
+            self.restoreState(state)
+
+    def closeEvent(self, event):
+        self._settings.setValue("geometry", self.saveGeometry())
+        self._settings.setValue("windowState", self.saveState())
+        super().closeEvent(event)
+
+    def _last_dir(self) -> str:
+        return str(self._settings.value("lastDir", ""))
+
+    def _remember_dir(self, path: str):
+        folder = path if os.path.isdir(path) else os.path.dirname(path)
+        self._settings.setValue("lastDir", folder)
+
+    # ------------------------------------------------------------------
     # Actions
     # ------------------------------------------------------------------
     def open_folder(self):
         folder = QFileDialog.getExistingDirectory(
-            self, "Open Dataset Folder", "",
+            self, "Open Dataset Folder", self._last_dir(),
             QFileDialog.ShowDirsOnly | QFileDialog.DontResolveSymlinks
         )
         if folder:
@@ -221,7 +246,7 @@ class MainWindow(QMainWindow):
 
     def open_file(self):
         path, _ = QFileDialog.getOpenFileName(
-            self, "Open Dataset File", "",
+            self, "Open Dataset File", self._last_dir(),
             "InstanSeg PTH (*.pth);;All Files (*)"
         )
         if path:
@@ -229,7 +254,14 @@ class MainWindow(QMainWindow):
 
     def _open_path(self, path: str):
         """Detect, load and display a dataset from a folder or file path."""
-        loader, fmt = detect_format(path)
+        try:
+            loader, fmt = detect_format(path)
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Failed to Open Dataset",
+                f"Could not load the dataset at:\n{path}\n\n{e}"
+            )
+            return
         if loader is None:
             QMessageBox.warning(
                 self, "Unknown Dataset Format",
@@ -238,6 +270,7 @@ class MainWindow(QMainWindow):
                 "For a .pth file use File → Open File…"
             )
             return
+        self._remember_dir(path)
         self._loader = loader
         self.browser.load_dataset(loader)
         self.dock.show()
@@ -257,12 +290,13 @@ class MainWindow(QMainWindow):
         from datasets.voc_exporter import VOCExporter
         from datasets.pth_exporter import PTHExporter
 
-        dialog = SaveAsDialog(self)
+        dialog = SaveAsDialog(self, start_dir=self._last_dir())
         if dialog.exec() != QDialog.Accepted:
             return
 
         fmt = dialog.selected_format()
         dest = dialog.selected_folder()
+        self._remember_dir(dest)
 
         exporter = {
             'YOLO': YOLOExporter,
@@ -298,7 +332,6 @@ class MainWindow(QMainWindow):
         name = os.path.basename(path)
         n = len(annotations)
         ann_txt = f"{n} annotation{'s' if n != 1 else ''}"
-        from PySide6.QtGui import QImageReader
         size = QImageReader(path).size()
         dim_txt = f"{size.width()}×{size.height()}" if size.isValid() else ""
         parts = [name, dim_txt, ann_txt]

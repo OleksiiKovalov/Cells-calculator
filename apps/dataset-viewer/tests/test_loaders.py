@@ -50,3 +50,46 @@ def test_images_resolve_to_existing_files():
     loader, _ = detect_format(sample("coco"))
     for img in _all_images(loader):
         assert os.path.isfile(img["path"])
+
+
+def test_yolo_split_images_layout(tmp_path):
+    """Datasets laid out as <split>/images + <split>/labels are detected."""
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QImage
+
+    root = tmp_path / "ds"
+    for split in ("train", "val"):
+        (root / split / "images").mkdir(parents=True)
+        (root / split / "labels").mkdir(parents=True)
+        img = QImage(10, 10, QImage.Format_RGB32)
+        img.fill(Qt.white)
+        assert img.save(str(root / split / "images" / f"{split}_a.png"))
+        (root / split / "labels" / f"{split}_a.txt").write_text("0 0.5 0.5 0.4 0.4\n")
+
+    loader, fmt = detect_format(str(root))
+    assert fmt == "YOLO"
+    assert sorted(loader.get_splits()) == ["train", "val"]
+    imgs = _all_images(loader)
+    assert len(imgs) == 2
+    anns = loader.get_annotations(imgs[0]["path"])
+    assert len(anns) == 1 and anns[0]["type"] == "bbox"
+
+
+def test_pth_instance_masks_become_rle_annotations():
+    """PTH-style instance masks surface as 'mask' annotations whose RLE
+    decodes back to the exact instance shape (bbox fields kept alongside)."""
+    import numpy as np
+    from datasets.pth_loader import _mask_to_annotations
+    from datasets.rle import decode_mask
+
+    m = np.zeros((8, 8), dtype=np.int32)
+    m[1:4, 1:4] = 1
+    m[5:8, 2:6] = 2
+
+    anns = _mask_to_annotations({"cell_masks": m})
+    assert len(anns) == 2
+    for iid, ann in enumerate(anns, start=1):
+        assert ann["type"] == "mask"
+        assert ann["rle_size"] == [8, 8]
+        assert (decode_mask(ann["rle_counts"], ann["rle_size"]) == (m == iid)).all()
+        assert ann["w"] > 0 and ann["h"] > 0

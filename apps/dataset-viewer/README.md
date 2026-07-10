@@ -56,7 +56,7 @@ Three tiny synthetic datasets ship under `datasets/` (`yolo_seg`, `coco`) for tr
 ```bash
 pip install -r requirements-dev.txt
 python -m pytest          # loaders, exporters, round-trips, format detection, GUI smoke
-python -m mypy app main.py
+python -m mypy src main.py
 ```
 
 ## Project layout

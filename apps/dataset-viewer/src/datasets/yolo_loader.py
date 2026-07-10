@@ -50,12 +50,23 @@ class YOLOLoader(BaseDatasetLoader):
     # Splits / images
     # ------------------------------------------------------------------
     def get_splits(self) -> list[str]:
+        # images/<split> layout
         images_root = os.path.join(self.folder, 'images')
-        if not os.path.isdir(images_root):
+        if os.path.isdir(images_root):
+            splits = sorted(
+                d for d in os.listdir(images_root)
+                if os.path.isdir(os.path.join(images_root, d))
+            )
+            if splits:
+                return splits
+        # <split>/images layout
+        try:
+            entries = os.listdir(self.folder)
+        except OSError:
             return []
         return sorted(
-            d for d in os.listdir(images_root)
-            if os.path.isdir(os.path.join(images_root, d))
+            d for d in entries
+            if os.path.isdir(os.path.join(self.folder, d, 'images'))
         )
 
     def get_images(self, split: str | None = None) -> list[dict]:
@@ -147,16 +158,23 @@ class YOLOLoader(BaseDatasetLoader):
 
     @staticmethod
     def _label_path(image_path: str) -> str:
-        """Swap the 'images' component for 'labels' and change extension to .txt."""
-        norm = image_path.replace('\\', '/')
-        parts = norm.split('/')
-        for i, part in enumerate(parts):
-            if part == 'images':
+        """Swap the last 'images' path component for 'labels' (ext → .txt).
+
+        The last occurrence is the one belonging to the dataset layout — a
+        dataset stored under e.g. ``D:/images/datasets/foo/images/train`` must
+        not have its first component rewritten. Falls back to a .txt next to
+        the image (flat layout).
+        """
+        flat = os.path.splitext(image_path)[0] + '.txt'
+        parts = image_path.replace('\\', '/').split('/')
+        for i in range(len(parts) - 1, -1, -1):
+            if parts[i] == 'images':
                 parts[i] = 'labels'
-                candidate = os.path.normpath('/'.join(parts))
-                return os.path.splitext(candidate)[0] + '.txt'
-        # Flat layout: same directory
-        return os.path.splitext(image_path)[0] + '.txt'
+                swapped = os.path.splitext(os.path.normpath('/'.join(parts)))[0] + '.txt'
+                if os.path.isfile(swapped) or not os.path.isfile(flat):
+                    return swapped
+                break
+        return flat
 
     @staticmethod
     def _image_size(path: str) -> tuple[int, int]:

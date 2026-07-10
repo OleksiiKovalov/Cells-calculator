@@ -30,7 +30,8 @@ class FileBrowser(QWidget):
         self.tree.setSelectionMode(QAbstractItemView.SingleSelection)
         self.tree.setAlternatingRowColors(True)
         self.tree.setUniformRowHeights(True)
-        self.tree.itemClicked.connect(self._on_clicked)
+        # currentItemChanged covers both mouse clicks and keyboard navigation;
+        # also connecting itemClicked would load every clicked image twice.
         self.tree.currentItemChanged.connect(self._on_current_changed)
         layout.addWidget(self.tree)
 
@@ -81,11 +82,8 @@ class FileBrowser(QWidget):
     # ------------------------------------------------------------------
     # Selection
     # ------------------------------------------------------------------
-    def _on_clicked(self, item: QTreeWidgetItem, _col: int = 0):
-        self._emit_image(item)
-
     def _on_current_changed(self, current: QTreeWidgetItem, _prev):
-        """Fires on keyboard navigation so arrow keys browse images."""
+        """Fires on mouse selection and keyboard navigation alike."""
         if current is not None:
             self._emit_image(current)
 

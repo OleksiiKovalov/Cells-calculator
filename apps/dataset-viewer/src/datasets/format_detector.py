@@ -49,11 +49,21 @@ def detect_format(folder: str):
         from .yolo_loader import YOLOLoader
         return YOLOLoader(folder), "YOLO"
 
-    # --- YOLO flat: image files paired with same-stem .txt files ---
     try:
         entries = os.listdir(folder)
     except OSError:
         return None, None
+
+    # --- YOLO split layout: <split>/images + <split>/labels subfolders ---
+    if any(
+        os.path.isdir(os.path.join(folder, d, 'images')) and
+        os.path.isdir(os.path.join(folder, d, 'labels'))
+        for d in entries
+    ):
+        from .yolo_loader import YOLOLoader
+        return YOLOLoader(folder), "YOLO"
+
+    # --- YOLO flat: image files paired with same-stem .txt files ---
 
     _IMG = {'.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.webp'}
     txt_stems = {os.path.splitext(f)[0] for f in entries if f.lower().endswith('.txt')}

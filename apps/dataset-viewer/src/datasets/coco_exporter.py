@@ -11,7 +11,7 @@ def _image_size(path: str) -> tuple[int, int]:
     return (s.width(), s.height()) if s.isValid() else (0, 0)
 
 
-def _segmentation(ann: dict) -> list:
+def _segmentation(ann: dict) -> list | dict:
     if ann.get('type') == 'polygon':
         points = ann.get('points')
         if points:
@@ -20,6 +20,9 @@ def _segmentation(ann: dict) -> list:
         if polygons:
             return [[coord for pt in poly for coord in (round(pt[0], 2), round(pt[1], 2))]
                     for poly in polygons]
+    if ann.get('type') == 'mask' and ann.get('rle_counts') and ann.get('rle_size'):
+        # Uncompressed COCO RLE, column-major — same form the loader accepts.
+        return {'counts': list(ann['rle_counts']), 'size': list(ann['rle_size'])}
     return []
 
 
@@ -30,9 +33,7 @@ class COCOExporter:
         total = sum(len(imgs) for _, imgs in image_sets)
         done = 0
 
-        img_dir = os.path.join(output_folder, 'images')
         ann_dir = os.path.join(output_folder, 'annotations')
-        os.makedirs(img_dir, exist_ok=True)
         os.makedirs(ann_dir, exist_ok=True)
 
         categories = [{'id': i + 1, 'name': n, 'supercategory': 'none'}
@@ -46,6 +47,13 @@ class COCOExporter:
             coco_images: list[dict] = []
             coco_anns: list[dict] = []
 
+            # Per-split image subfolders keep same-named files in different
+            # splits from overwriting each other; the loader probes
+            # images/<split>/<name> when resolving.
+            img_dir = (os.path.join(output_folder, 'images', split)
+                       if splits else os.path.join(output_folder, 'images'))
+            os.makedirs(img_dir, exist_ok=True)
+
             for img_info in images:
                 src = img_info['path']
                 base = os.path.basename(src)
@@ -55,7 +63,10 @@ class COCOExporter:
 
                 img_w, img_h = _image_size(src)
                 img_id += 1
-                coco_images.append({'id': img_id, 'file_name': base,
+                # file_name is relative to the dataset root so any loader can
+                # resolve it without knowing the split naming scheme.
+                file_name = f'images/{split}/{base}' if splits else f'images/{base}'
+                coco_images.append({'id': img_id, 'file_name': file_name,
                                     'width': img_w, 'height': img_h})
 
                 for ann in loader.get_annotations(src):

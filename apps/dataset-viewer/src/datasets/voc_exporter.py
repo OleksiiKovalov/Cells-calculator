@@ -4,6 +4,13 @@ from xml.etree import ElementTree as ET
 from .base_loader import BaseDatasetLoader
 
 
+def _image_size(path: str) -> tuple[int, int]:
+    from PySide6.QtGui import QImageReader
+    r = QImageReader(path)
+    s = r.size()
+    return (s.width(), s.height()) if s.isValid() else (0, 0)
+
+
 class VOCExporter:
     def export(self, loader: BaseDatasetLoader, output_folder: str, progress_cb=None) -> None:
         splits = loader.get_splits()
@@ -30,7 +37,8 @@ class VOCExporter:
                 stem = os.path.splitext(base)[0]
                 stems.append(stem)
 
-                xml_str = self._build_xml(base, loader.get_annotations(src))
+                img_w, img_h = _image_size(src)
+                xml_str = self._build_xml(base, img_w, img_h, loader.get_annotations(src))
                 with open(os.path.join(ann_dir, stem + '.xml'), 'w', encoding='utf-8') as f:
                     f.write(xml_str)
 
@@ -49,9 +57,14 @@ class VOCExporter:
                     f.write('\n'.join(stems) + '\n')
 
     @staticmethod
-    def _build_xml(filename: str, annotations: list[dict]) -> str:
+    def _build_xml(filename: str, img_w: int, img_h: int, annotations: list[dict]) -> str:
         root = ET.Element('annotation')
         ET.SubElement(root, 'filename').text = filename
+
+        size = ET.SubElement(root, 'size')
+        ET.SubElement(size, 'width').text = str(img_w)
+        ET.SubElement(size, 'height').text = str(img_h)
+        ET.SubElement(size, 'depth').text = '3'
 
         for ann in annotations:
             obj = ET.SubElement(root, 'object')
@@ -63,6 +76,15 @@ class VOCExporter:
             ET.SubElement(bndbox, 'ymin').text = str(int(round(y)))
             ET.SubElement(bndbox, 'xmax').text = str(int(round(x + w)))
             ET.SubElement(bndbox, 'ymax').text = str(int(round(y + h)))
+
+            # Extended-VOC <polygon> — the same form VOCLoader reads back.
+            if ann.get('type') == 'polygon':
+                points = ann.get('points') or (ann.get('polygons') or [[]])[0]
+                if len(points) >= 3:
+                    poly = ET.SubElement(obj, 'polygon')
+                    for i, (px, py) in enumerate(points, start=1):
+                        ET.SubElement(poly, f'x{i}').text = f'{px:.2f}'
+                        ET.SubElement(poly, f'y{i}').text = f'{py:.2f}'
 
         ET.indent(root, space='  ')
         return '<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(root, encoding='unicode') + '\n'

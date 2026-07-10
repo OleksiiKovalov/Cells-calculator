@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from .base_loader import BaseDatasetLoader
+from .rle import decode_mask
 
 
 def _load_image_as_array(path: str) -> np.ndarray:
@@ -29,6 +30,14 @@ def _anns_to_instance_mask(annotations: list[dict], h: int, w: int) -> np.ndarra
             points = ann.get('points') or (ann.get('polygons') or [[]])[0]
             if points:
                 _fill_polygon(mask, points, iid)
+                continue
+
+        if ann.get('type') == 'mask' and ann.get('rle_counts') and ann.get('rle_size'):
+            sub = decode_mask(ann['rle_counts'], ann['rle_size'])
+            hh, ww = min(h, sub.shape[0]), min(w, sub.shape[1])
+            region = sub[:hh, :ww] > 0
+            if region.any():
+                mask[:hh, :ww][region] = iid
                 continue
 
         x2 = min(x + bw, w)
