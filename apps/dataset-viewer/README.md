@@ -12,7 +12,13 @@ different format.
 - **Image viewer**: smooth zoom (2 %–3200 %), pan, fit-to-window, 1:1.
 - **Split-aware browser**: train / val / test grouped in a dockable tree;
   arrow keys walk through images.
-- **Convert** between any supported formats via *Save As…* with a progress bar.
+- **Convert** between any supported formats via *Prepare & Export…* with a
+  progress bar, or headlessly via `src/convert.py` (same engine, no GUI).
+- **Prepare** while exporting — to **any** format: preprocess (standardize to
+  RGB/uint8, resize toward N px, contrast) and (re)split train/val/test (keep the
+  source's or re-split by ratio+seed). Resize rescales bbox/polygon/RLE
+  coordinates, so a resized YOLO/COCO/VOC export stays correct — not only `.pth`.
+  See [Prepare & Export](#prepare--export).
 
 ## Supported formats
 | Format | Load | Export | Notes |
@@ -48,9 +54,28 @@ lazily, with a helpful message if missing).
 - **File → Open Folder…** (Ctrl+O) — auto-detect a YOLO / COCO / VOC dataset.
 - **File → Open File…** (Ctrl+Shift+O) — open an InstanSeg `.pth`.
 - Click an image (or use ← / →) to view it; toggle overlays with **A**.
-- **File → Save As…** (Ctrl+Shift+S) — convert to another format.
+- **File → Prepare & Export…** (Ctrl+Shift+S) — preprocess, split and export.
 
-Three tiny synthetic datasets ship under `datasets/` (`yolo_seg`, `coco`) for trying it out and for the test suite.
+### Prepare & Export
+The dialog turns a raw annotation set into a ready dataset in one step, for **any**
+target format:
+- **Preprocess** — *standardize* images to RGB/uint8, *resize* toward N px, and/or
+  *enhance contrast*. Resize rescales every annotation (bbox, polygon, and COCO
+  RLE mask), so a resized YOLO/COCO/VOC export stays geometrically correct.
+- **Split** — *keep source splits*, or *re-split by ratio* (train/val/test + seed)
+  to (re)partition an unsplit or differently-split dataset.
+- **InstanSeg PTH** target adds *file name* and *modality*; `val` splits are
+  written as **`Validation`** (the key InstanSeg's trainer reads).
+
+### Headless (scripting / batch)
+Same engine, no window:
+```bash
+python src/convert.py --src path/to/coco --out out --to yolo \
+    --resize --resize-target 512 --split ratio --train 0.7 --val 0.1 --test 0.2
+```
+Importable: `convert.convert_dataset(src, out, "pth", prepare_spec={...}, pth_options={...})`.
+
+Two tiny synthetic datasets ship under `datasets/` (`yolo_seg`, `coco`) for trying it out and for the test suite.
 
 ## Development
 ```bash
@@ -67,8 +92,10 @@ src/                    # import root
   app.py                #   entry point (Fusion style, High-DPI)
   main_window.py        #   window, menus, toolbar, actions
   widgets/              #   image_viewer (QGraphicsView), file_browser (dock tree)
-  datasets/             #   base_loader, format_detector, {yolo,coco,voc,pth}_{loader,exporter}
-  dialogs/              #   save_as_dialog
+  convert.py            #   headless prepare & convert (CLI + convert_dataset())
+  datasets/             #   base_loader, format_detector, rle, prepared_loader,
+                        #   {yolo,coco,voc,pth}_{loader,exporter}
+  dialogs/              #   save_as_dialog (Prepare & Export)
 datasets/               # bundled demo datasets
 docs/                   # SPEC.md + developer docs
 tests/                  # pytest suite

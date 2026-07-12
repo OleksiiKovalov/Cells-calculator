@@ -68,9 +68,9 @@ class MainWindow(QMainWindow):
         open_file_act.triggered.connect(self.open_file)
         file_m.addAction(open_file_act)
 
-        save_as_act = QAction("Save &As…", self)
+        save_as_act = QAction("&Prepare && Export…", self)
         save_as_act.setShortcut(QKeySequence("Ctrl+Shift+S"))
-        save_as_act.setStatusTip("Export the loaded dataset to a different format")
+        save_as_act.setStatusTip("Preprocess, split and export the loaded dataset to any format")
         save_as_act.triggered.connect(self.save_as)
         file_m.addAction(save_as_act)
 
@@ -145,8 +145,8 @@ class MainWindow(QMainWindow):
         open_act.triggered.connect(self.open_folder)
         tb.addAction(open_act)
 
-        save_as_act = QAction("Save As…", self)
-        save_as_act.setToolTip("Export dataset to another format  (Ctrl+Shift+S)")
+        save_as_act = QAction("Prepare & Export…", self)
+        save_as_act.setToolTip("Preprocess, split and export to any format  (Ctrl+Shift+S)")
         save_as_act.triggered.connect(self.save_as)
         tb.addAction(save_as_act)
 
@@ -289,6 +289,7 @@ class MainWindow(QMainWindow):
         from datasets.coco_exporter import COCOExporter
         from datasets.voc_exporter import VOCExporter
         from datasets.pth_exporter import PTHExporter
+        from datasets.prepared_loader import PreparedLoader
 
         dialog = SaveAsDialog(self, start_dir=self._last_dir())
         if dialog.exec() != QDialog.Accepted:
@@ -298,12 +299,18 @@ class MainWindow(QMainWindow):
         dest = dialog.selected_folder()
         self._remember_dir(dest)
 
-        exporter = {
-            'YOLO': YOLOExporter,
-            'COCO': COCOExporter,
-            'Pascal VOC': VOCExporter,
-            'InstanSeg PTH': PTHExporter,
-        }[fmt]()
+        # Preprocess + split are applied by wrapping the source loader; the
+        # exporters consume the prepared view unchanged.
+        source = PreparedLoader(self._loader, dialog.prepare_spec())
+
+        if fmt == 'InstanSeg PTH':
+            exporter = PTHExporter(**dialog.pth_options())
+        else:
+            exporter = {
+                'YOLO': YOLOExporter,
+                'COCO': COCOExporter,
+                'Pascal VOC': VOCExporter,
+            }[fmt]()
 
         progress = QProgressDialog(f"Exporting to {fmt}…", "Cancel", 0, 100, self)
         progress.setWindowTitle("Saving Dataset")
@@ -317,7 +324,7 @@ class MainWindow(QMainWindow):
             return not progress.wasCanceled()
 
         try:
-            exporter.export(self._loader, dest, on_progress)
+            exporter.export(source, dest, on_progress)
         except Exception as e:
             progress.close()
             QMessageBox.critical(self, "Export Failed", str(e))

@@ -1,0 +1,4 @@
+-r requirements.txt
+
+pytest>=8.0
+mypy>=1.20.0

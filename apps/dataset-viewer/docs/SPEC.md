@@ -203,24 +203,72 @@ XML built with `xml.etree.ElementTree` + `ET.indent(root, space='  ')` (Python 3
 ---
 
 ## `pth_exporter.py`
-Output: single `dataset.pth` in the chosen folder.
+Output: a single `.pth` (default `dataset.pth`) in the chosen folder.
 
 - Load each image as RGB numpy array via `PIL.Image.open().convert('RGB')`.
 - Convert annotations to int32 instance mask (H×W, 0=bg):
   - Bbox: fill `mask[y:y2, x:x2] = instance_id`
   - Polygon: use `PIL.ImageDraw` with a temporary `'L'` image, draw polygon with fill=1, then `mask[tmp_array > 0] = instance_id` (avoids 32-bit ImageDraw issues).
-- Split label mapping: `'train'→'Train'`, `'validation'→'Validation'`, `'test'→'Test'`, others → `.title()`.
-- Mask key: `'cell_masks'` if `loader.class_names[0] == 'cell'`, else `'nucleus_masks'`.
+  - RLE mask: decode via `rle.decode_mask` and stamp `instance_id`.
+- Split label mapping via `_split_label`: any name containing `train`→`Train`,
+  `val`→**`Validation`** (so YOLO/COCO `val` is not lost as `Val`), `test`→`Test`,
+  else `.title()`.
+- Mask key: `'cell_masks'` if `loader.class_names[0] == 'cell'`, else
+  `'nucleus_masks'` (overridable via the `mask_key` option).
 - `torch.save(dataset, path)`.
+
+**Constructor options** (defaults reproduce the original behaviour): `filename`,
+`modality`, `mask_key`. Preprocessing and splitting are NOT done here — wrap the
+source loader in a `PreparedLoader` (below) for that. `export(loader,
+output_folder, progress_cb)` signature is unchanged.
 
 ---
 
-## `save_as_dialog.py`
-`QDialog` with `QFormLayout`:
-- `QComboBox` with options: `['YOLO', 'COCO', 'Pascal VOC', 'InstanSeg PTH']`
-- Folder row: `QLineEdit` + `QPushButton("Browse…")` → `QFileDialog.getExistingDirectory`
-- `QDialogButtonBox(Ok | Cancel)`
-- `accept()` validates folder is not empty before closing.
+## `prepared_loader.py`
+`PreparedLoader(BaseDatasetLoader)` wraps a base loader and presents a *prepared*
+view, so **every** exporter produces preprocessed/re-split output with no exporter
+changes. Constructed with a `spec` dict: `standardize`, `resize`, `resize_target`,
+`resample`, `contrast`, `contrast_factor`, `split_mode` (`'keep'`|`'ratio'`),
+`ratios`, `seed`.
+
+- When an image transform is active, each image is **materialized** to a
+  `tempfile.mkdtemp(prefix='dv_prep_')` sub-dir (PIL `convert('RGB')` → resize
+  `scale=max(1,w//target,h//target)` → contrast); otherwise the original path is
+  used. Cleanup via `atexit`+`__del__` (mirrors `pth_loader.py`).
+- `get_splits`/`get_images` reflect the split (`keep` = source splits; `ratio` =
+  seeded shuffle into `train`/`val`/`test`).
+- `get_annotations(path)` scales the base annotations by that image's resize
+  factor `(sx,sy)`: `_scale_annotation` scales `x/y/w/h`, `points`, `polygons`,
+  and for `type=='mask'` decodes→nearest-resizes→`rle.encode_mask` (updating
+  `rle_counts`/`rle_size`). Pass-through when `sx==sy==1`.
+- `class_names`/`folder` proxy the base loader.
+
+---
+
+## `convert.py` (headless prepare & convert)
+Non-GUI counterpart of *File → Prepare & Export* — Dataset Viewer's own CLI for
+scripting/batch (not called by any other app).
+
+- `convert_dataset(src, out, target_format, prepare_spec=None, pth_options=None,
+  progress_cb=None)` — `detect_format(src)` → `PreparedLoader(loader,
+  prepare_spec)` → matching exporter → `export`. `pth_options` →
+  `PTHExporter(**pth_options)` for the PTH target.
+- `resolve_format(name)` accepts friendly aliases (`yolo`/`coco`/`voc`/`pth`/…).
+- Creates an off-screen `QApplication` on demand (loaders read sizes via
+  `QImageReader`), so it runs headless. CLI: `python src/convert.py --src … --out
+  … --to yolo --resize --resize-target 512 --split ratio …`.
+
+---
+
+## `save_as_dialog.py`  ("Prepare & Export")
+`QDialog`: target-format combo + output-folder row, then two groups that apply to
+**all** formats — **Preprocess** (standardize RGB/uint8; resize toward N px +
+resample; contrast ×factor) and **Split** (keep source splits | re-split by ratio
++ train/val/test + seed, ratio widgets enabled only for ratio) — plus an
+**InstanSeg PTH** group (file name, modality) shown only for that target.
+`prepare_spec()` returns the `PreparedLoader` spec; `pth_options()` the
+`PTHExporter` kwargs. `main_window.save_as` wraps the loader in a `PreparedLoader`
+and runs the chosen exporter.
 
 ---
 

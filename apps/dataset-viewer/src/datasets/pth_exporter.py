@@ -48,10 +48,43 @@ def _anns_to_instance_mask(annotations: list[dict], h: int, w: int) -> np.ndarra
     return mask
 
 
-_SPLIT_LABEL = {'train': 'Train', 'validation': 'Validation', 'test': 'Test'}
+def _split_label(split: str) -> str:
+    """Canonical InstanSeg split key for a source split name.
+
+    InstanSeg's training/test loaders key on 'Train' / 'Validation' / 'Test', so
+    a YOLO/COCO 'val' (or 'valid') split must map to 'Validation' — not 'Val',
+    which the loader would silently ignore.
+    """
+    low = split.lower()
+    if 'train' in low:
+        return 'Train'
+    if 'val' in low:
+        return 'Validation'
+    if 'test' in low:
+        return 'Test'
+    return split.title()
 
 
 class PTHExporter:
+    """Export a loaded dataset to an InstanSeg ``.pth`` (a ``torch.save`` dict).
+
+    Preprocessing and train/val/test splitting are NOT done here — wrap the
+    source loader in :class:`~datasets.prepared_loader.PreparedLoader` for that.
+    This exporter only turns whatever the loader presents into the InstanSeg
+    schema. Options:
+
+    * ``filename`` — output file name (default ``'dataset.pth'``).
+    * ``modality`` — ``image_modality`` tag on every item (default ``'Brightfield'``).
+    * ``mask_key`` — ``'cell_masks'`` / ``'nucleus_masks'``; ``None`` auto-picks
+      from the class names (``'cell'`` → cell, else nucleus).
+    """
+
+    def __init__(self, *, filename: str = 'dataset.pth', modality: str = 'Brightfield',
+                 mask_key: str | None = None):
+        self.filename = filename if filename.endswith('.pth') else f'{filename}.pth'
+        self.modality = modality
+        self.mask_key = mask_key
+
     def export(self, loader: BaseDatasetLoader, output_folder: str, progress_cb=None) -> None:
         try:
             import torch
@@ -63,34 +96,29 @@ class PTHExporter:
         total = sum(len(imgs) for _, imgs in image_sets)
         done = 0
 
-        mask_key = 'cell_masks' if (loader.class_names and loader.class_names[0] == 'cell') else 'nucleus_masks'
+        mask_key = self.mask_key or (
+            'cell_masks' if (loader.class_names and loader.class_names[0] == 'cell') else 'nucleus_masks')
         parent_dataset = os.path.basename(os.path.normpath(loader.folder))
 
         dataset: dict[str, list] = {}
-
         for split, images in image_sets:
             items = []
             for img_info in images:
                 src = img_info['path']
                 image = _load_image_as_array(src)
                 h, w = image.shape[:2]
-                annotations = loader.get_annotations(src)
-                mask = _anns_to_instance_mask(annotations, h, w)
-
+                mask = _anns_to_instance_mask(loader.get_annotations(src), h, w)
                 items.append({
                     'image': image,
                     'file_name': src,
                     'parent_dataset': parent_dataset,
-                    'image_modality': 'Brightfield',
+                    'image_modality': self.modality,
                     mask_key: mask,
                 })
-
                 done += 1
                 if progress_cb and not progress_cb(done, total):
                     return
-
-            label = _SPLIT_LABEL.get(split, split.title())
-            dataset[label] = items
+            dataset.setdefault(_split_label(split), []).extend(items)
 
         os.makedirs(output_folder, exist_ok=True)
-        torch.save(dataset, os.path.join(output_folder, 'dataset.pth'))
+        torch.save(dataset, os.path.join(output_folder, self.filename))
