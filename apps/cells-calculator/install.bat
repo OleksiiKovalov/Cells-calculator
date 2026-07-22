@@ -6,7 +6,7 @@ REM  2) Creates a conda environment and installs the app's dependencies.
 REM ============================================================================
 cd /d "%~dp0"
 
-set ENV_NAME=cells-calculator
+set ENV_NAME=cells-calculator-v4
 set PY_VERSION=3.13
 set CONDA_HOME=%USERPROFILE%\Miniconda3
 set INSTALLER=redistributables\Miniconda3-latest-Windows-x86_64.exe

@@ -17,7 +17,7 @@ if not defined CONDA_EXE (
 )
 
 REM Ensure the test tooling (pytest, hypothesis, pillow) is present.
-call "%CONDA_EXE%" run --no-capture-output --name cells-calculator python -m pip install -q -r requirements-dev.txt || (
+call "%CONDA_EXE%" run --no-capture-output --name cells-calculator-v4 python -m pip install -q -r requirements-dev.txt || (
     echo [ERROR] Failed to install test dependencies. & pause & exit /b 1
 )
 
@@ -28,5 +28,5 @@ REM                   stream live, so there is constant on-screen activity
 REM   --durations   : list the slowest tests at the end
 REM Force unbuffered Python so lines appear immediately (not in blocks).
 set PYTHONUNBUFFERED=1
-call "%CONDA_EXE%" run --no-capture-output --name cells-calculator python -m pytest -v -s --durations=20 --color=yes %*
+call "%CONDA_EXE%" run --no-capture-output --name cells-calculator-v4 python -m pytest -v -s --durations=20 --color=yes %*
 pause

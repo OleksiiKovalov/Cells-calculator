@@ -9,4 +9,4 @@ set "CONDA_EXE="
 for /f "delims=" %%I in ('where conda.exe 2^>nul') do if not defined CONDA_EXE set "CONDA_EXE=%%I"
 if not defined CONDA_EXE if exist "%CONDA_HOME%\Scripts\conda.exe" set "CONDA_EXE=%CONDA_HOME%\Scripts\conda.exe"
 
-call "%CONDA_EXE%" run --name cells-calculator --no-capture-output python main.py
+call "%CONDA_EXE%" run --name cells-calculator-v4 --no-capture-output python main.py

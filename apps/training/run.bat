@@ -2,7 +2,7 @@
 REM Launch Training Studio in its conda environment (created by install.bat).
 cd /d "%~dp0"
 
-set ENV_NAME=cells-calculator-training
+set ENV_NAME=cells-calculator-training-v4
 set CONDA_HOME=%USERPROFILE%\Miniconda3
 
 REM Find conda on PATH, otherwise the per-user Miniconda install.bat created.
