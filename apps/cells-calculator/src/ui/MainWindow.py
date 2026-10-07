@@ -118,6 +118,7 @@ class MainWindow(QMainWindow):
         self._detection_cache = None  # list of {bbox, coords, tooltip} built after inference
         self.inference_duration = 0
         self._last_inference_duration = 0.0
+        self._inference_count = 0  # successful inferences since app start
         self._inference_worker = None
         self._image_name = ""
         self._image_dims = (0, 0, 0)  # (width, height, channels)
@@ -949,6 +950,7 @@ class MainWindow(QMainWindow):
         elapsed = self._progress_panel.elapsed_seconds()
         self._last_inference_duration = elapsed
         self.inference_duration = elapsed
+        self._inference_count += 1
         self.detections = detections
         self._build_detection_cache()
         min_value, max_value = get_segmentation_detections_range(detections, size_metric="area")
@@ -995,7 +997,8 @@ class MainWindow(QMainWindow):
         w, h, ch = self._image_dims
         if spheroid_df is None or spheroid_df.empty:
             self.write_info(f"**************************************")
-            self.write_info(f"Image           : {self._image_name}")
+            self.write_info(f"Inference #{self._inference_count}")
+            self.write_info(f"Image          : {self._image_name}")
             self.write_info(f"Dimensions      : {w} × {h}  ({ch}ch)")
             self.write_info(f"Model           : {self.current_model.model_name}")
             self.write_info(f"Duration        : {self.inference_duration:.2f} seconds")
@@ -1009,6 +1012,7 @@ class MainWindow(QMainWindow):
         avg_volume = volume_norm * 1000
         num_cells = spheroid_df.shape[0]
         self.write_info(f"**************************************")
+        self.write_info(f"Inference #{self._inference_count}")
         self.write_info(f"Image           : {self._image_name}")
         self.write_info(f"Dimensions      : {w} × {h}  ({ch}ch)")
         self.write_info(f"Model           : {self.current_model.model_name}")
