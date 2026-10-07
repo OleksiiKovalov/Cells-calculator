@@ -984,7 +984,12 @@ class MainWindow(QMainWindow):
         self._progress_panel.hide()
         self._toolbar.setEnabled(True)
         self.btnCalculate.setEnabled(True)
-        self._inference_worker = None
+        worker, self._inference_worker = self._inference_worker, None
+        if worker is not None:
+            # Result/error/cancelled are emitted as run()'s last statement, so the
+            # thread is already exiting; wait so the QThread is never destroyed
+            # while still running.
+            worker.wait()
 
     def show_detection_stats(self):
         """Write detection summary statistics to the info panel.
