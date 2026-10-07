@@ -347,18 +347,22 @@ def results_to_pandas(outputs: Results, store_bin_mask:bool = False) -> pd.DataF
         data["bin_mask"] = []
     # No masks at all (zero detections) -> return an empty, correctly-typed frame
     # instead of crashing on outputs.masks.xyn (outputs.masks is None).
-    if outputs.masks is None:
+    masks = outputs.masks
+    if masks is None:
         return pd.DataFrame(data)
-    for i, _ in enumerate(outputs.masks.xyn):
-        if len(outputs.masks.xyn[i]) == 0:
+    boxes = outputs.boxes
+    if boxes is None:  # masks without boxes is not produced by YOLO; narrows the type
+        return pd.DataFrame(data)
+    for i, _ in enumerate(masks.xyn):
+        if len(masks.xyn[i]) == 0:
             continue
         data['id_label'].append(i)
-        box = outputs.boxes.xyxyn[i].cpu().detach().numpy()
+        box = boxes.xyxyn[i].cpu().detach().numpy()
         box[2:] -= box[:2]
         data['box'].append(box)
-        data['mask'].append(outputs.masks.xyn[i])
-        data['confidence'].append(outputs.boxes.conf[i].cpu().detach().numpy())
-        bin_mask, morphology = plot_mask(outputs.masks.xyn[i], image_size=outputs.orig_shape)
+        data['mask'].append(masks.xyn[i])
+        data['confidence'].append(boxes.conf[i].cpu().detach().numpy())
+        bin_mask, morphology = plot_mask(masks.xyn[i], image_size=outputs.orig_shape)
         data['diameter'].append(morphology['diameter'])
         data['area'].append(morphology['area'])
         data['volume'].append(morphology['volume'])

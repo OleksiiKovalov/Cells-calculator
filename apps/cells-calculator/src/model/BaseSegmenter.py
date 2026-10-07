@@ -129,11 +129,11 @@ class BaseSegmenter:
             pts[:, 0] *= fed_w / src_w
             pts[:, 1] *= fed_h / src_h
         # fed inference space -> original pixels
-        pts = invert_transform_points(pts, transform)
+        orig_pts = invert_transform_points(pts, transform)
         # original pixels -> normalized [0, 1]
-        pts[:, 0] /= orig_w
-        pts[:, 1] /= orig_h
-        return pts
+        orig_pts[:, 0] /= orig_w
+        orig_pts[:, 1] /= orig_h
+        return orig_pts
 
     # =====================================================================
     # Detection DataFrame assembly — shared by all segmenter converters

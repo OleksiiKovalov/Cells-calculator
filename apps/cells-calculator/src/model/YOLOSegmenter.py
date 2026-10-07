@@ -1,7 +1,9 @@
 # Standard library imports
+from typing import cast
 
 # Third-party imports
 from ultralytics import YOLO
+from ultralytics.engine.results import Results
 
 # Local application imports
 from model.BaseSegmenter import BaseSegmenter
@@ -42,7 +44,9 @@ class YoloSegmenter(BaseSegmenter):
         Returns:
             pd.DataFrame: Detections with the standard detection columns.
         """
-        outputs = self.model(
+        # YOLO.__call__ is typed as a union of list/iterator/tensor; with a single
+        # image and stream=False it always returns a list of Results.
+        results = cast(list[Results], self.model(
             input_image,
             device=self.device,
             conf=0.3,
@@ -50,7 +54,8 @@ class YoloSegmenter(BaseSegmenter):
             max_det=2000,
             retina_masks=True,
             **kwargs
-        )[0]
+        ))
+        outputs = results[0]
         detections = results_to_pandas(outputs, True)
         return detections
 
