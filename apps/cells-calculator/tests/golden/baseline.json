@@ -1,0 +1,42 @@
+{
+  "YOLO-512 Segmenter": {
+    "count": 79,
+    "area_sum": 0.090329,
+    "area_mean": 0.001143,
+    "diameter_mean": 0.037447,
+    "confidence_sum": 49.529561,
+    "confidence_mean": 0.626956
+  },
+  "InstanSeg V3 (512)": {
+    "count": 50,
+    "area_sum": 0.036976,
+    "area_mean": 0.00074,
+    "diameter_mean": 0.029437,
+    "confidence_sum": 50.0,
+    "confidence_mean": 1.0
+  },
+  "Neuroblastoma Inst V3.1": {
+    "count": 28,
+    "area_sum": 0.005135,
+    "area_mean": 0.000183,
+    "diameter_mean": 0.011513,
+    "confidence_sum": 28.0,
+    "confidence_mean": 1.0
+  },
+  "Neuroblastoma Inst V3.1(512)": {
+    "count": 11,
+    "area_sum": 0.048634,
+    "area_mean": 0.004421,
+    "diameter_mean": 0.072148,
+    "confidence_sum": 11.0,
+    "confidence_mean": 1.0
+  },
+  "Stardist trained 0602": {
+    "count": 99,
+    "area_sum": 0.072144,
+    "area_mean": 0.000729,
+    "diameter_mean": 0.02993,
+    "confidence_sum": 77.643734,
+    "confidence_mean": 0.78428
+  }
+}

@@ -1,0 +1,7 @@
+-r requirements.txt
+
+pytest>=8.0
+mypy>=1.20.0
+# Soft runtime deps, required to exercise the InstanSeg .pth loader/exporter:
+torch
+Pillow

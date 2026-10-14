@@ -1,0 +1,24 @@
+PySide6
+superqt
+numpy>=2.1,<2.3  # >=2.1 for TensorFlow/ml_dtypes on py3.13; <2.3 for numba/stardist
+scikit-image
+opencv-python
+pandas
+scikit-learn
+matplotlib
+tifffile
+# GPU (CUDA): install torch separately BEFORE this file:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+# (adjust cu128 to match your installed CUDA version: cu121, cu124, cu128, etc.)
+# The plain 'torch' line below is a CPU-only fallback for environments without a GPU.
+torch
+csbdeep
+ultralytics
+shapely
+instanseg-torch[io]
+cellpose
+stardist
+tensorflow
+PyYAML  # used by the dataset-viewer app (shares this env) for YOLO data.yaml
+
+

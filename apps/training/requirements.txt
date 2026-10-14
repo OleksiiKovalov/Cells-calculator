@@ -1,0 +1,27 @@
+# Image preview (GUI Open Image / Open Mask) + .pth I/O dependencies.
+numpy
+opencv-python
+scikit-image
+Pillow
+imagecodecs
+
+# torch is needed to read the prepared .pth (torch.load) and by the trainer.
+torch
+
+# GUI front-end
+PySide6>=6.6
+
+# --- Training / evaluation / export backend ---------------------------------
+# InstanSeg powers the Train / Evaluate / Export steps (a CUDA GPU is strongly
+# recommended for real training). The app auto-detects which backend is present
+# and adapts, so EITHER of the following works:
+#
+#   * Mainline (default below): the stock package. Trains with the standard API;
+#     `monai` is needed for the augmentation / evaluation path.
+instanseg-torch
+monai
+#
+#   * Cryobiology fork (adds early stopping via max_no_improvement + custom
+#     bits). To use it instead, comment out `instanseg-torch` above and install:
+#       pip install git+https://github.com/sonyalytv/instanseg_cryobiology.git
+#       pip install monai stardist edt

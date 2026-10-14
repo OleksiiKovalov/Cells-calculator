@@ -1,0 +1,22 @@
+{
+  "train": {
+    "model_folder": "my_first_instanseg",
+    "source_dataset": "my_dataset",
+    "target_segmentation": "C",
+    "requested_pixel_size": 0.5,
+    "num_epochs": 500,
+    "max_no_improvement": 5,
+    "hotstart_training": 5,
+    "resume_weights": ""
+  },
+  "evaluate": {
+    "set": "Test",
+    "target_segmentation": "C",
+    "save_images": true,
+    "cpu_and_ram": true
+  },
+  "export": {
+    "version": "1",
+    "show_example": false
+  }
+}
