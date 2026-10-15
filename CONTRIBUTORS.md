@@ -52,3 +52,6 @@
 * **Vuziian Y.** - *Data Labeling*
 * **Borovko L.** - *Data Labeling*
 * **Kovalov O.** - *tech-lead*
+
+**CellsCalculator V4.0** has been developed by the following students of NTU "KhPI":
+* **Kovalov O.** - *tech-lead*
